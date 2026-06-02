@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #111111;
+  color: #F5F5F5;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: #111111;
+  color: #F5F5F5;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@layer components {
+  .panel {
+    @apply border border-[#303030] bg-[#1B1B1B];
+  }
+
+  .field {
+    @apply w-full border border-[#303030] bg-[#111111] px-3 py-2.5 text-sm text-[#F5F5F5] outline-none transition focus:border-[#FFE600] focus:ring-2 focus:ring-[#FFE600]/40;
+  }
+
+  .label {
+    @apply mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#B0B0B0];
+  }
+
+  .button-primary {
+    @apply inline-flex items-center justify-center gap-2 bg-[#FFE600] px-4 py-2.5 text-sm font-semibold text-[#111111] transition hover:bg-[#FFD500] disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .button-secondary {
+    @apply inline-flex items-center justify-center gap-2 border border-[#303030] bg-[#1B1B1B] px-4 py-2.5 text-sm font-semibold text-[#F5F5F5] transition hover:border-[#FFE600] hover:text-[#FFE600] disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .button-yellow {
+    @apply inline-flex items-center justify-center gap-2 bg-[#FFE600] px-4 py-2.5 text-sm font-semibold text-[#111111] transition hover:bg-[#FFD500] disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .icon-button {
+    @apply inline-flex h-9 w-9 items-center justify-center border border-[#303030] bg-[#1B1B1B] text-[#B0B0B0] transition hover:border-[#FFE600] hover:bg-[#FFE600] hover:text-[#111111];
+  }
+}

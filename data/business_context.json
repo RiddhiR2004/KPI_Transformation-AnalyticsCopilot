@@ -1,0 +1,36 @@
+{
+  "industry": "Manufacturing",
+  "organization_level": "Function Head",
+  "kpi_count": 15,
+  "business_priorities": [
+    "Improve Gross Margin",
+    "Increase Asset Productivity",
+    "Improve Workplace Safety",
+    "Strengthen Forecast Accuracy"
+  ],
+  "business_challenges": [
+    "High Fuel Cost",
+    "Supply Chain Delays",
+    "Low Data Trust",
+    "Safety Compliance Risks",
+    "High Defect and Scrap Rates",
+    "Customer Churn and Complaints",
+    "Manual Data Collection"
+  ],
+  "top_kras": [
+    "Profitability",
+    "Customer Growth",
+    "Service Reliability",
+    "Risk Management",
+    "Asset Productivity"
+  ],
+  "functional_areas": [
+    "Sales",
+    "Supply Chain",
+    "Quality",
+    "Procurement",
+    "Operations",
+    "Customer Service"
+  ],
+  "updated_at": "2026-05-30T16:27:43.852393"
+}

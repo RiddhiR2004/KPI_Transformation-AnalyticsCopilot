@@ -1,0 +1,602 @@
+[
+  {
+    "id": "3590204f-1599-48d3-aa85-be13c1dc785b",
+    "label": "Business Context Created",
+    "detail": "Manufacturing / Function Head",
+    "created_at": "2026-06-02T10:35:28.917888"
+  },
+  {
+    "id": "860a3e6e-d0d7-4bac-9b0d-cff124176aaf",
+    "label": "Business Context Created",
+    "detail": "Manufacturing / Function Head",
+    "created_at": "2026-06-02T10:35:19.406947"
+  },
+  {
+    "id": "545f95a6-30ea-4b61-b1fa-e017be1615d6",
+    "label": "Prompt Generated",
+    "detail": "KPI generation prompt prepared in Prompt Studio",
+    "created_at": "2026-06-02T09:51:40.472049"
+  },
+  {
+    "id": "d9d93531-4084-4a82-8617-bef85f8a15e1",
+    "label": "Business Context Created",
+    "detail": "Manufacturing / Function Head",
+    "created_at": "2026-06-02T09:51:38.190002"
+  },
+  {
+    "id": "b8465727-8883-4654-89ef-97522935f9fb",
+    "label": "Business Context Created",
+    "detail": "Manufacturing / Function Head",
+    "created_at": "2026-06-02T09:51:36.889907"
+  },
+  {
+    "id": "068fe54b-c99b-47d7-b4ae-6197fac7d5e5",
+    "label": "Business Context Created",
+    "detail": "Manufacturing / Function Head",
+    "created_at": "2026-06-02T09:51:12.268589"
+  },
+  {
+    "id": "47ba42cb-fb47-49d3-9aa8-ba16300ae855",
+    "label": "Business Context Created",
+    "detail": "Manufacturing / Function Head",
+    "created_at": "2026-06-02T09:51:12.219907"
+  },
+  {
+    "id": "ec28514a-7b9e-4375-8fd2-8411176c1bce",
+    "label": "Business Context Created",
+    "detail": "Manufacturing / Function Head",
+    "created_at": "2026-06-02T09:51:11.175043"
+  },
+  {
+    "id": "dd580166-4eeb-4691-8904-e01e228a5c77",
+    "label": "Business Context Created",
+    "detail": "Manufacturing / Function Head",
+    "created_at": "2026-06-02T09:51:08.106396"
+  },
+  {
+    "id": "44944d38-e7c0-402b-846e-921d49ec3e1b",
+    "label": "Prompt Generated",
+    "detail": "KPI generation prompt prepared in Prompt Studio",
+    "created_at": "2026-06-02T09:50:35.760309"
+  },
+  {
+    "id": "1211fb8e-91ad-42cd-b74c-e07e38ffd62e",
+    "label": "Business Context Created",
+    "detail": "Manufacturing / Function Head",
+    "created_at": "2026-06-02T09:50:28.271639"
+  },
+  {
+    "id": "a70642c0-af6c-4eee-9cdc-42fe5b3b5b08",
+    "label": "Business Context Created",
+    "detail": "Manufacturing / Function Head",
+    "created_at": "2026-06-02T09:50:25.915030"
+  },
+  {
+    "id": "3f9a6a5f-2051-4329-9e84-fc1d0f399c56",
+    "label": "Prompt Saved",
+    "detail": "Prompt Studio edits saved",
+    "created_at": "2026-06-02T09:49:18.383043"
+  },
+  {
+    "id": "5d7482bb-f35a-4650-b117-215efc4e5b8b",
+    "label": "KPI Library Generated",
+    "detail": "20 KPIs created",
+    "created_at": "2026-06-02T09:48:00.020882"
+  },
+  {
+    "id": "adca240d-96c9-4e88-a40a-909ff8a4ba05",
+    "label": "KPI Library Generated",
+    "detail": "13 KPIs created",
+    "created_at": "2026-06-02T09:45:42.684305"
+  },
+  {
+    "id": "8bd8ab42-4cb8-4572-97de-c557a3b92ab6",
+    "label": "Prompt Generated",
+    "detail": "KPI generation prompt prepared in Prompt Studio",
+    "created_at": "2026-06-02T09:40:46.858057"
+  },
+  {
+    "id": "54287716-fef1-45ca-a297-2ab6e540c8c5",
+    "label": "Business Context Created",
+    "detail": "Manufacturing / Function Head",
+    "created_at": "2026-06-02T09:40:46.016418"
+  },
+  {
+    "id": "eec14368-d056-477a-a301-b91750ae3cbf",
+    "label": "Business Context Created",
+    "detail": "Manufacturing / Function Head",
+    "created_at": "2026-06-02T09:40:44.999153"
+  },
+  {
+    "id": "377aebf3-5f4d-41ce-9615-e869e139ca7f",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Function Head",
+    "created_at": "2026-06-02T09:40:43.556212"
+  },
+  {
+    "id": "3c17ea8e-80c6-4712-9f46-2ae84662e5e5",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Board",
+    "created_at": "2026-06-02T09:40:42.626449"
+  },
+  {
+    "id": "ea155ec6-a27b-4649-aa2c-21fc3a8c179c",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Board",
+    "created_at": "2026-06-02T09:40:41.072124"
+  },
+  {
+    "id": "54f5f392-b14d-4d52-90b7-0ea7dcd270fb",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Board",
+    "created_at": "2026-06-02T09:40:38.434613"
+  },
+  {
+    "id": "936637aa-5caf-4302-b6cb-33e999ac1bb9",
+    "label": "Prompt Generated",
+    "detail": "KPI generation prompt prepared in Prompt Studio",
+    "created_at": "2026-06-02T09:40:27.754628"
+  },
+  {
+    "id": "62ac1e3b-6f9b-4672-9831-c8bd217364df",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Board",
+    "created_at": "2026-06-02T09:40:26.784266"
+  },
+  {
+    "id": "eb3d5d14-f84f-430a-9408-ea524bb6234b",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Board",
+    "created_at": "2026-06-02T09:40:26.023669"
+  },
+  {
+    "id": "6d370d67-f373-4dcd-b220-dd767437e189",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Board",
+    "created_at": "2026-06-02T09:40:25.320812"
+  },
+  {
+    "id": "211cac4a-da36-4ccf-b878-ae5dd955c766",
+    "label": "KPI Approval Updated",
+    "detail": "1 KPI(s) marked rejected",
+    "created_at": "2026-06-02T07:15:19.925648"
+  },
+  {
+    "id": "d99cf379-d677-4430-b6a7-af777a8d74eb",
+    "label": "KPI Approval Updated",
+    "detail": "1 KPI(s) marked approved",
+    "created_at": "2026-06-02T07:14:53.163230"
+  },
+  {
+    "id": "62b7131d-2837-40ca-9f85-65de7607c019",
+    "label": "Prompt Saved",
+    "detail": "Prompt Studio edits saved",
+    "created_at": "2026-06-02T07:13:26.503006"
+  },
+  {
+    "id": "459a089d-7ea8-462a-ba55-c0917a1773d4",
+    "label": "Prompt Generated",
+    "detail": "KPI generation prompt prepared in Prompt Studio",
+    "created_at": "2026-06-02T07:12:54.689993"
+  },
+  {
+    "id": "295b2bbc-3305-4e97-a46c-2334292c612f",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Board",
+    "created_at": "2026-06-02T07:12:54.145149"
+  },
+  {
+    "id": "87f3f1b2-0594-4756-a85c-8663379f242e",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Board",
+    "created_at": "2026-06-02T07:12:47.081602"
+  },
+  {
+    "id": "2a878ee3-dfd3-49a9-89eb-c173a1b47592",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Board",
+    "created_at": "2026-06-02T07:12:45.894660"
+  },
+  {
+    "id": "77425802-4ac0-4b2c-92c7-e044a07504d6",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Business Unit",
+    "created_at": "2026-06-02T07:12:43.656691"
+  },
+  {
+    "id": "893dca05-6e87-49d4-99f8-feb93a502565",
+    "label": "Business Context Created",
+    "detail": "Telecom / Business Unit",
+    "created_at": "2026-06-02T07:12:33.651472"
+  },
+  {
+    "id": "5054ebe9-6c66-4748-9359-c2364f15bd8d",
+    "label": "Prompt Generated",
+    "detail": "KPI generation prompt prepared in Prompt Studio",
+    "created_at": "2026-06-02T07:08:12.367637"
+  },
+  {
+    "id": "a0443c26-58e8-461f-9511-a5a62df6cfef",
+    "label": "Business Context Created",
+    "detail": "Telecom / Business Unit",
+    "created_at": "2026-06-02T07:08:11.996031"
+  },
+  {
+    "id": "768df06c-6e5e-4283-b55b-19cfecc750cf",
+    "label": "Business Context Created",
+    "detail": "Telecom / Business Unit",
+    "created_at": "2026-06-02T07:08:11.881762"
+  },
+  {
+    "id": "f559ad06-375a-4ca0-aa3b-03b26f10394d",
+    "label": "Business Context Created",
+    "detail": "Telecom / Board",
+    "created_at": "2026-06-02T07:08:09.477404"
+  },
+  {
+    "id": "da696bf4-8e65-4716-a3a5-3f6d3a5c8482",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Board",
+    "created_at": "2026-06-02T07:08:06.900635"
+  },
+  {
+    "id": "0d191e59-8f06-464d-80f2-2070210d07ff",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Board",
+    "created_at": "2026-06-02T07:08:03.340423"
+  },
+  {
+    "id": "342d19a9-6a0f-4df6-8551-ad49f8ea7676",
+    "label": "Prompt Generated",
+    "detail": "KPI generation prompt prepared in Prompt Studio",
+    "created_at": "2026-06-02T07:08:03.335178"
+  },
+  {
+    "id": "d7a44e27-8275-4791-a193-7f208bb649e4",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Board",
+    "created_at": "2026-06-02T07:08:02.767090"
+  },
+  {
+    "id": "fe488c61-d235-4d49-9f5a-8c2a55383911",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Board",
+    "created_at": "2026-06-02T07:08:02.299612"
+  },
+  {
+    "id": "acac4eb8-59b1-435b-8bea-f5749884ceb2",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Board",
+    "created_at": "2026-06-02T07:07:58.132985"
+  },
+  {
+    "id": "e808cf89-07bc-4f02-a18c-e80a26b13cef",
+    "label": "Prompt Generated",
+    "detail": "KPI generation prompt prepared in Prompt Studio",
+    "created_at": "2026-06-02T07:07:40.248245"
+  },
+  {
+    "id": "ec5a3f8e-3e19-4001-9428-8d985a801c5d",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Board",
+    "created_at": "2026-06-02T07:07:39.682273"
+  },
+  {
+    "id": "19c79946-5c84-49d8-9bd4-6ad6a0e3d1e0",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Board",
+    "created_at": "2026-06-02T07:07:39.234113"
+  },
+  {
+    "id": "55e5d18a-e7bb-43ba-a9c0-bf7c38d50ccf",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Board",
+    "created_at": "2026-06-02T07:07:36.360134"
+  },
+  {
+    "id": "47c983fe-d758-4931-ac1b-cd7d8a9c1ebc",
+    "label": "Prompt Generated",
+    "detail": "KPI generation prompt prepared in Prompt Studio",
+    "created_at": "2026-06-01T12:08:19.351144"
+  },
+  {
+    "id": "41f3363e-0659-44eb-a2f8-465be7344fa1",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Board",
+    "created_at": "2026-06-01T12:08:18.809801"
+  },
+  {
+    "id": "ccb33ceb-ca8c-4fea-9956-6bcb6653b9fa",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Board",
+    "created_at": "2026-06-01T12:08:17.846803"
+  },
+  {
+    "id": "19f98597-e3d0-4ff4-a458-5e08d700932d",
+    "label": "Business Context Created",
+    "detail": "Healthcare / Function Head",
+    "created_at": "2026-06-01T12:08:15.707138"
+  },
+  {
+    "id": "9b90c3be-f34e-4d6d-a396-85820b4c5a2c",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-06-01T12:08:12.393437"
+  },
+  {
+    "id": "8db79f8f-8552-40fc-bc28-12e7a20b3912",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-06-01T12:08:11.488307"
+  },
+  {
+    "id": "fc822696-690d-4c36-840a-b10ce1153d36",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-06-01T12:08:10.270649"
+  },
+  {
+    "id": "cd95efd2-fed9-4a86-845b-0b39d804d3d7",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-06-01T12:07:59.574142"
+  },
+  {
+    "id": "404de443-f56b-4cfa-aeb5-4cbde7422123",
+    "label": "Prompt Generated",
+    "detail": "KPI generation prompt prepared in Prompt Studio",
+    "created_at": "2026-06-01T12:07:59.553178"
+  },
+  {
+    "id": "acf5f294-229d-49c2-abdf-dea1df78f4d3",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-06-01T12:07:58.942231"
+  },
+  {
+    "id": "f5d3ef37-cdfb-4ceb-b7b9-4ed27a2c0f75",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-06-01T12:07:56.936037"
+  },
+  {
+    "id": "7e1d74c2-3424-4bc1-a46f-dbffb57b13e7",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-06-01T12:07:52.304394"
+  },
+  {
+    "id": "740740b1-2134-418e-a0fc-f9cdfddb87d4",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-06-01T10:25:00.759643"
+  },
+  {
+    "id": "a566b7ba-9402-45c9-92de-09d30267d090",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T11:47:09.102107"
+  },
+  {
+    "id": "3c4514a9-6a0b-4392-841a-7e35fc7727d3",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T11:45:50.603123"
+  },
+  {
+    "id": "dd2ab4a5-6c14-4bb2-a50d-8d4a8713626f",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T11:45:42.069750"
+  },
+  {
+    "id": "fff2ead0-70a9-4406-bd88-f268fea8dc3c",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T11:45:30.549172"
+  },
+  {
+    "id": "42338566-ab4b-44ae-80f7-7df95e9d4eb6",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T11:45:28.486630"
+  },
+  {
+    "id": "d7981138-173c-4e23-b7df-1669ad8ef0a4",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T11:43:52.552610"
+  },
+  {
+    "id": "8fff1bf6-9377-47e3-a4bd-0cebe899618c",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T11:43:42.122204"
+  },
+  {
+    "id": "75c71d4f-258d-49f2-9d07-989cc36249b8",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T11:39:08.156955"
+  },
+  {
+    "id": "bb9aace0-98ed-4381-be7e-09f27348ad05",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T11:37:52.486741"
+  },
+  {
+    "id": "3af6a9a4-6d1e-4ee2-8204-57f1029139b7",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T11:31:17.214471"
+  },
+  {
+    "id": "fceffd90-d6ea-4982-ad0d-2458ee14f087",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T11:30:47.508027"
+  },
+  {
+    "id": "6c47cf5b-4324-4391-818f-0f4b187ce760",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T11:28:47.602968"
+  },
+  {
+    "id": "8638606a-f337-4130-968e-375b186a6899",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T11:28:47.016495"
+  },
+  {
+    "id": "2084c384-bd2f-4af0-8738-774a3a9e12fa",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T11:28:43.261106"
+  },
+  {
+    "id": "bd50bab5-f175-4cac-ba24-9c9aa6558325",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T11:28:32.633661"
+  },
+  {
+    "id": "1bdf08bc-00a8-4710-ae81-4d85a5157ad6",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T11:27:01.128815"
+  },
+  {
+    "id": "a5c34851-52d2-432d-9916-a802ec3c824e",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T11:26:59.474205"
+  },
+  {
+    "id": "bbe5abab-87d8-4afc-be95-967c508e690c",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T11:26:58.571864"
+  },
+  {
+    "id": "0efabcb2-d784-4905-807b-d74664ccdaa2",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T11:26:39.170213"
+  },
+  {
+    "id": "0ffe4281-9ece-4e39-a191-9dcba900d1d6",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T11:15:04.110042"
+  },
+  {
+    "id": "05839e77-cd97-48a6-8454-e28192a6b390",
+    "label": "KPI Library Generated",
+    "detail": "12 KPIs created",
+    "created_at": "2026-05-31T11:10:29.196614"
+  },
+  {
+    "id": "74c0c773-c8fd-4ba3-85ab-c5aa902fbef3",
+    "label": "Prompt Saved",
+    "detail": "Prompt Studio edits saved",
+    "created_at": "2026-05-31T11:09:16.947841"
+  },
+  {
+    "id": "c1a6de5c-5f11-43f5-8190-4e9bc056d8cc",
+    "label": "Prompt Saved",
+    "detail": "Prompt Studio edits saved",
+    "created_at": "2026-05-31T11:00:07.073122"
+  },
+  {
+    "id": "a7d51cfc-7098-497e-826c-d901d4aa954e",
+    "label": "Prompt Generated",
+    "detail": "KPI generation prompt prepared in Prompt Studio",
+    "created_at": "2026-05-31T10:59:42.661701"
+  },
+  {
+    "id": "2f5a1d22-9c3b-4267-8faf-6e29539f850a",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T10:58:57.318506"
+  },
+  {
+    "id": "548b2313-b413-4bbb-acb3-8ad57ed06929",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T10:58:44.684608"
+  },
+  {
+    "id": "b99fa637-bde8-4009-a322-3ac1201a6ea8",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T10:58:40.776743"
+  },
+  {
+    "id": "88be10ec-4192-4898-b98b-76d66a1805ac",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-31T10:57:55.886705"
+  },
+  {
+    "id": "7cd4289d-b9c2-4993-9faa-9832783f2223",
+    "label": "KPI Library Generated",
+    "detail": "12 KPIs created",
+    "created_at": "2026-05-30T18:22:32.131839"
+  },
+  {
+    "id": "816dcb5d-65cf-4a9b-b7a5-73fad339ab24",
+    "label": "Prompt Saved",
+    "detail": "Prompt Studio edits saved",
+    "created_at": "2026-05-30T18:21:38.335331"
+  },
+  {
+    "id": "cbc6615d-f9a9-499b-8c02-96e1b3559338",
+    "label": "Prompt Generated",
+    "detail": "KPI generation prompt prepared in Prompt Studio",
+    "created_at": "2026-05-30T18:19:07.056074"
+  },
+  {
+    "id": "79d80f69-2aa1-4df5-9b12-d88d483f0657",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-30T18:18:31.900931"
+  },
+  {
+    "id": "a9f3c533-2e71-42fa-92fc-4119d18ddb16",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-30T18:18:14.899841"
+  },
+  {
+    "id": "0636e50e-6065-40e9-ac84-2eba6e8f5a06",
+    "label": "Business Context Created",
+    "detail": "Banking / Function Head",
+    "created_at": "2026-05-30T18:03:11.045233"
+  },
+  {
+    "id": "f0101256-9c41-4b8d-8796-051fd7a611e4",
+    "label": "KPI Approval Updated",
+    "detail": "1 KPI(s) marked rejected",
+    "created_at": "2026-05-30T18:02:11.310943"
+  },
+  {
+    "id": "ea255cf3-5fb3-4aca-88ca-48d02fc5d5ef",
+    "label": "KPI Approval Updated",
+    "detail": "1 KPI(s) marked rejected",
+    "created_at": "2026-05-30T18:02:10.495779"
+  },
+  {
+    "id": "f755c1fa-8e32-4d47-8f43-b55e0b265edd",
+    "label": "KPI Approval Updated",
+    "detail": "1 KPI(s) marked rejected",
+    "created_at": "2026-05-30T18:02:09.879864"
+  },
+  {
+    "id": "f481ea67-2e7c-4279-9af5-733fd8692309",
+    "label": "KPI Approval Updated",
+    "detail": "1 KPI(s) marked rejected",
+    "created_at": "2026-05-30T18:02:09.411076"
+  }
+]

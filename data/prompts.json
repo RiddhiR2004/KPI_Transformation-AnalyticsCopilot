@@ -1,0 +1,192 @@
+{
+  "prompt": "You are an Enterprise KPI Transformation Consultant.\n\nGenerate a KPI Library for the following business context.\n\nIndustry: Manufacturing\nOrganization Level: Function Head\n\nBusiness Priorities:\n- Improve Gross Margin\n- Increase Asset Productivity\n- Improve Workplace Safety\n- Strengthen Forecast Accuracy\n\nBusiness Challenges:\n- High Fuel Cost\n- Supply Chain Delays\n- Low Data Trust\n- Safety Compliance Risks\n- High Defect and Scrap Rates\n- Customer Churn and Complaints\n- Manual Data Collection\n\nTop KRAs:\n- Profitability\n- Customer Growth\n- Service Reliability\n- Risk Management\n- Asset Productivity\n\nFunctional Areas:\n- Sales\n- Supply Chain\n- Quality\n\nGenerate 15 KPI definitions.\n\nFor each KPI provide custom values for:\n- KPI Name (must match catalog name exactly)\n- KPI Description (customized business purpose)\n- Business Owner\n- Data Owner\n- Refresh Cadence\n- Target Range\n- Threshold Range\n- Notes\n\nPrioritize KPIs that best support the stated business objectives and challenges.",
+  "ai_summary": {
+    "Business Focus": "Manufacturing transformation for Function Head leadership.",
+    "Primary Challenges": [
+      "High Fuel Cost",
+      "Supply Chain Delays",
+      "Low Data Trust"
+    ],
+    "Recommended KPI Areas": [
+      "Sales",
+      "Supply Chain",
+      "Quality"
+    ],
+    "Executive Summary": "The KPI library should prioritize measurable value creation, operational discipline and executive visibility.",
+    "business_summary": {
+      "business_focus": "Optimizing manufacturing operations for enhanced profitability, asset utilization, and safety, while ensuring reliable customer service and robust risk management.",
+      "primary_challenges": [
+        "High Fuel Cost",
+        "Supply Chain Delays",
+        "Low Data Trust",
+        "Safety Compliance Risks",
+        "High Defect and Scrap Rates",
+        "Customer Churn and Complaints",
+        "Manual Data Collection"
+      ],
+      "recommended_kpi_areas": [
+        "Financial Performance",
+        "Operational Efficiency",
+        "Workplace Safety",
+        "Supply Chain Resilience",
+        "Quality Control",
+        "Customer Satisfaction",
+        "Forecasting Accuracy"
+      ],
+      "executive_summary": "As an Enterprise KPI Transformation Consultant for a Manufacturing organization at the Function Head level, the strategic focus is on driving profitability, increasing asset productivity, and improving workplace safety, underpinned by strengthening forecast accuracy. Key challenges include managing high fuel costs, mitigating supply chain delays, addressing low data trust, and reducing safety compliance risks, alongside high defect rates and customer churn. The recommended KPI framework will span profitability, customer growth, service reliability, risk management, and asset productivity, with specific attention to Sales, Supply Chain, and Quality functions, to provide actionable insights for strategic decision-making and operational excellence."
+    },
+    "kpi_library": [
+      {
+        "kpi_name": "Gross Margin Percentage",
+        "kpi_description": "Measures the percentage of revenue left after deducting the cost of goods sold, indicating the core profitability of manufacturing operations.",
+        "business_owner": "Head of Finance / CFO",
+        "data_owner": "Finance Department",
+        "refresh_cadence": "Monthly",
+        "target_range": "35% - 40%",
+        "threshold_range": "Below 30% (Critical)",
+        "notes": "Crucial for assessing pricing strategies, production costs, and overall financial health. Directly impacts profitability KRA."
+      },
+      {
+        "kpi_name": "Overall Equipment Effectiveness (OEE)",
+        "kpi_description": "Measures the percentage of manufacturing time that is truly productive, combining availability, performance, and quality.",
+        "business_owner": "Head of Production / COO",
+        "data_owner": "Production Operations / Maintenance",
+        "refresh_cadence": "Daily / Weekly",
+        "target_range": "85% - 90%",
+        "threshold_range": "Below 70% (Critical)",
+        "notes": "Key indicator for asset productivity and identifying bottlenecks in the production process. Directly addresses 'Increase Asset Productivity'."
+      },
+      {
+        "kpi_name": "Lost Time Injury Frequency Rate (LTIIR)",
+        "kpi_description": "Measures the number of lost time injuries per 1 million hours worked, indicating the frequency of severe workplace accidents.",
+        "business_owner": "Head of HR / Head of Operations",
+        "data_owner": "HR / Safety Department",
+        "refresh_cadence": "Monthly",
+        "target_range": "< 1.0",
+        "threshold_range": "> 2.0 (Critical)",
+        "notes": "Directly addresses 'Improve Workplace Safety' and 'Safety Compliance Risks'. Essential for risk management."
+      },
+      {
+        "kpi_name": "Sales Forecast Accuracy",
+        "kpi_description": "Measures the deviation between actual sales and forecasted sales, indicating the reliability of demand planning.",
+        "business_owner": "Head of Sales / Head of Supply Chain",
+        "data_owner": "Sales Operations / Demand Planning",
+        "refresh_cadence": "Monthly",
+        "target_range": "85% - 95%",
+        "threshold_range": "Below 75% (Critical)",
+        "notes": "Critical for optimizing production schedules, inventory levels, and resource allocation. Directly addresses 'Strengthen Forecast Accuracy'."
+      },
+      {
+        "kpi_name": "On-Time In-Full (OTIF) Delivery Rate",
+        "kpi_description": "Measures the percentage of customer orders delivered on time and complete, reflecting service reliability and customer satisfaction.",
+        "business_owner": "Head of Supply Chain / Head of Sales",
+        "data_owner": "Logistics / Order Fulfillment",
+        "refresh_cadence": "Weekly",
+        "target_range": "95% - 98%",
+        "threshold_range": "Below 90% (Critical)",
+        "notes": "Directly addresses 'Service Reliability' and mitigates 'Supply Chain Delays' impact on customers."
+      },
+      {
+        "kpi_name": "Scrap Rate",
+        "kpi_description": "Measures the percentage of raw materials or finished goods that are discarded due to defects or damage during the production process.",
+        "business_owner": "Head of Quality / Head of Production",
+        "data_owner": "Production / Quality Control",
+        "refresh_cadence": "Daily / Weekly",
+        "target_range": "< 2.0%",
+        "threshold_range": "> 3.5% (Critical)",
+        "notes": "Directly addresses 'High Defect and Scrap Rates' and has a significant impact on 'Gross Margin'."
+      },
+      {
+        "kpi_name": "Inventory Turnover",
+        "kpi_description": "Measures how many times inventory is sold or used in a given period, indicating efficiency in managing stock.",
+        "business_owner": "Head of Supply Chain / Head of Finance",
+        "data_owner": "Inventory Management / Finance",
+        "refresh_cadence": "Monthly / Quarterly",
+        "target_range": "6 - 8 turns per year",
+        "threshold_range": "Below 4 turns per year (Critical)",
+        "notes": "Improves 'Asset Productivity' by reducing capital tied up in inventory and minimizing obsolescence."
+      },
+      {
+        "kpi_name": "Supplier On-Time Delivery Rate",
+        "kpi_description": "Measures the percentage of supplier deliveries that arrive on or before the scheduled date, indicating supplier reliability.",
+        "business_owner": "Head of Supply Chain",
+        "data_owner": "Procurement / Logistics",
+        "refresh_cadence": "Monthly",
+        "target_range": "90% - 95%",
+        "threshold_range": "Below 85% (Critical)",
+        "notes": "Crucial for mitigating 'Supply Chain Delays' and ensuring consistent production flow."
+      },
+      {
+        "kpi_name": "Customer Retention Rate",
+        "kpi_description": "Measures the percentage of existing customers that remain customers over a specific period, indicating customer loyalty and satisfaction.",
+        "business_owner": "Head of Sales / Head of Marketing",
+        "data_owner": "Sales / CRM",
+        "refresh_cadence": "Quarterly",
+        "target_range": "85% - 90%",
+        "threshold_range": "Below 80% (Critical)",
+        "notes": "Directly addresses 'Customer Churn and Complaints' and supports 'Customer Growth' KRA."
+      },
+      {
+        "kpi_name": "First Pass Yield (FPY)",
+        "kpi_description": "Measures the percentage of products that pass through a process step or entire production line without any rework or defects.",
+        "business_owner": "Head of Quality / Head of Production",
+        "data_owner": "Quality Control / Production",
+        "refresh_cadence": "Daily / Weekly",
+        "target_range": "95% - 98%",
+        "threshold_range": "Below 90% (Critical)",
+        "notes": "Directly addresses 'High Defect and Scrap Rates' and is a key indicator of manufacturing quality and efficiency."
+      },
+      {
+        "kpi_name": "Energy Consumption per Unit Produced",
+        "kpi_description": "Measures the amount of energy (e.g., kWh, GJ) consumed for each unit of product manufactured, indicating energy efficiency.",
+        "business_owner": "Head of Operations / Head of Finance",
+        "data_owner": "Production / Utilities Management",
+        "refresh_cadence": "Monthly",
+        "target_range": "Reduce by 5-10% annually",
+        "threshold_range": "Increase by > 2% (Critical)",
+        "notes": "Directly addresses 'High Fuel Cost' by focusing on overall energy efficiency in production."
+      },
+      {
+        "kpi_name": "Maintenance Cost as % of Revenue",
+        "kpi_description": "Measures the total cost of equipment maintenance as a percentage of total revenue, indicating the efficiency of asset upkeep.",
+        "business_owner": "Head of Operations / Head of Finance",
+        "data_owner": "Maintenance / Finance",
+        "refresh_cadence": "Monthly / Quarterly",
+        "target_range": "2% - 3%",
+        "threshold_range": "> 4% (Critical)",
+        "notes": "Balances 'Asset Productivity' with cost control, preventing excessive spending while ensuring equipment reliability."
+      },
+      {
+        "kpi_name": "Safety Audit Compliance Score",
+        "kpi_description": "Measures the average score from internal and external safety audits, reflecting adherence to safety regulations and standards.",
+        "business_owner": "Head of Operations / Head of HR",
+        "data_owner": "Safety Department / Compliance",
+        "refresh_cadence": "Quarterly",
+        "target_range": "90% - 95%",
+        "threshold_range": "Below 85% (Critical)",
+        "notes": "Directly addresses 'Safety Compliance Risks' and supports 'Risk Management' KRA."
+      },
+      {
+        "kpi_name": "Order Fulfillment Cycle Time",
+        "kpi_description": "Measures the total time from customer order placement to delivery, indicating the speed and efficiency of the entire order-to-delivery process.",
+        "business_owner": "Head of Supply Chain / Head of Sales",
+        "data_owner": "Logistics / Production Planning",
+        "refresh_cadence": "Weekly",
+        "target_range": "3-5 days",
+        "threshold_range": "> 7 days (Critical)",
+        "notes": "Addresses 'Supply Chain Delays' by focusing on end-to-end process efficiency and improving 'Service Reliability'."
+      },
+      {
+        "kpi_name": "Customer Complaint Resolution Time",
+        "kpi_description": "Measures the average time taken to resolve customer complaints from initial report to final closure, indicating responsiveness to customer issues.",
+        "business_owner": "Head of Sales / Head of Quality",
+        "data_owner": "Customer Service / Quality Assurance",
+        "refresh_cadence": "Monthly",
+        "target_range": "< 24 hours",
+        "threshold_range": "> 48 hours (Critical)",
+        "notes": "Directly addresses 'Customer Churn and Complaints' and enhances 'Customer Growth' through improved service."
+      }
+    ]
+  },
+  "updated_at": "2026-06-02T09:51:40.469994"
+}
