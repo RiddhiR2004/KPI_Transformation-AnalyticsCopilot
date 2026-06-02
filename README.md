@@ -1,9 +1,4 @@
 # KPI Transformation & Analytics Copilot
-
-An enterprise-grade, consulting-ready AI workspace designed to convert strategic corporate priorities into governed, structured KPI definitions and professional Functional Specification deliverables.
-
-This platform bridges the gap between strategic leadership intent (business context, priorities, KRAs) and technical execution details (formulas, source mappings, data ownership) using structured generative AI and strict catalog boundaries.
-
 ---
 
 ## 1. Technical Stack
