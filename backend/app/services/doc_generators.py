@@ -418,3 +418,135 @@ def generate_pdf_spec(path: Path, items: list[FunctionalSpecItem], context: Busi
 
     # Build the document
     doc.build(story, canvasmaker=NumberedCanvas)
+
+
+def generate_docx_prompt(path: Path, prompt_text: str, context: BusinessContext) -> None:
+    """Generates a professional Word Document for the KPI Prompt."""
+    doc = Document()
+    
+    # Configure page margins (1.0 inch)
+    for section in doc.sections:
+        section.top_margin = Inches(1.0)
+        section.bottom_margin = Inches(1.0)
+        section.left_margin = Inches(1.0)
+        section.right_margin = Inches(1.0)
+
+    # Document Styles
+    styles = doc.styles
+    normal_style = styles['Normal']
+    normal_font = normal_style.font
+    normal_font.name = 'Calibri'
+    normal_font.size = Pt(11)
+    normal_font.color.rgb = RGBColor(30, 30, 30)
+
+    # Title Page / Header
+    title_p = doc.add_paragraph()
+    title_p.paragraph_format.space_before = Pt(12)
+    title_p.paragraph_format.space_after = Pt(4)
+    title_run = title_p.add_run("EY KPI Advisory & Analytics Copilot")
+    title_run.font.name = 'Calibri'
+    title_run.font.size = Pt(12)
+    title_run.font.bold = True
+    title_run.font.color.rgb = RGBColor(180, 150, 0) # EY Gold
+
+    main_title_p = doc.add_paragraph()
+    main_title_p.paragraph_format.space_after = Pt(12)
+    main_title_run = main_title_p.add_run("KPI Generation Prompt & Requirements")
+    main_title_run.font.name = 'Calibri'
+    main_title_run.font.size = Pt(22)
+    main_title_run.font.bold = True
+    main_title_run.font.color.rgb = RGBColor(27, 27, 27)
+
+    # Metadata Block
+    meta_p = doc.add_paragraph()
+    meta_p.paragraph_format.space_after = Pt(24)
+    meta_p.paragraph_format.line_spacing = 1.3
+    meta_p.add_run("Industry Sector: ").bold = True
+    meta_p.add_run(f"{context.industry}\n")
+    meta_p.add_run("Organizational Level: ").bold = True
+    meta_p.add_run(f"{context.organization_level}\n")
+    meta_p.add_run("Strategic KPI Count: ").bold = True
+    meta_p.add_run(f"{context.kpi_count} Metrics\n")
+
+    # Yellow accent separator
+    accent_table = doc.add_table(rows=1, cols=1)
+    accent_table.autofit = False
+    accent_table.columns[0].width = Inches(6.5)
+    accent_cell = accent_table.cell(0, 0)
+    set_cell_shading(accent_cell, "FFE600") # EY Yellow
+    set_cell_margins(accent_cell, top=20, bottom=20, left=0, right=0)
+
+    doc.add_paragraph().paragraph_format.space_after = Pt(12)
+
+    # Split prompt_text into lines and parse
+    in_code_block = False
+    lines = prompt_text.splitlines()
+    for line in lines:
+        cleaned_line = line.strip()
+        
+        # Code block toggle
+        if cleaned_line.startswith("```"):
+            in_code_block = not in_code_block
+            continue
+            
+        if in_code_block:
+            p = doc.add_paragraph()
+            p.paragraph_format.left_indent = Inches(0.4)
+            p.paragraph_format.space_after = Pt(2)
+            run = p.add_run(line)
+            run.font.name = 'Consolas'
+            run.font.size = Pt(9.5)
+            run.font.color.rgb = RGBColor(80, 80, 80)
+            continue
+
+        if not cleaned_line:
+            # Add small spacing for empty lines, but avoid adding empty paragraphs
+            continue
+
+        # Markdown headings
+        if line.startswith("# "):
+            heading_text = line[2:].strip()
+            heading = doc.add_heading(level=1)
+            heading.paragraph_format.space_before = Pt(12)
+            heading.paragraph_format.space_after = Pt(4)
+            heading.paragraph_format.keep_with_next = True
+            run = heading.add_run(heading_text)
+            run.font.name = 'Calibri'
+            run.font.bold = True
+            run.font.color.rgb = RGBColor(27, 27, 27)
+        elif line.startswith("## "):
+            heading_text = line[3:].strip()
+            heading = doc.add_heading(level=2)
+            heading.paragraph_format.space_before = Pt(10)
+            heading.paragraph_format.space_after = Pt(3)
+            heading.paragraph_format.keep_with_next = True
+            run = heading.add_run(heading_text)
+            run.font.name = 'Calibri'
+            run.font.bold = True
+            run.font.color.rgb = RGBColor(27, 27, 27)
+        elif line.startswith("### "):
+            heading_text = line[4:].strip()
+            heading = doc.add_heading(level=3)
+            heading.paragraph_format.space_before = Pt(8)
+            heading.paragraph_format.space_after = Pt(2)
+            heading.paragraph_format.keep_with_next = True
+            run = heading.add_run(heading_text)
+            run.font.name = 'Calibri'
+            run.font.bold = True
+            run.font.color.rgb = RGBColor(27, 27, 27)
+        # Bullet points
+        elif line.startswith("- ") or line.startswith("* "):
+            bullet_text = line[2:].strip()
+            p = doc.add_paragraph(style='List Bullet')
+            p.paragraph_format.space_after = Pt(3)
+            run = p.add_run(bullet_text)
+            run.font.name = 'Calibri'
+        else:
+            p = doc.add_paragraph()
+            p.paragraph_format.space_after = Pt(6)
+            p.paragraph_format.line_spacing = 1.15
+            run = p.add_run(line)
+            run.font.name = 'Calibri'
+
+    doc.save(path)
+

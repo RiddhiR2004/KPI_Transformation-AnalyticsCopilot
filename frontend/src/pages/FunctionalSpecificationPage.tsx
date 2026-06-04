@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { api, exportUrl } from "../lib/api";
 import type { ExportItem, FunctionalSpecification, FunctionalSpecItem, KPILibrary } from "../types/api";
 
-export function Step3Page({ onChange, exports }: { onChange: () => void; exports: ExportItem[] }) {
+export function FunctionalSpecificationPage({ onChange, exports }: { onChange: () => void; exports: ExportItem[] }) {
   const [library, setLibrary] = useState<KPILibrary>({ items: [], quality: {}, recommendations: {} });
   const [spec, setSpec] = useState<FunctionalSpecification>({ items: [] });
   const [loading, setLoading] = useState(false);

@@ -1,122 +1,253 @@
-import { Play, Save } from "lucide-react";
+import { AlertTriangle, Check, Download, Play, Save, Send, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
-import type { BusinessContext, PromptRecord } from "../types/api";
+import type { PromptRecord } from "../types/api";
 
 export function PromptStudio({ onChange }: { onChange: () => void }) {
-  const [record, setRecord] = useState<PromptRecord>({ prompt: "", ai_summary: {} });
-  const [context, setContext] = useState<BusinessContext | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [record, setRecord] = useState<PromptRecord>({ prompt: "", ai_summary: {}, is_approved: false });
+  const [userInstructions, setUserInstructions] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+  
+  const [generatingPrompt, setGeneratingPrompt] = useState(false);
+  const [refiningPrompt, setRefiningPrompt] = useState(false);
+  const [generatingLibrary, setGeneratingLibrary] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     api.getPrompt().then((data) => {
-      if (data.prompt) setRecord(data as PromptRecord);
-    });
-    api.getContext().then((data) => {
-      if (data.industry) setContext(data as BusinessContext);
+      if (data.prompt) {
+        setRecord(data as PromptRecord);
+        setUserInstructions(data.user_instructions || "");
+      }
     });
   }, []);
 
-  async function savePrompt() {
-    if (!record.prompt) return;
-    await api.savePrompt(record);
-    onChange();
-  }
-
-  async function generateKpis() {
-    setBusy(true);
+  async function generatePrompt() {
+    setGeneratingPrompt(true);
     setError("");
+    setSuccessMsg("");
     try {
-      await savePrompt();
-      await api.generateKpis();
+      const data = await api.generatePrompt(userInstructions);
+      setRecord(data);
+      setSuccessMsg("AI prompt successfully generated!");
       onChange();
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "KPI generation failed");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate prompt");
     } finally {
-      setBusy(false);
+      setGeneratingPrompt(false);
     }
   }
 
+  async function refinePrompt() {
+    if (!userInstructions.trim()) return;
+    setRefiningPrompt(true);
+    setError("");
+    setSuccessMsg("");
+    try {
+      const data = await api.refinePrompt(userInstructions);
+      setRecord(data);
+      setUserInstructions(""); // Clear input on success
+      setSuccessMsg("Prompt successfully refined and updated by AI!");
+      onChange();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to refine prompt");
+    } finally {
+      setRefiningPrompt(false);
+    }
+  }
+
+  async function saveDraft() {
+    setSavingDraft(true);
+    setError("");
+    setSuccessMsg("");
+    try {
+      await api.savePrompt(record);
+      setSuccessMsg("Draft saved successfully!");
+      onChange();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save draft");
+    } finally {
+      setSavingDraft(false);
+    }
+  }
+
+  async function approvePrompt() {
+    setError("");
+    setSuccessMsg("");
+    try {
+      const updated = { ...record, is_approved: !record.is_approved };
+      await api.savePrompt(updated);
+      setRecord(updated);
+      setSuccessMsg(updated.is_approved ? "Prompt approved and locked successfully!" : "Prompt unlocked!");
+      onChange();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to approve prompt");
+    }
+  }
+
+  async function generateKpis() {
+    setGeneratingLibrary(true);
+    setError("");
+    setSuccessMsg("");
+    try {
+      // Auto-save the current state first
+      await api.savePrompt(record);
+      await api.generateKpis();
+      setSuccessMsg("KPI library generation triggered successfully!");
+      onChange();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "KPI generation failed");
+    } finally {
+      setGeneratingLibrary(false);
+    }
+  }
+
+  const downloadPrompt = async () => {
+    if (!record.prompt) return;
+    try {
+      await api.savePrompt(record);
+      const element = document.createElement("a");
+      element.href = "/api/exports/prompt/docx";
+      element.download = "kpi_advisory_prompt.docx";
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to download prompt");
+    }
+  };
+
+  const handlePromptChange = (text: string) => {
+    setRecord((prev) => ({
+      ...prev,
+      prompt: text,
+      is_approved: false
+    }));
+    if (successMsg) setSuccessMsg("");
+  };
+
   return (
-    <section className="panel p-7">
-      <div className="mb-6 flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#FFE600]">Prompt Studio</p>
-          <h3 className="mt-2 text-2xl font-semibold text-[#F5F5F5]">KPI Generation Prompt</h3>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#B0B0B0]">
-            Review and adjust the generated business-readable KPI prompt draft before launching the Advisory AI engine.
-          </p>
+    <section className="panel p-7 space-y-6">
+      {/* Title block */}
+      <div>
+        <h3 className="text-2xl font-semibold text-[#F5F5F5]">KPI Prompt Studio</h3>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-[#B0B0B0]">
+          Synthesize customized, consulting-grade KPI prompts using generative AI. Refine with instructions, download the assets, and approve to drive metric library creation.
+        </p>
+      </div>
+
+      {error ? (
+        <div className="border border-red-950 bg-red-950/20 p-3 text-xs text-red-400 border-l-2 border-red-500 rounded-sm">
+          {error}
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button className="button-secondary" disabled={!record.prompt} onClick={savePrompt}>
-            <Save size={16} />
-            Save Draft
-          </button>
-          <button className="button-yellow" disabled={!record.prompt || busy} onClick={generateKpis}>
-            <Play size={16} />
-            {busy ? "Generating..." : "Generate KPI Library"}
+      ) : null}
+
+      {successMsg ? (
+        <div className="border border-emerald-950 bg-emerald-950/20 p-3 text-xs text-emerald-400 border-l-2 border-emerald-500 rounded-sm animate-pulse">
+          {successMsg}
+        </div>
+      ) : null}
+
+      {/* Inputs Section */}
+      <div className="border border-[#303030] border-l-2 border-l-[#FFE600] bg-[#111111] p-6 rounded-sm space-y-4">
+        <div className="space-y-1">
+          <label htmlFor="advisory-instructions" className="text-xs font-bold uppercase tracking-wider text-[#F5F5F5] block">
+            Additional Business Guidance (Optional)
+          </label>
+          <span className="text-[11px] text-[#B0B0B0] block leading-relaxed">
+            Provide optional constraints, target frameworks, or guidance for the AI consultant to tailor the generated prompt.
+          </span>
+        </div>
+        <textarea
+          id="advisory-instructions"
+          className="field min-h-[110px] p-4 text-xs leading-relaxed focus:border-[#FFE600] transition-colors"
+          placeholder={"Specify guidance or refinement instructions here, e.g.:\n- Focus on profitability and margin improvement\n- Include ESG and sustainability metrics\n- Prioritize operational KPIs\n- Emphasize warehouse safety and compliance"}
+          value={userInstructions}
+          onChange={(e) => {
+            setUserInstructions(e.target.value);
+            if (successMsg) setSuccessMsg("");
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && e.ctrlKey) {
+              void generatePrompt();
+            }
+          }}
+        />
+        <div className="flex justify-end">
+          <button
+            className="button-yellow flex items-center gap-2"
+            disabled={generatingPrompt}
+            onClick={generatePrompt}
+            title={record.prompt ? "Regenerate prompt from scratch using instructions" : "Generate initial prompt using instructions"}
+          >
+            <Sparkles size={15} />
+            {generatingPrompt ? "Generating..." : record.prompt ? "Regenerate Prompt" : "Generate AI Prompt"}
           </button>
         </div>
       </div>
 
-      {error ? <div className="mb-4 border border-red-950 bg-red-950/20 p-3 text-xs text-red-400 border-l-2 border-red-500">{error}</div> : null}
+      {/* Prompt Editor and Sidebar Column layout */}
+      {record.prompt && (
+        <div className="space-y-4">
+          {/* Prompt Editor area */}
+          <div className="flex flex-col space-y-2">
+            <label htmlFor="prompt-workspace" className="text-xs font-bold uppercase tracking-wider text-[#F5F5F5] block">
+              Prompt Editor
+            </label>
+            <span className="text-[11px] text-[#B0B0B0] block">
+              Review the prompt generated from your business context and guidance. You may edit it manually or ask AI to improve it before KPI generation.
+            </span>
+            <textarea
+              id="prompt-workspace"
+              className={`field min-h-[380px] resize-y font-mono text-xs leading-relaxed p-4 ${record.is_approved ? 'opacity-85 bg-[#161616] cursor-not-allowed border-emerald-500/25' : ''}`}
+              value={record.prompt}
+              onChange={(e) => handlePromptChange(e.target.value)}
+              aria-label="Editable generated prompt content"
+              readOnly={record.is_approved}
+            />
+          </div>
 
-      <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
-        {/* User-facing visible prompt workpaper */}
-        <div className="flex flex-col space-y-2">
-          <textarea
-            className="field min-h-[400px] resize-y font-mono text-xs leading-relaxed p-4"
-            value={record.prompt}
-            onChange={(event) => setRecord({ ...record, prompt: event.target.value })}
-            aria-label="KPI Generation Prompt Content"
-          />
-        </div>
-
-        {/* Business Context Summary Column */}
-        <div className="border border-[#303030] bg-[#111111] p-5 rounded-sm space-y-4 self-start">
-          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#FFE600]">Engagement Context Summary</p>
-          
-          <div className="space-y-3 text-xs">
-            <div className="flex justify-between border-b border-[#303030]/30 pb-2">
-              <span className="text-[#B0B0B0]">Industry Context:</span>
-              <span className="font-bold text-[#F5F5F5]">{context?.industry || "—"}</span>
+          {/* Action buttons */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+            <div className="flex flex-wrap gap-2">
+              <button className="button-secondary" onClick={downloadPrompt} title="Download prompt as Word file">
+                <Download size={15} />
+                Download Prompt
+              </button>
+              <button className="button-secondary" disabled={savingDraft} onClick={saveDraft} title="Save current progress as draft">
+                <Save size={15} />
+                {savingDraft ? "Saving..." : "Save Draft"}
+              </button>
+              <button
+                className={`button-secondary flex items-center gap-2 ${record.is_approved ? 'border-emerald-500/40 text-emerald-400 bg-emerald-950/20 font-semibold' : 'border-emerald-500/20 text-emerald-400 hover:bg-emerald-950/20'}`}
+                onClick={approvePrompt}
+                title={record.is_approved ? "Click to unlock prompt for editing" : "Lock this prompt as approved"}
+              >
+                <Check size={15} />
+                {record.is_approved ? "Approved" : "Approve Prompt"}
+              </button>
             </div>
-            
-            <div className="flex justify-between border-b border-[#303030]/30 pb-2">
-              <span className="text-[#B0B0B0]">Org Level Target:</span>
-              <span className="font-bold text-[#F5F5F5]">{context?.organization_level || "—"}</span>
-            </div>
-            
-            <div className="flex justify-between border-b border-[#303030]/30 pb-2">
-              <span className="text-[#B0B0B0]">Target KPI Count:</span>
-              <span className="font-bold text-[#FFE600]">{context?.kpi_count || "—"} Metrics</span>
-            </div>
-
-            <div>
-              <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block mb-1.5">Functional Scope</span>
-              <div className="flex flex-wrap gap-1">
-                {context?.functional_areas.map(a => (
-                  <span key={a} className="bg-[#1B1B1B] text-[#F5F5F5] border border-[#303030] px-2 py-0.5 text-[9px] font-bold uppercase rounded-sm">
-                    {a}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block mb-1.5">Top KRAs Covered</span>
-              <div className="flex flex-wrap gap-1">
-                {context?.top_kras.map(k => (
-                  <span key={k} className="bg-[#1B1B1B]/40 text-[#FFE600] border border-[#FFE600]/20 px-2 py-0.5 text-[9px] font-bold uppercase rounded-sm">
-                    {k}
-                  </span>
-                ))}
-              </div>
+            <div className="flex items-center gap-3">
+              {!record.is_approved && (
+                <span className="text-xs text-[#FFE600] font-semibold flex items-center gap-1.5 animate-pulse">
+                  <AlertTriangle size={14} className="shrink-0" />
+                  Approve prompt to generate KPI library
+                </span>
+              )}
+              <button
+                className="button-yellow flex items-center gap-2"
+                disabled={generatingLibrary || !record.is_approved}
+                onClick={generateKpis}
+                title={!record.is_approved ? "Please approve prompt before generating library" : "Generate KPI Library"}
+              >
+                <Play size={15} />
+                {generatingLibrary ? "Generating KPI Library..." : "Generate KPI Library"}
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </section>
   );
 }

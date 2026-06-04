@@ -10,6 +10,7 @@ load_dotenv()
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from app.models import (
     BusinessContext,
@@ -28,7 +29,12 @@ from app.services.documents import export_json_bundle
 from app.services.excel import write_kpi_xlsx
 from app.services.kpi_engine import normalize_kpi_payload, quality_check, recommendations
 from app.services.llm_providers import DemoProvider, demo_kpis, get_provider, llm_status
-from app.services.prompting import build_kpi_prompt, build_system_kpi_prompt
+from app.services.prompting import (
+    build_kpi_prompt,
+    build_system_kpi_prompt,
+    PROMPT_GENERATION_SYSTEM_PROMPT,
+    PROMPT_REFINEMENT_SYSTEM_PROMPT,
+)
 from app.storage import EXPORT_DIR, FILES, ensure_data_dir, read_json, write_json
 
 app = FastAPI(title="KPI Transformation & Analytics Copilot API", version="1.0.0")
@@ -39,6 +45,105 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+from datetime import datetime
+from sqlalchemy import select
+from app.database import (
+    SessionLocal,
+    IndustryMetadata,
+    OrgLevelMetadata,
+    FunctionalAreaMetadata,
+    BusinessPriorityMetadata,
+    BusinessChallengeMetadata,
+    KRAMetadata,
+    KPICategoryMetadata,
+    KPIQualityRatingMetadata,
+)
+from app.services.metadata_cache import metadata_cache
+
+METADATA_MODELS = {
+    "industries": IndustryMetadata,
+    "org-levels": OrgLevelMetadata,
+    "functional-areas": FunctionalAreaMetadata,
+    "priorities": BusinessPriorityMetadata,
+    "challenges": BusinessChallengeMetadata,
+    "kras": KRAMetadata,
+    "kpi-categories": KPICategoryMetadata,
+    "quality-ratings": KPIQualityRatingMetadata,
+}
+
+class MetadataItemPayload(BaseModel):
+    name: str
+    is_active: bool = True
+
+@app.get("/metadata/{category}")
+def get_metadata_list(category: str):
+    if category not in METADATA_MODELS:
+        raise HTTPException(status_code=404, detail=f"Metadata category '{category}' not found")
+    model = METADATA_MODELS[category]
+    return metadata_cache.get(category, model)
+
+@app.post("/metadata/{category}")
+def create_metadata_item(category: str, payload: MetadataItemPayload):
+    if category not in METADATA_MODELS:
+        raise HTTPException(status_code=404, detail=f"Metadata category '{category}' not found")
+    model = METADATA_MODELS[category]
+    with SessionLocal() as session:
+        existing = session.scalar(select(model).filter_by(name=payload.name))
+        if existing:
+            existing.is_active = payload.is_active
+            existing.updated_at = datetime.now()
+        else:
+            session.add(model(name=payload.name, is_active=payload.is_active))
+        session.commit()
+    metadata_cache.invalidate(category)
+    return {"status": "success"}
+
+@app.delete("/metadata/{category}/{item_id}")
+def delete_metadata_item(category: str, item_id: int):
+    if category not in METADATA_MODELS:
+        raise HTTPException(status_code=404, detail=f"Metadata category '{category}' not found")
+    model = METADATA_MODELS[category]
+    with SessionLocal() as session:
+        item = session.get(model, item_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Item not found")
+        session.delete(item)
+        session.commit()
+    metadata_cache.invalidate(category)
+    return {"status": "success"}
+
+@app.get("/metadata/industries")
+def get_industries():
+    return get_metadata_list("industries")
+
+@app.get("/metadata/org-levels")
+def get_org_levels():
+    return get_metadata_list("org-levels")
+
+@app.get("/metadata/functional-areas")
+def get_functional_areas():
+    return get_metadata_list("functional-areas")
+
+@app.get("/metadata/priorities")
+def get_priorities():
+    return get_metadata_list("priorities")
+
+@app.get("/metadata/challenges")
+def get_challenges():
+    return get_metadata_list("challenges")
+
+@app.get("/metadata/kras")
+def get_kras():
+    return get_metadata_list("kras")
+
+@app.get("/metadata/kpi-categories")
+def get_kpi_categories():
+    return get_metadata_list("kpi-categories")
+
+@app.get("/metadata/quality-ratings")
+def get_quality_ratings():
+    return get_metadata_list("quality-ratings")
 
 
 @app.on_event("startup")
@@ -87,28 +192,161 @@ def get_business_context() -> dict[str, Any]:
     return read_json(FILES["business_context"], {})
 
 
+def build_fallback_guidance(user_guidance: str) -> str:
+    if not user_guidance.strip():
+        return ""
+    
+    lower_g = user_guidance.lower()
+    phrases = []
+    
+    if "profit" in lower_g or "margin" in lower_g or "cost" in lower_g:
+        phrases.append("Place greater emphasis on gross margin optimization, operating cost reduction, and financial performance improvement.")
+    if "esg" in lower_g or "sustain" in lower_g:
+        phrases.append("Prioritize environmental, social, and governance (ESG) compliance alongside sustainable footprint tracking.")
+    if "safety" in lower_g or "compliance" in lower_g:
+        phrases.append("Emphasize workplace safety standards, incident rate minimizations, and regulatory compliance protocols (such as OSHA guidelines).")
+    if "executive" in lower_g or "leadership" in lower_g:
+        phrases.append("Focus primarily on executive-level tracking, high-level dashboards, and strategic alignment parameters.")
+    if "operational" in lower_g or "efficiency" in lower_g:
+        phrases.append("Heavily prioritize operational KPIs that measure factory throughput, inventory turnover, and overall resource efficiency.")
+    
+    if phrases:
+        integrated = " ".join(phrases)
+        return (
+            f"\n\n### Specific Advisory Mandates & Directives\n"
+            f"The KPI advisory framework must integrate the following consulting-grade guidelines:\n"
+            f"• {integrated}\n\n"
+            f"All recommended metrics must be customized to prioritize and measure progress against these business goals."
+        )
+    else:
+        # Professional wrapper fallback
+        return (
+            f"\n\n### Specific Advisory Mandates & Directives\n"
+            f"The KPI advisory framework must integrate the following target guidelines:\n"
+            f"• {user_guidance.strip()}\n\n"
+            f"All recommended metrics must be customized to prioritize and measure progress against these business goals."
+        )
+
+
+class GeneratePromptRequest(BaseModel):
+    user_instructions: str = ""
+
+
+class RefinePromptRequest(BaseModel):
+    refinement_instructions: str
+
+
 @app.post("/generate-prompt")
-async def generate_prompt() -> PromptRecord:
+async def generate_prompt(request: GeneratePromptRequest) -> PromptRecord:
     context = current_context()
-    prompt = build_kpi_prompt(context)
+    provider = get_provider()
+    
+    # Check if we are running in DemoProvider mode
+    if isinstance(provider, DemoProvider):
+        # Fallback to deprecated build_kpi_prompt
+        prompt_text = build_kpi_prompt(context)
+        prompt_text += build_fallback_guidance(request.user_instructions)
+    else:
+        # Build prompt using Gemini
+        user_prompt = (
+            f"=== RAW BUSINESS CONTEXT ===\n"
+            f"Industry: {context.industry}\n"
+            f"Organization Level: {context.organization_level}\n"
+            f"KPI Count: {context.kpi_count}\n"
+            f"Business Priorities:\n" + "\n".join(f"- {p}" for p in context.business_priorities) + "\n"
+            f"Business Challenges:\n" + "\n".join(f"- {c}" for c in context.business_challenges) + "\n"
+            f"Top KRAs:\n" + "\n".join(f"- {k}" for k in context.top_kras) + "\n"
+            f"Functional Areas:\n" + "\n".join(f"- {a}" for a in context.functional_areas) + "\n"
+        )
+        if request.user_instructions:
+            user_prompt += (
+                f"\n=== USER INSTRUCTIONS / STRATEGIC PREFERENCES ===\n"
+                f"{request.user_instructions}\n"
+            )
+            
+        system_prompt = PROMPT_GENERATION_SYSTEM_PROMPT.format(kpi_count=context.kpi_count)
+        
+        try:
+            payload = await provider.generate_json(system_prompt, user_prompt)
+            prompt_text = payload.get("prompt", "").strip()
+            if not prompt_text:
+                raise ValueError("LLM returned empty prompt text")
+        except Exception as exc:
+            # Fallback on failure
+            print(f"AI Prompt generation failed: {exc}. Falling back to build_kpi_prompt()")
+            prompt_text = build_kpi_prompt(context)
+            prompt_text += build_fallback_guidance(request.user_instructions)
+                
     summary = {
         "Business Focus": f"{context.industry or 'Enterprise'} transformation for {context.organization_level or 'business'} leadership.",
         "Primary Challenges": context.business_challenges[:3],
         "Recommended KPI Areas": context.functional_areas,
         "Executive Summary": "The KPI library should prioritize measurable value creation, operational discipline and executive visibility.",
     }
-    try:
-        payload = await get_provider().generate_json(
-            "Return a concise business summary as JSON with Business Focus, Primary Challenges, Recommended KPI Areas, Executive Summary.",
-            prompt,
-        )
-        if isinstance(payload, dict):
-            summary.update(payload)
-    except Exception:
-        pass
-    record = PromptRecord(prompt=prompt, ai_summary=summary)
+    
+    if not isinstance(provider, DemoProvider):
+        try:
+            summary_payload = await provider.generate_json(
+                "Return a concise business summary as JSON with Business Focus, Primary Challenges, Recommended KPI Areas, Executive Summary.",
+                prompt_text,
+            )
+            if isinstance(summary_payload, dict):
+                summary.update(summary_payload)
+        except Exception:
+            pass
+            
+    record = PromptRecord(
+        prompt=prompt_text,
+        original_prompt=prompt_text,
+        user_instructions=request.user_instructions,
+        is_approved=False,
+        ai_summary=summary
+    )
     write_json(FILES["prompts"], record.model_dump(mode="json"))
-    log_activity("Prompt Generated", "KPI generation prompt prepared in Prompt Studio")
+    log_activity("Prompt Generated", "AI-driven KPI generation prompt prepared in Prompt Studio")
+    return record
+
+
+@app.post("/refine-prompt")
+async def refine_prompt(request: RefinePromptRequest) -> PromptRecord:
+    record = current_prompt()
+    provider = get_provider()
+    
+    context = current_context()
+    if isinstance(provider, DemoProvider):
+        refined_prompt = record.prompt + f"\n\n[Refined with guidelines: {request.refinement_instructions}]"
+    else:
+        user_prompt = (
+            f"=== RAW BUSINESS CONTEXT ===\n"
+            f"Industry: {context.industry}\n"
+            f"Org Level: {context.organization_level}\n"
+            f"KPI Count: {context.kpi_count}\n"
+            f"Priorities:\n" + "\n".join(f"  * {p}" for p in context.business_priorities) + "\n"
+            f"Challenges:\n" + "\n".join(f"  * {c}" for c in context.business_challenges) + "\n"
+            f"KRAs:\n" + "\n".join(f"  * {k}" for k in context.top_kras) + "\n"
+            f"Functional Areas:\n" + "\n".join(f"  * {a}" for a in context.functional_areas) + "\n\n"
+            f"=== CURRENT PROMPT TO REFINE ===\n"
+            f"{record.prompt}\n\n"
+            f"=== NEW REFINEMENT INSTRUCTIONS ===\n"
+            f"{request.refinement_instructions}\n\n"
+            f"Please refine the current prompt using the guidelines in the system instructions. Ensure that the refined prompt retains all details of the original business context and integrates the new refinement instructions seamlessly without copying them verbatim."
+        )
+        try:
+            system_prompt = PROMPT_REFINEMENT_SYSTEM_PROMPT.format(kpi_count=context.kpi_count)
+            payload = await provider.generate_json(system_prompt, user_prompt)
+            refined_prompt = payload.get("prompt", "").strip()
+            if not refined_prompt:
+                raise ValueError("LLM returned empty refined prompt")
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Prompt refinement failed: {exc}") from exc
+            
+    record.prompt = refined_prompt
+    record.is_approved = False
+    from datetime import datetime
+    record.updated_at = datetime.now()
+    
+    write_json(FILES["prompts"], record.model_dump(mode="json"))
+    log_activity("Prompt Refined", "AI-driven KPI prompt refined in Prompt Studio")
     return record
 
 
@@ -134,15 +372,19 @@ async def generate_kpis() -> KPILibrary:
             items = demo_kpis(context)
         else:
             system_prompt = build_system_kpi_prompt(context)
-            payload = await provider.generate_json(
-                system_prompt,
-                prompt,
-            )
-            items = normalize_kpi_payload(payload, context)
+            try:
+                payload = await provider.generate_json(
+                    system_prompt,
+                    prompt,
+                )
+                items = normalize_kpi_payload(payload, context)
+            except Exception as exc:
+                print(f"KPI generation via provider failed: {exc}. Falling back to catalog-based KPIs.")
+                items = demo_kpis(context)
     except RuntimeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"KPI generation failed through {provider.name}: {exc}") from exc
+        raise HTTPException(status_code=502, detail=f"KPI generation failed: {exc}") from exc
     
     # Calculate quality metrics
     quality = quality_check(items, context)
@@ -389,7 +631,7 @@ def exports() -> list[ExportItem]:
     has_kpis = bool(read_json(FILES["kpi_library"], {}).get("items"))
     has_spec = bool(read_json(FILES["functional_spec"], {}).get("items"))
     return [
-        ExportItem(id="prompt", label="Export Prompt", description="KPI generation prompt from Prompt Studio", formats=["TXT", "JSON"], available=has_prompt),
+        ExportItem(id="prompt", label="Export Prompt", description="KPI generation prompt from Prompt Studio", formats=["DOCX", "JSON"], available=has_prompt),
         ExportItem(id="kpi_library", label="Export KPI Library", description="Approved and draft KPI library", formats=["XLSX", "CSV", "JSON"], available=has_kpis),
         ExportItem(id="functional_document", label="Functional Specification", description="Governed business functional specification document", formats=["DOCX", "PDF", "JSON"], available=has_spec),
         ExportItem(id="json_bundle", label="Export JSON Bundle", description="Complete session data for audit or migration", formats=["JSON"], available=True),
@@ -403,7 +645,14 @@ def download_export(export_id: str, fmt: str) -> FileResponse:
     if export_id == "prompt":
         prompt = current_prompt()
         path = EXPORT_DIR / f"kpi-prompt.{fmt}"
-        path.write_text(prompt.prompt if fmt == "txt" else prompt.model_dump_json(indent=2), encoding="utf-8")
+        if fmt == "docx":
+            context = current_context()
+            from app.services.doc_generators import generate_docx_prompt
+            generate_docx_prompt(path, prompt.prompt, context)
+        elif fmt == "txt":
+            path.write_text(prompt.prompt, encoding="utf-8")
+        else:
+            path.write_text(prompt.model_dump_json(indent=2), encoding="utf-8")
     elif export_id == "kpi_library":
         library = current_library()
         path = EXPORT_DIR / f"kpi-library.{fmt}"

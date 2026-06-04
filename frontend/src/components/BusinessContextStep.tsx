@@ -2,113 +2,87 @@ import { Save, Sparkles, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
+import { metadataService } from "../lib/metadataService";
 import type { BusinessContext } from "../types/api";
 import { MultiSelect } from "./MultiSelect";
 
-const industries = [
-  "Manufacturing",
-  "Retail",
-  "Technology",
-  "Telecom",
-  "Healthcare",
-  "FMCG",
-  "Automotive",
-  "Energy",
-  "Chemicals",
-  "Banking",
-  "Consumer Electronics",
-  "Public Sector",
-  "Logistics",
-  "Financial Services"
-];
-
-const organizationLevels = [
-  "Board",
-  "CXO",
-  "Business Unit",
-  "Function Head",
-  "Regional Leadership"
-];
-
-const priorities = [
-  "Improve Gross Margin",
-  "Improve Cash Flow",
-  "Accelerate Revenue Growth",
-  "Reduce Operating Cost",
-  "Improve Customer Retention",
-  "Increase Asset Productivity",
-  "Strengthen Forecast Accuracy",
-  "Improve Working Capital",
-  "Enhance Process Automation",
-  "Reduce Defect Rates",
-  "Minimize ESG Carbon Intensity",
-  "Improve Workplace Safety"
-];
-
-const challenges = [
-  "High Operational Cost",
-  "Supply Chain Delays",
-  "Demand Volatility",
-  "Manual Data Collection",
-  "Low Inventory Turn Velocity",
-  "Margin Leakage from Discounting",
-  "Customer Churn and Complaints",
-  "High Defect and Scrap Rates",
-  "Safety Compliance Risks",
-  "Excess Working Capital Lock-up"
-];
-
-const kras = [
-  "Revenue Growth",
-  "Profitability",
-  "Customer Growth",
-  "Operational Excellence",
-  "Cost Reduction",
-  "Asset Productivity",
-  "Cash Flow",
-  "Risk Management"
-];
-
-const areas = [
-  "Sales",
-  "Production",
-  "Supply Chain",
-  "Finance",
-  "Quality",
-  "Customer Service",
-  "Procurement",
-  "Operations"
-];
-
-const defaults: BusinessContext = {
-  industry: "Manufacturing",
-  organization_level: "CXO",
-  kpi_count: 8,
-  business_priorities: ["Improve Gross Margin", "Improve Cash Flow"],
-  business_challenges: ["Supply Chain Delays", "Margin Leakage from Discounting"],
-  top_kras: ["Profitability", "Operational Excellence"],
-  functional_areas: ["Sales", "Production", "Supply Chain", "Finance"]
-};
-
 export function BusinessContextStep({ onChange }: { onChange: () => void }) {
-  const [form, setForm] = useState(defaults);
+  const [form, setForm] = useState<BusinessContext>({
+    industry: "",
+    organization_level: "",
+    kpi_count: 8,
+    business_priorities: [],
+    business_challenges: [],
+    top_kras: [],
+    functional_areas: []
+  });
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
 
+  const [industries, setIndustries] = useState<string[]>([]);
+  const [organizationLevels, setOrganizationLevels] = useState<string[]>([]);
+  const [priorities, setPriorities] = useState<string[]>([]);
+  const [challenges, setChallenges] = useState<string[]>([]);
+  const [kras, setKras] = useState<string[]>([]);
+  const [areas, setAreas] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    api.getContext().then((data) => {
-      if (data.industry) setForm({ ...defaults, ...data } as BusinessContext);
+    Promise.all([
+      metadataService.getMetadataNames("industries"),
+      metadataService.getMetadataNames("org-levels"),
+      metadataService.getMetadataNames("priorities"),
+      metadataService.getMetadataNames("challenges"),
+      metadataService.getMetadataNames("kras"),
+      metadataService.getMetadataNames("functional-areas")
+    ]).then(([ind, org, prio, chal, kra, ar]) => {
+      setIndustries(ind);
+      setOrganizationLevels(org);
+      setPriorities(prio);
+      setChallenges(chal);
+      setKras(kra);
+      setAreas(ar);
+
+      const defaultIndustry = ind.find(x => x === "Manufacturing") || ind[0] || "";
+      const defaultOrgLevel = org.find(x => x === "CXO") || org[0] || "";
+      const defaultPriorities = prio.filter(x => x === "Improve Gross Margin" || x === "Improve Cash Flow");
+      const defaultChallenges = chal.filter(x => x === "Supply Chain Delays" || x === "Margin Leakage from Discounting");
+      const defaultKras = kra.filter(x => x === "Profitability" || x === "Operational Excellence");
+      const defaultAreas = ar.filter(x => x === "Sales" || x === "Production" || x === "Supply Chain" || x === "Finance");
+
+      const dynamicDefaults: BusinessContext = {
+        industry: defaultIndustry,
+        organization_level: defaultOrgLevel,
+        kpi_count: 8,
+        business_priorities: defaultPriorities,
+        business_challenges: defaultChallenges,
+        top_kras: defaultKras,
+        functional_areas: defaultAreas
+      };
+
+      api.getContext().then((data) => {
+        if (data.industry) {
+          setForm({ ...dynamicDefaults, ...data } as BusinessContext);
+        } else {
+          setForm(dynamicDefaults);
+        }
+        setLoading(false);
+      });
+    }).catch((err) => {
+      console.error("Failed to load metadata lists", err);
+      setLoading(false);
     });
   }, []);
 
   useEffect(() => {
+    if (loading) return;
     const handle = window.setTimeout(() => {
       void save(false);
     }, 700);
     return () => window.clearTimeout(handle);
-  }, [form]);
+  }, [form, loading]);
 
   async function save(showMessage = true) {
     const kCount = Number(form.kpi_count);
@@ -144,6 +118,15 @@ export function BusinessContextStep({ onChange }: { onChange: () => void }) {
     } finally {
       setGenerating(false);
     }
+  }
+
+  if (loading) {
+    return (
+      <section className="panel p-7 flex h-64 items-center justify-center text-[#FFE600]">
+        <RefreshCw size={28} className="animate-spin" />
+        <span className="ml-3 text-sm font-semibold tracking-wide uppercase">Loading Strategic Context Schema...</span>
+      </section>
+    );
   }
 
   return (

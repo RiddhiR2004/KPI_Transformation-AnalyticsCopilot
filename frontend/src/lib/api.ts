@@ -7,7 +7,8 @@ import type {
   KPI,
   PromptRecord,
   WorkflowStatus,
-  FunctionalSpecification
+  FunctionalSpecification,
+  MetadataItem
 } from "../types/api";
 
 const jsonHeaders = { "Content-Type": "application/json" };
@@ -25,7 +26,18 @@ export const api = {
   getContext: () => request<Partial<BusinessContext>>("/business-context"),
   saveContext: (body: BusinessContext) =>
     request<BusinessContext>("/business-context", { method: "POST", headers: jsonHeaders, body: JSON.stringify(body) }),
-  generatePrompt: () => request<PromptRecord>("/generate-prompt", { method: "POST" }),
+  generatePrompt: (user_instructions?: string) =>
+    request<PromptRecord>("/generate-prompt", {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify({ user_instructions: user_instructions ?? "" })
+    }),
+  refinePrompt: (refinement_instructions: string) =>
+    request<PromptRecord>("/refine-prompt", {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify({ refinement_instructions })
+    }),
   getPrompt: () => request<Partial<PromptRecord>>("/prompt"),
   savePrompt: (body: PromptRecord) =>
     request<PromptRecord>("/prompt", { method: "POST", headers: jsonHeaders, body: JSON.stringify(body) }),
@@ -43,7 +55,8 @@ export const api = {
   getTimeline: () => request<ActivityEvent[]>("/timeline"),
   getExports: () => request<ExportItem[]>("/exports"),
   getLlmStatus: () =>
-    request<{ provider: string; model: string; uses_real_llm: boolean; api_key_configured: boolean; api_key_env: string }>("/llm-status")
+    request<{ provider: string; model: string; uses_real_llm: boolean; api_key_configured: boolean; api_key_env: string }>("/llm-status"),
+  getMetadata: (category: string) => request<MetadataItem[]>(`/metadata/${category}`)
 };
 
 export function exportUrl(id: string, format: string) {

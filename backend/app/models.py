@@ -22,13 +22,16 @@ class BusinessContext(BaseModel):
     business_challenges: list[str] = Field(default_factory=list)
     top_kras: list[str] = Field(default_factory=list)
     functional_areas: list[str] = Field(default_factory=list)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.now)
 
 
 class PromptRecord(BaseModel):
     prompt: str
+    original_prompt: str = ""
+    user_instructions: str = ""
+    is_approved: bool = False
     ai_summary: dict[str, Any] = Field(default_factory=dict)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.now)
 
 
 class KPI(BaseModel):
@@ -74,7 +77,7 @@ class FunctionalSpecItem(BaseModel):
 
 class FunctionalSpecification(BaseModel):
     items: list[FunctionalSpecItem] = Field(default_factory=list)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.now)
 
 
 class KPILibrary(BaseModel):
@@ -82,7 +85,7 @@ class KPILibrary(BaseModel):
     quality: dict[str, Any] = Field(default_factory=dict)
     recommendations: dict[str, Any] = Field(default_factory=dict)
     executive_summary: dict[str, Any] = Field(default_factory=dict)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.now)
 
 
 class KPIApprovalRequest(BaseModel):
@@ -109,7 +112,7 @@ class ActivityEvent(BaseModel):
     id: str
     label: str
     detail: str = ""
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
 
 
 class ExportItem(BaseModel):

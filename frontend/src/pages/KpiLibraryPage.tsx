@@ -2,7 +2,7 @@ import { KpiLibrary } from "../components/KpiLibrary";
 import { PromptStudio } from "../components/PromptStudio";
 import type { ExportItem } from "../types/api";
 
-export function Step2Page({ onChange, exports }: { onChange: () => void; exports: ExportItem[] }) {
+export function KpiLibraryPage({ onChange, exports }: { onChange: () => void; exports: ExportItem[] }) {
   return (
     <div className="space-y-6">
       <section className="border-l-8 border-[#ffe600] bg-white p-7">

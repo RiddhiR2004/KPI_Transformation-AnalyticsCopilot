@@ -6,3 +6,8 @@ dist/
 build/
 *.pyc
 .DS_Store
+data/*.db
+kpi.db
+data/
+backend/data/
+frontend/tsconfig.tsbuildinfo
