@@ -10,6 +10,9 @@ export type BusinessContext = {
 
 export type PromptRecord = {
   prompt: string;
+  original_prompt?: string;
+  user_instructions?: string;
+  is_approved?: boolean;
   ai_summary: Record<string, unknown>;
   updated_at?: string;
 };
@@ -111,3 +114,12 @@ export type FunctionalSpecification = {
   items: FunctionalSpecItem[];
   updated_at?: string;
 };
+
+export type MetadataItem = {
+  id: number;
+  name: string;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+

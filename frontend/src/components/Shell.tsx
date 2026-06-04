@@ -28,18 +28,7 @@ export function Shell({
       <header className="border-b border-[#303030] bg-[#1B1B1B]">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between px-8 py-5">
           <NavLink to="/" className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex flex-col">
-                <svg className="w-16 h-3" viewBox="0 0 80 16">
-                  <polygon points="0,14 80,0 80,6" fill="#FFE600" />
-                </svg>
-                <span className="text-3xl font-black leading-none text-white tracking-tighter -mt-1 font-sans">EY</span>
-              </div>
-              <div className="flex flex-col text-[9px] uppercase tracking-wider font-semibold text-white/85 leading-tight border-l border-white/25 pl-3">
-                <span>Shape the future</span>
-                <span>with confidence</span>
-              </div>
-            </div>
+            <img src="/ey_logo.png" alt="EY Logo" className="h-16 w-auto object-contain" />
             <div className="h-8 w-px bg-[#303030] mx-1" />
             <h1 className="text-lg font-semibold tracking-tight text-[#F5F5F5]">KPI Transformation & Analytics Copilot</h1>
           </NavLink>

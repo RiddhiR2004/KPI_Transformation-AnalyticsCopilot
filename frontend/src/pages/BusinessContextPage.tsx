@@ -1,6 +1,6 @@
 import { BusinessContextStep } from "../components/BusinessContextStep";
 
-export function Step1Page({ onChange }: { onChange: () => void }) {
+export function BusinessContextPage({ onChange }: { onChange: () => void }) {
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Step 01" title="Business Context" text="Capture the business scope used to generate a deterministic KPI prompt for Gemini-backed KPI creation." />

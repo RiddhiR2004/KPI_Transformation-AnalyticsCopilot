@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from abc import ABC, abstractmethod
@@ -73,27 +74,38 @@ class GeminiProvider(LLMProvider):
         last_exception = None
         for attempt_model in models_to_try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{attempt_model}:generateContent"
-            try:
-                async with httpx.AsyncClient(timeout=60) as client:
-                    response = await client.post(
-                        url,
-                        params={"key": self.api_key},
-                        json={
-                            "systemInstruction": {"parts": [{"text": system}]},
-                            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                            "generationConfig": {
-                                "responseMimeType": "application/json",
-                                "temperature": 0.2,
+            
+            max_retries = 3
+            backoff_factor = 2.0
+            
+            for attempt in range(max_retries):
+                try:
+                    async with httpx.AsyncClient(timeout=60) as client:
+                        response = await client.post(
+                            url,
+                            params={"key": self.api_key},
+                            json={
+                                "systemInstruction": {"parts": [{"text": system}]},
+                                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                                "generationConfig": {
+                                    "responseMimeType": "application/json",
+                                    "temperature": 0.2,
+                                },
                             },
-                        },
-                    )
-                    response.raise_for_status()
-                text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-                return json.loads(text)
-            except Exception as exc:
-                last_exception = exc
-                # Print fallback details to stdout/stderr
-                print(f"GeminiProvider: Model '{attempt_model}' call failed: {exc}. Trying next model...")
+                        )
+                        if response.status_code in (429, 503):
+                            response.raise_for_status()
+                        response.raise_for_status()
+                    text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+                    return json.loads(text)
+                except Exception as exc:
+                    last_exception = exc
+                    if attempt < max_retries - 1:
+                        sleep_time = backoff_factor ** attempt
+                        print(f"GeminiProvider: Model '{attempt_model}' call failed: {exc}. Retrying in {sleep_time}s...")
+                        await asyncio.sleep(sleep_time)
+                    else:
+                        print(f"GeminiProvider: Model '{attempt_model}' call failed: {exc}. Trying next model...")
                 
         if last_exception:
             raise last_exception
