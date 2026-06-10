@@ -34,6 +34,10 @@ class BusinessContext(Base):
     business_challenges: Mapped[str] = mapped_column(Text, default="[]")  # JSON string
     top_kras: Mapped[str] = mapped_column(Text, default="[]")  # JSON string
     functional_areas: Mapped[str] = mapped_column(Text, default="[]")  # JSON string
+    additional_business_priorities: Mapped[str] = mapped_column(Text, default="[]")  # JSON string
+    additional_business_challenges: Mapped[str] = mapped_column(Text, default="[]")  # JSON string
+    additional_kras: Mapped[str] = mapped_column(Text, default="[]")  # JSON string
+    additional_functional_areas: Mapped[str] = mapped_column(Text, default="[]")  # JSON string
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
@@ -88,6 +92,10 @@ class FunctionalSpecification(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     items: Mapped[str] = mapped_column(Text, default="[]")  # JSON string
+    executive_summary: Mapped[str] = mapped_column(Text, default="")
+    draft_items: Mapped[str] = mapped_column(Text, default="[]")  # JSON string
+    approved_items: Mapped[str] = mapped_column(Text, default="[]")  # JSON string
+    status: Mapped[str] = mapped_column(String(50), default="draft")  # "draft" or "approved"
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
@@ -99,6 +107,22 @@ class ApprovedKPIs(Base):
     items: Mapped[str] = mapped_column(Text, default="[]")  # JSON string
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+class LLMUsageLog(Base):
+    __tablename__ = "llm_usage_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    provider: Mapped[str] = mapped_column(String(100), default="")
+    model: Mapped[str] = mapped_column(String(100), default="")
+    workflow_step: Mapped[str] = mapped_column(String(100), default="")
+    input_tokens: Mapped[int] = mapped_column(Integer, nullable=True)
+    output_tokens: Mapped[int] = mapped_column(Integer, nullable=True)
+    total_tokens: Mapped[int] = mapped_column(Integer, nullable=True)
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+    success: Mapped[bool] = mapped_column(Boolean, default=False)
+    error_message: Mapped[str] = mapped_column(Text, nullable=True)
 
 
 class IndustryMetadata(Base):
@@ -244,4 +268,36 @@ def seed_metadata() -> None:
 def init_db() -> None:
     DATA_DIR.mkdir(exist_ok=True)
     Base.metadata.create_all(bind=engine)
+    
+    # Run dynamic column migrations for existing SQLite databases
+    try:
+        with engine.connect() as conn:
+            # business_context migration
+            cursor = conn.exec_driver_sql("PRAGMA table_info(business_context)")
+            existing_cols = [row[1] for row in cursor.fetchall()]
+            new_cols = [
+                ("additional_business_priorities", "TEXT DEFAULT '[]'"),
+                ("additional_business_challenges", "TEXT DEFAULT '[]'"),
+                ("additional_kras", "TEXT DEFAULT '[]'"),
+                ("additional_functional_areas", "TEXT DEFAULT '[]'")
+            ]
+            for col_name, col_def in new_cols:
+                if col_name not in existing_cols:
+                    conn.exec_driver_sql(f"ALTER TABLE business_context ADD COLUMN {col_name} {col_def}")
+
+            # functional_specification migration
+            cursor_fs = conn.exec_driver_sql("PRAGMA table_info(functional_specification)")
+            existing_cols_fs = [row[1] for row in cursor_fs.fetchall()]
+            new_cols_fs = [
+                ("executive_summary", "TEXT DEFAULT ''"),
+                ("draft_items", "TEXT DEFAULT '[]'"),
+                ("approved_items", "TEXT DEFAULT '[]'"),
+                ("status", "VARCHAR(50) DEFAULT 'draft'")
+            ]
+            for col_name, col_def in new_cols_fs:
+                if col_name not in existing_cols_fs:
+                    conn.exec_driver_sql(f"ALTER TABLE functional_specification ADD COLUMN {col_name} {col_def}")
+    except Exception as e:
+        print(f"Error performing SQLite migrations: {e}")
+        
     seed_metadata()

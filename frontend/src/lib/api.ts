@@ -32,11 +32,11 @@ export const api = {
       headers: jsonHeaders,
       body: JSON.stringify({ user_instructions: user_instructions ?? "" })
     }),
-  refinePrompt: (refinement_instructions: string) =>
+  refinePrompt: (prompt: string, refinement_instructions: string) =>
     request<PromptRecord>("/refine-prompt", {
       method: "POST",
       headers: jsonHeaders,
-      body: JSON.stringify({ refinement_instructions })
+      body: JSON.stringify({ prompt, refinement_instructions })
     }),
   getPrompt: () => request<Partial<PromptRecord>>("/prompt"),
   savePrompt: (body: PromptRecord) =>
@@ -51,6 +51,7 @@ export const api = {
   saveFunctionalSpec: (body: FunctionalSpecification) =>
     request<FunctionalSpecification>("/functional-spec", { method: "POST", headers: jsonHeaders, body: JSON.stringify(body) }),
   generateSpec: () => request<FunctionalSpecification>("/generate-spec", { method: "POST" }),
+  approveSpec: () => request<{ status: string; message: string; updated_at: string }>("/approve-spec", { method: "POST" }),
   getWorkflowStatus: () => request<WorkflowStatus>("/workflow-status"),
   getTimeline: () => request<ActivityEvent[]>("/timeline"),
   getExports: () => request<ExportItem[]>("/exports"),

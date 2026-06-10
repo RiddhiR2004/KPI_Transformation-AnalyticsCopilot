@@ -6,6 +6,10 @@ export type BusinessContext = {
   business_challenges: string[];
   top_kras: string[];
   functional_areas: string[];
+  additional_business_priorities?: string[];
+  additional_business_challenges?: string[];
+  additional_kras?: string[];
+  additional_functional_areas?: string[];
 };
 
 export type PromptRecord = {
@@ -100,18 +104,69 @@ export type ExportItem = {
 export type FunctionalSpecItem = {
   id: string;
   kpi_name: string;
-  business_purpose: string;
-  formula: string;
-  business_logic: string;
-  source_system: string;
-  data_owner: string;
-  refresh_frequency: string;
-  assumptions: string;
-  reporting_requirements: string;
+  
+  // Section A: KPI Overview
+  kpi_category?: string;
+  functional_area?: string;
+  related_kra?: string;
+  strategic_objective_supported?: string;
+  business_challenge_addressed?: string;
+  business_owner?: string;
+  data_owner?: string;
+
+  // Section B: Business Purpose & Strategic Relevance
+  business_purpose_relevance?: string;
+
+  // Section C: KPI Definition
+  kpi_definition?: string;
+
+  // Section D: Calculation Methodology
+  formula?: string;
+  numerator?: string;
+  denominator?: string;
+  calculation_methodology?: string;
+  inclusion_rules?: string;
+  exclusion_rules?: string;
+  sample_calculation?: string;
+
+  // Section E: Business Rules & Validation
+  business_rules?: string;
+  data_validation_rules?: string;
+  exception_handling_rules?: string;
+  data_quality_expectations?: string;
+
+  // Section F: Source Systems & Data Lineage
+  source_systems_lineage?: string;
+
+  // Section G: Ownership & Governance
+  ownership_governance?: string;
+
+  // Section H: Assumptions & Constraints
+  assumptions_constraints?: string;
+
+  // Section I: Reporting Requirements
+  reporting_requirements?: string;
+  dashboard_recommendations?: string;
+  threshold_guidance?: string;
+
+  // Section J: Implementation Guidance
+  implementation_guidance?: string;
+
+  validation_warnings?: string[];
+
+  // Backward Compatibility fields
+  business_purpose?: string;
+  business_logic?: string;
+  source_system?: string;
+  refresh_frequency?: string;
+  assumptions?: string;
 };
 
 export type FunctionalSpecification = {
   items: FunctionalSpecItem[];
+  approved_items?: FunctionalSpecItem[];
+  executive_summary?: string;
+  status?: string;
   updated_at?: string;
 };
 

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, exportUrl } from "../lib/api";
 import type { BusinessContext, ExportItem, KPI, KPILibrary, KPIStatus } from "../types/api";
+import { metadataService } from "../lib/metadataService";
 
 const columns: Array<[keyof KPI, string]> = [
   ["kpi_name", "KPI Name"],
@@ -21,11 +22,15 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
   const [selectedKpi, setSelectedKpi] = useState<KPI | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<KPI | null>(null);
+  const [functionalAreas, setFunctionalAreas] = useState<string[]>([]);
+  const [kpiCategories, setKpiCategories] = useState<string[]>([]);
   const navigate = useNavigate();
   const pageSize = 6;
 
   useEffect(() => {
     refresh();
+    metadataService.getMetadataNames("functional-areas").then(setFunctionalAreas);
+    metadataService.getMetadataNames("kpi-categories").then(setKpiCategories);
   }, [exports]);
 
   async function refresh() {
@@ -50,6 +55,44 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
     onChange();
   }
 
+  function setFormVal(key: keyof KPI, val: any) {
+    setEditForm(prev => prev ? { ...prev, [key]: val } : null);
+  }
+
+  async function saveEdits() {
+    if (!editForm || !selectedKpi) return;
+    try {
+      const patch: Partial<KPI> = {
+        kpi_name: editForm.kpi_name,
+        kpi_description: editForm.kpi_description,
+        formula: editForm.formula,
+        numerator: editForm.numerator,
+        denominator: editForm.denominator,
+        business_owner: editForm.business_owner,
+        data_owner: editForm.data_owner,
+        refresh_cadence: editForm.refresh_cadence,
+        recommended_target_range: editForm.recommended_target_range,
+        recommended_threshold_range: editForm.recommended_threshold_range,
+        notes: editForm.notes,
+        functional_area: editForm.functional_area,
+        kpi_category: editForm.kpi_category,
+      };
+      
+      const updated = await api.updateKpi(selectedKpi.id, patch);
+      setLibrary(updated);
+      
+      const match = updated.items.find(item => item.id === selectedKpi.id);
+      if (match) {
+        setSelectedKpi(match);
+        setEditForm(match);
+      }
+      setIsEditing(false);
+      onChange();
+    } catch (err) {
+      console.error("Failed to save KPI edits", err);
+    }
+  }
+
   const filtered = useMemo(() => {
     const needle = query.toLowerCase();
     return [...library.items]
@@ -70,10 +113,17 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
   const hasApproved = library.items.some((item) => item.status === "approved");
   const coverage = library.quality.coverage_summary || {};
   const totalKpis = library.items.length;
-  
   const uniqueAreasCount = new Set(library.items.map(k => k.functional_area)).size;
-  // Only show coverage if we have KPIs
   const showCoverage = totalKpis > 0;
+  
+  const displayedPriorities = [
+    ...(context?.business_priorities || []),
+    ...(context?.additional_business_priorities || [])
+  ];
+  const displayedKras = [
+    ...(context?.top_kras || []),
+    ...(context?.additional_kras || [])
+  ];
 
   return (
     <section className="panel p-7">
@@ -214,8 +264,8 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
               <div>
                 <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block mb-1">Business Priorities</span>
                 <ul className="list-disc list-inside space-y-1 text-[#F5F5F5] font-semibold">
-                  {context?.business_priorities && context.business_priorities.length > 0 ? (
-                    context.business_priorities.map(p => (
+                  {displayedPriorities.length > 0 ? (
+                    displayedPriorities.map(p => (
                       <li key={p} className="truncate text-[11px]" title={p}>{p}</li>
                     ))
                   ) : (
@@ -226,8 +276,8 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
               <div>
                 <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block mb-1">Top KRAs</span>
                 <ul className="list-disc list-inside space-y-1 text-[#FFE600] font-semibold">
-                  {context?.top_kras && context.top_kras.length > 0 ? (
-                    context.top_kras.map(k => (
+                  {displayedKras.length > 0 ? (
+                    displayedKras.map(k => (
                       <li key={k} className="truncate text-[11px]" title={k}>{k}</li>
                     ))
                   ) : (
@@ -342,7 +392,7 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
               <div className="flex-1 mr-4">
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#FFE600]">
-                    {selectedKpi.functional_area}
+                    {isEditing ? (editForm?.functional_area || selectedKpi.functional_area) : selectedKpi.functional_area}
                   </span>
                   <span className={`border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${selectedKpi.status === "approved" ? "border-emerald-500 text-emerald-400 bg-emerald-500/10" : selectedKpi.status === "rejected" ? "border-rose-500 text-rose-400 bg-rose-500/10" : selectedKpi.status === "recommended" ? "border-[#FFE600] text-[#FFE600] bg-[#FFE600]/10" : "border-[#B0B0B0]/40 text-[#B0B0B0] bg-[#B0B0B0]/5"}`}>
                     {selectedKpi.status}
@@ -350,154 +400,362 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
                 </div>
                 
                 <h3 className="mt-2 text-xl font-semibold text-[#F5F5F5] tracking-tight">
-                  {selectedKpi.kpi_name}
+                  {isEditing ? (editForm?.kpi_name || selectedKpi.kpi_name) : selectedKpi.kpi_name}
                 </h3>
               </div>
               
-              <button 
-                className="text-[#B0B0B0] hover:text-[#F5F5F5] transition-colors p-1"
-                aria-label="Close details"
-                onClick={() => {
-                  setSelectedKpi(null);
-                  setIsEditing(false);
-                }}
-              >
-                <X size={20} />
-              </button>
+              <div className="flex items-center gap-2">
+                {!isEditing && (
+                  <button
+                    className="icon-button !h-8 !w-8 text-[#FFE600] border border-[#FFE600]/20 hover:bg-[#FFE600]/10"
+                    title="Edit KPI"
+                    onClick={() => {
+                      setIsEditing(true);
+                      setEditForm(selectedKpi);
+                    }}
+                  >
+                    <Edit3 size={15} />
+                  </button>
+                )}
+                
+                <button 
+                  className="text-[#B0B0B0] hover:text-[#F5F5F5] transition-colors p-1"
+                  aria-label="Close details"
+                  onClick={() => {
+                    setSelectedKpi(null);
+                    setIsEditing(false);
+                  }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             {/* Scrollable body content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              <div className="space-y-6">
-                
-                {/* Classifications Grid */}
-                <div className="grid grid-cols-3 gap-4 bg-[#111111] p-4 border border-[#303030] rounded-sm">
+              {isEditing ? (
+                <div className="space-y-5">
+                  {/* KPI Name */}
                   <div>
-                    <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">Functional Area</span>
-                    <span className="text-xs font-semibold text-[#FFE600] block mt-1">{selectedKpi.functional_area || "—"}</span>
+                    <label className="label">KPI Name</label>
+                    <input
+                      type="text"
+                      className="field text-xs font-semibold"
+                      value={editForm?.kpi_name || ""}
+                      onChange={(e) => setFormVal("kpi_name", e.target.value)}
+                    />
                   </div>
+
+                  {/* Classifications Grid */}
+                  <div className="grid grid-cols-2 gap-4 bg-[#111111] p-4 border border-[#303030] rounded-sm">
+                    <div>
+                      <label className="label">Functional Area</label>
+                      <select
+                        className="field text-xs font-semibold"
+                        value={editForm?.functional_area || ""}
+                        onChange={(e) => setFormVal("functional_area", e.target.value)}
+                      >
+                        <option value="" disabled className="bg-[#1B1B1B]">Select Area...</option>
+                        {functionalAreas.map(area => (
+                          <option key={area} value={area} className="bg-[#1B1B1B] text-[#F5F5F5]">{area}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label">KPI Category</label>
+                      <select
+                        className="field text-xs font-semibold"
+                        value={editForm?.kpi_category || ""}
+                        onChange={(e) => setFormVal("kpi_category", e.target.value)}
+                      >
+                        <option value="" disabled className="bg-[#1B1B1B]">Select Category...</option>
+                        {kpiCategories.map(cat => (
+                          <option key={cat} value={cat} className="bg-[#1B1B1B] text-[#F5F5F5]">{cat}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">KRA (Read-Only)</span>
+                      <span className="text-xs font-semibold text-[#F5F5F5] block mt-1">{editForm?.kra || "—"}</span>
+                    </div>
+                    <div>
+                      <label className="label">Refresh Cadence</label>
+                      <input
+                        type="text"
+                        className="field text-xs font-semibold"
+                        value={editForm?.refresh_cadence || ""}
+                        onChange={(e) => setFormVal("refresh_cadence", e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Business Description */}
                   <div>
-                    <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">KRA</span>
-                    <span className="text-xs font-semibold text-[#F5F5F5] block mt-1">{selectedKpi.kra || "—"}</span>
+                    <label className="label">Business Purpose / Description</label>
+                    <textarea
+                      rows={3}
+                      className="field text-xs font-semibold leading-relaxed"
+                      value={editForm?.kpi_description || ""}
+                      onChange={(e) => setFormVal("kpi_description", e.target.value)}
+                    />
                   </div>
+
+                  {/* Calculation Details */}
+                  <div className="bg-[#111111] p-4 border border-[#303030] rounded-sm space-y-4">
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#FFE600]">Calculation Details</h4>
+                    <div>
+                      <label className="label">Formula</label>
+                      <textarea
+                        rows={2}
+                        className="field text-xs font-mono font-semibold"
+                        value={editForm?.formula || ""}
+                        onChange={(e) => setFormVal("formula", e.target.value)}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="label">Numerator</label>
+                        <input
+                          type="text"
+                          className="field text-xs font-semibold"
+                          value={editForm?.numerator || ""}
+                          onChange={(e) => setFormVal("numerator", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Denominator</label>
+                        <input
+                          type="text"
+                          className="field text-xs font-semibold"
+                          value={editForm?.denominator || ""}
+                          onChange={(e) => setFormVal("denominator", e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Enterprise Governance */}
+                  <div className="bg-[#111111]/40 border border-[#303030] p-4 rounded-sm space-y-4">
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#FFE600]">Enterprise Governance & Infrastructure</h4>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="col-span-1">
+                        <label className="label">Business Owner</label>
+                        <input
+                          type="text"
+                          className="field text-xs font-semibold"
+                          value={editForm?.business_owner || ""}
+                          onChange={(e) => setFormVal("business_owner", e.target.value)}
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <label className="label">Data Owner</label>
+                        <input
+                          type="text"
+                          className="field text-xs font-semibold"
+                          value={editForm?.data_owner || ""}
+                          onChange={(e) => setFormVal("data_owner", e.target.value)}
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">Source System (Read-Only)</span>
+                        <span className="text-xs font-semibold text-[#F5F5F5] block mt-1">{editForm?.source_system || "—"}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Targets & Thresholds */}
+                  <div className="bg-[#111111]/40 border border-[#303030] p-4 rounded-sm space-y-4">
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#FFE600]">Target & Thresholds</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="label">Target Range</label>
+                        <input
+                          type="text"
+                          className="field text-xs font-semibold"
+                          value={editForm?.recommended_target_range || ""}
+                          onChange={(e) => setFormVal("recommended_target_range", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Threshold Range</label>
+                        <input
+                          type="text"
+                          className="field text-xs font-semibold"
+                          value={editForm?.recommended_threshold_range || ""}
+                          onChange={(e) => setFormVal("recommended_threshold_range", e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notes / Assumptions */}
                   <div>
-                    <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">Refresh Cadence</span>
-                    <span className="text-xs font-semibold text-[#F5F5F5] block mt-1">{selectedKpi.refresh_cadence || "—"}</span>
+                    <label className="label">Notes / Assumptions</label>
+                    <textarea
+                      rows={3}
+                      className="field text-xs font-semibold"
+                      value={editForm?.notes || ""}
+                      onChange={(e) => setFormVal("notes", e.target.value)}
+                    />
                   </div>
                 </div>
+              ) : (
+                <div className="space-y-6">
+                  
+                  {/* Classifications Grid */}
+                  <div className="grid grid-cols-4 gap-4 bg-[#111111] p-4 border border-[#303030] rounded-sm">
+                    <div>
+                      <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">Functional Area</span>
+                      <span className="text-xs font-semibold text-[#FFE600] block mt-1">{selectedKpi.functional_area || "—"}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">KRA</span>
+                      <span className="text-xs font-semibold text-[#F5F5F5] block mt-1">{selectedKpi.kra || "—"}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">Category</span>
+                      <span className="text-xs font-semibold text-[#F5F5F5] block mt-1">{selectedKpi.kpi_category || "—"}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">Refresh Cadence</span>
+                      <span className="text-xs font-semibold text-[#F5F5F5] block mt-1">{selectedKpi.refresh_cadence || "—"}</span>
+                    </div>
+                  </div>
 
-                {/* Business Purpose / Description */}
-                <div>
-                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#FFE600] mb-2">Business Purpose / Description</h4>
-                  <p className="text-xs text-[#B0B0B0] leading-relaxed whitespace-pre-wrap">
-                    {selectedKpi.kpi_description || "—"}
-                  </p>
-                </div>
-
-                {/* Formula and Numerator/Denominator */}
-                <div className="bg-[#111111] p-4 border border-[#303030] rounded-sm space-y-3">
-                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#FFE600]">Calculation Details</h4>
+                  {/* Business Purpose / Description */}
                   <div>
-                    <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">Formula</span>
-                    <code className="text-xs text-[#FFE600] block mt-1.5 font-mono break-all bg-[#1B1B1B] p-2 border border-[#303030] rounded-sm leading-relaxed">
-                      {selectedKpi.formula || "—"}
-                    </code>
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#FFE600] mb-2">Business Purpose / Description</h4>
+                    <p className="text-xs text-[#B0B0B0] leading-relaxed whitespace-pre-wrap">
+                      {selectedKpi.kpi_description || "—"}
+                    </p>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 pt-1">
-                    <div>
-                      <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">Numerator</span>
-                      <span className="text-xs text-[#F5F5F5] font-medium block mt-1">{selectedKpi.numerator || "—"}</span>
-                    </div>
-                    <div>
-                      <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">Denominator</span>
-                      <span className="text-xs text-[#F5F5F5] font-medium block mt-1">{selectedKpi.denominator || "—"}</span>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Ownership & Source System */}
-                <div className="bg-[#111111]/40 border border-[#303030] p-4 rounded-sm">
-                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#FFE600] mb-3">Enterprise Governance & Infrastructure</h4>
-                  <div className="grid grid-cols-3 gap-4">
+                  {/* Formula and Numerator/Denominator */}
+                  <div className="bg-[#111111] p-4 border border-[#303030] rounded-sm space-y-3">
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#FFE600]">Calculation Details</h4>
                     <div>
-                      <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">Business Owner</span>
-                      <span className="text-xs font-semibold text-[#F5F5F5] block mt-1">{selectedKpi.business_owner || "—"}</span>
+                      <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">Formula</span>
+                      <code className="text-xs text-[#FFE600] block mt-1.5 font-mono break-all bg-[#1B1B1B] p-2 border border-[#303030] rounded-sm leading-relaxed">
+                        {selectedKpi.formula || "—"}
+                      </code>
                     </div>
-                    <div>
-                      <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">Data Owner</span>
-                      <span className="text-xs font-semibold text-[#F5F5F5] block mt-1">{selectedKpi.data_owner || "—"}</span>
-                    </div>
-                    <div>
-                      <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">Source System</span>
-                      <span className="text-xs font-semibold text-[#F5F5F5] block mt-1">{selectedKpi.source_system || "—"}</span>
+                    <div className="grid grid-cols-2 gap-4 pt-1">
+                      <div>
+                        <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">Numerator</span>
+                        <span className="text-xs text-[#F5F5F5] font-medium block mt-1">{selectedKpi.numerator || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">Denominator</span>
+                        <span className="text-xs text-[#F5F5F5] font-medium block mt-1">{selectedKpi.denominator || "—"}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Target & Threshold Ranges */}
-                <div className="bg-[#111111]/40 border border-[#303030] p-4 rounded-sm">
-                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#FFE600] mb-3">Threshold / Target</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block mb-1">Target Range</span>
-                      <p className="text-xs text-[#F5F5F5] font-semibold leading-relaxed">
-                        {selectedKpi.recommended_target_range || "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block mb-1">Threshold Range</span>
-                      <p className="text-xs text-[#F5F5F5] font-semibold leading-relaxed">
-                        {selectedKpi.recommended_threshold_range || "—"}
-                      </p>
+                  {/* Ownership & Source System */}
+                  <div className="bg-[#111111]/40 border border-[#303030] p-4 rounded-sm">
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#FFE600] mb-3">Enterprise Governance & Infrastructure</h4>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">Business Owner</span>
+                        <span className="text-xs font-semibold text-[#F5F5F5] block mt-1">{selectedKpi.business_owner || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">Data Owner</span>
+                        <span className="text-xs font-semibold text-[#F5F5F5] block mt-1">{selectedKpi.data_owner || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">Source System</span>
+                        <span className="text-xs font-semibold text-[#F5F5F5] block mt-1">{selectedKpi.source_system || "—"}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Notes / Assumptions */}
-                <div>
-                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#FFE600] mb-2">Notes / Assumptions</h4>
-                  <p className="text-xs text-[#B0B0B0] leading-relaxed italic whitespace-pre-wrap bg-[#111111] p-4 border-l-2 border-[#FFE600] rounded-r-sm">
-                    {selectedKpi.notes || "—"}
-                  </p>
-                </div>
+                  {/* Target & Threshold Ranges */}
+                  <div className="bg-[#111111]/40 border border-[#303030] p-4 rounded-sm">
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#FFE600] mb-3">Threshold / Target</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block mb-1">Target Range</span>
+                        <p className="text-xs text-[#F5F5F5] font-semibold leading-relaxed">
+                          {selectedKpi.recommended_target_range || "—"}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block mb-1">Threshold Range</span>
+                        <p className="text-xs text-[#F5F5F5] font-semibold leading-relaxed">
+                          {selectedKpi.recommended_threshold_range || "—"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
 
-              </div>
+                  {/* Notes / Assumptions */}
+                  <div>
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#FFE600] mb-2">Notes / Assumptions</h4>
+                    <p className="text-xs text-[#B0B0B0] leading-relaxed italic whitespace-pre-wrap bg-[#111111] p-4 border-l-2 border-[#FFE600] rounded-r-sm">
+                      {selectedKpi.notes || "—"}
+                    </p>
+                  </div>
+
+                </div>
+              )}
             </div>
 
             {/* Footer */}
             <div className="p-6 border-t border-[#303030] bg-[#111111] flex justify-between gap-3 shrink-0">
-              <div className="flex gap-2">
-                <button 
-                  className="button-secondary !py-2" 
-                  onClick={async () => {
-                    await setStatus([selectedKpi.id], "approved");
-                  }}
-                >
-                  <Check size={14} className="text-emerald-400" />
-                  Approve
-                </button>
-                <button 
-                  className="button-secondary !py-2" 
-                  onClick={async () => {
-                    await setStatus([selectedKpi.id], "rejected");
-                  }}
-                >
-                  <X size={14} className="text-rose-400" />
-                  Reject
-                </button>
-              </div>
+              {isEditing ? (
+                <>
+                  <button 
+                    className="button-yellow py-2 px-4 text-xs font-semibold"
+                    onClick={saveEdits}
+                  >
+                    Save Changes
+                  </button>
+                  <button 
+                    className="button-secondary py-2 px-4 text-xs font-semibold"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setEditForm(selectedKpi);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    <button 
+                      className="button-secondary !py-2" 
+                      onClick={async () => {
+                        await setStatus([selectedKpi.id], "approved");
+                      }}
+                    >
+                      <Check size={14} className="text-emerald-400" />
+                      Approve
+                    </button>
+                    <button 
+                      className="button-secondary !py-2" 
+                      onClick={async () => {
+                        await setStatus([selectedKpi.id], "rejected");
+                      }}
+                    >
+                      <X size={14} className="text-rose-400" />
+                      Reject
+                    </button>
+                  </div>
 
-              <button 
-                className="button-secondary" 
-                onClick={() => {
-                  setSelectedKpi(null);
-                  setIsEditing(false);
-                }}
-              >
-                Close
-              </button>
+                  <button 
+                    className="button-secondary" 
+                    onClick={() => {
+                      setSelectedKpi(null);
+                      setIsEditing(false);
+                    }}
+                  >
+                    Close
+                  </button>
+                </>
+              )}
             </div>
-
           </div>
         </>
       )}
