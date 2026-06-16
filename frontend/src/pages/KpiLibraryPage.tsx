@@ -12,7 +12,9 @@ export function KpiLibraryPage({ onChange, exports }: { onChange: () => void; ex
           Generate KPIs from the saved prompt, review data quality, edit definitions and approve records for leadership review.
         </p>
       </section>
+      
       <PromptStudio onChange={onChange} />
+      
       <KpiLibrary onChange={onChange} exports={exports} />
     </div>
   );

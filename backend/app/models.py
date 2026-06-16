@@ -98,6 +98,36 @@ class KPIUpdateRequest(BaseModel):
     patch: dict[str, Any]
 
 
+class TranscriptInsights(BaseModel):
+    executive_summary: str = ""
+    strategic_priorities: list[str] = Field(default_factory=list)
+    business_challenges: list[str] = Field(default_factory=list)
+    key_decisions: list[str] = Field(default_factory=list)
+    action_items: list[str] = Field(default_factory=list)
+    risks_dependencies: list[str] = Field(default_factory=list)
+    functional_areas: list[str] = Field(default_factory=list)
+    mentioned_metrics: list[str] = Field(default_factory=list)
+    stakeholders: list[str] = Field(default_factory=list)
+
+
+class TranscriptAnalysisRecord(BaseModel):
+    id: int
+    filename: str
+    raw_text: str
+    extracted_insights: TranscriptInsights
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class TranscriptStatusUpdateRequest(BaseModel):
+    status: str
+
+
+class TranscriptInsightsUpdateRequest(BaseModel):
+    extracted_insights: TranscriptInsights
+
+
 class WorkflowStatus(BaseModel):
     business_context: bool = False
     prompt_generation: bool = False

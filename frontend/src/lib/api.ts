@@ -8,7 +8,9 @@ import type {
   PromptRecord,
   WorkflowStatus,
   FunctionalSpecification,
-  MetadataItem
+  MetadataItem,
+  TranscriptInsights,
+  TranscriptAnalysisRecord
 } from "../types/api";
 
 const jsonHeaders = { "Content-Type": "application/json" };
@@ -56,7 +58,34 @@ export const api = {
   getExports: () => request<ExportItem[]>("/exports"),
   getLlmStatus: () =>
     request<{ provider: string; model: string; uses_real_llm: boolean; api_key_configured: boolean; api_key_env: string }>("/llm-status"),
-  getMetadata: (category: string) => request<MetadataItem[]>(`/metadata/${category}`)
+  getMetadata: (category: string) => request<MetadataItem[]>(`/metadata/${category}`),
+  
+  // Transcripts API
+  getTranscripts: () => request<TranscriptAnalysisRecord[]>("/transcript/list"),
+  uploadTranscript: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request<TranscriptAnalysisRecord>("/transcript/upload", {
+      method: "POST",
+      body: formData
+    });
+  },
+  updateTranscriptInsights: (id: number, insights: TranscriptInsights) =>
+    request<TranscriptAnalysisRecord>(`/transcript/${id}/insights`, {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify({ extracted_insights: insights })
+    }),
+  updateTranscriptStatus: (id: number, status: "draft" | "approved" | "rejected") =>
+    request<TranscriptAnalysisRecord>(`/transcript/${id}/status`, {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify({ status })
+    }),
+  deleteTranscript: (id: number) =>
+    request<{ status: string; message: string }>(`/transcript/${id}`, {
+      method: "DELETE"
+    })
 };
 
 export function exportUrl(id: string, format: string) {

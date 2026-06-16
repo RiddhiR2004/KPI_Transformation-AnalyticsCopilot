@@ -17,6 +17,7 @@ from app.database import (
     FunctionalSpecification,
     ApprovedKPIs,
     DATA_DIR,
+    TranscriptAnalysis,
 )
 
 ROOT = Path(__file__).resolve().parents[2]

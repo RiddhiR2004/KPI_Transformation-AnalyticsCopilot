@@ -1,13 +1,22 @@
 from __future__ import annotations
 
 import csv
+import json
 import os
-from typing import Any
+from typing import Any, List
 
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException
+import logging
+logger = logging.getLogger("app.main")
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+    logger.addHandler(handler)
+
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -15,6 +24,7 @@ from pydantic import BaseModel
 from app.models import (
     BusinessContext,
     ExportItem,
+    KPI,
     KPIApprovalRequest,
     KPILibrary,
     KPIUpdateRequest,
@@ -23,17 +33,24 @@ from app.models import (
     FunctionalSpecItem,
     FunctionalSpecification,
     KPIStatus,
+    TranscriptInsights,
+    TranscriptAnalysisRecord,
+    TranscriptStatusUpdateRequest,
+    TranscriptInsightsUpdateRequest,
 )
 from app.services.activity import list_activity, log_activity
 from app.services.documents import export_json_bundle
 from app.services.excel import write_kpi_xlsx
 from app.services.kpi_engine import normalize_kpi_payload, quality_check, recommendations
 from app.services.llm_providers import DemoProvider, demo_kpis, get_provider, llm_status
+from app.services.transcript import extract_text_from_bytes, analyze_transcript_text
 from app.services.prompting import (
     build_kpi_prompt,
     build_system_kpi_prompt,
     PROMPT_GENERATION_SYSTEM_PROMPT,
     PROMPT_REFINEMENT_SYSTEM_PROMPT,
+    SPEC_EXECUTIVE_SUMMARY_SYSTEM_PROMPT,
+    SPEC_KPI_ITEM_SYSTEM_PROMPT,
 )
 from app.storage import EXPORT_DIR, FILES, ensure_data_dir, read_json, write_json
 
@@ -58,6 +75,7 @@ from app.database import (
     KRAMetadata,
     KPICategoryMetadata,
     KPIQualityRatingMetadata,
+    TranscriptAnalysis,
 )
 from app.services.metadata_cache import metadata_cache
 
@@ -151,11 +169,12 @@ def startup() -> None:
     ensure_data_dir()
 
 
-def current_context() -> BusinessContext:
+def current_context(merged: bool = True) -> BusinessContext:
     data = read_json(FILES["business_context"], {})
     if not data:
         raise HTTPException(status_code=400, detail="Business context has not been created.")
-    return BusinessContext(**data)
+    ctx = BusinessContext(**data)
+    return ctx.get_merged() if merged else ctx
 
 
 def current_prompt() -> PromptRecord:
@@ -178,6 +197,174 @@ def health() -> dict[str, str]:
 @app.get("/llm-status")
 def get_llm_status() -> dict[str, Any]:
     return llm_status()
+
+
+@app.post("/transcript/upload", response_model=TranscriptAnalysisRecord)
+async def upload_transcript(file: UploadFile = File(...)) -> TranscriptAnalysisRecord:
+    # 1. Size protection
+    MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="File size exceeds maximum limit of 5MB.")
+
+    # 2. Text extraction
+    try:
+        raw_text = extract_text_from_bytes(file.filename, content)
+    except ValueError as val_err:
+        raise HTTPException(status_code=400, detail=str(val_err))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to extract text: {exc}")
+
+    if not raw_text.strip():
+        raise HTTPException(status_code=400, detail="Extracted transcript text is empty.")
+
+    # 3. LLM insights extraction
+    try:
+        insights_dict = await analyze_transcript_text(raw_text)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to analyze transcript via LLM: {exc}")
+
+    # Validate insights dict structure
+    required_keys = [
+        "executive_summary", "strategic_priorities", "business_challenges",
+        "key_decisions", "action_items", "risks_dependencies",
+        "functional_areas", "mentioned_metrics", "stakeholders"
+    ]
+    for key in required_keys:
+        if key not in insights_dict:
+            insights_dict[key] = "" if key == "executive_summary" else []
+
+    # 4. Save to DB
+    with SessionLocal() as session:
+        db_record = TranscriptAnalysis(
+            filename=file.filename,
+            raw_text=raw_text,
+            extracted_insights=json.dumps(insights_dict),
+            status="draft",
+            created_at=datetime.now(),
+            updated_at=datetime.now()
+        )
+        session.add(db_record)
+        session.commit()
+        session.refresh(db_record)
+        
+        # Build Pydantic response
+        record = TranscriptAnalysisRecord(
+            id=db_record.id,
+            filename=db_record.filename,
+            raw_text=db_record.raw_text,
+            extracted_insights=TranscriptInsights(**insights_dict),
+            status=db_record.status,
+            created_at=db_record.created_at,
+            updated_at=db_record.updated_at
+        )
+        
+    log_activity("Transcript Uploaded", f"Transcript '{file.filename}' uploaded and analyzed.")
+    return record
+
+
+@app.get("/transcript/list", response_model=List[TranscriptAnalysisRecord])
+def list_transcripts() -> List[TranscriptAnalysisRecord]:
+    with SessionLocal() as session:
+        db_records = session.query(TranscriptAnalysis).all()
+        records = []
+        for r in db_records:
+            try:
+                insights_dict = json.loads(r.extracted_insights or "{}")
+            except Exception:
+                insights_dict = {}
+            
+            # Ensure standard fields exist
+            required_keys = [
+                "executive_summary", "strategic_priorities", "business_challenges",
+                "key_decisions", "action_items", "risks_dependencies",
+                "functional_areas", "mentioned_metrics", "stakeholders"
+            ]
+            for key in required_keys:
+                if key not in insights_dict:
+                    insights_dict[key] = "" if key == "executive_summary" else []
+
+            records.append(
+                TranscriptAnalysisRecord(
+                    id=r.id,
+                    filename=r.filename,
+                    raw_text=r.raw_text,
+                    extracted_insights=TranscriptInsights(**insights_dict),
+                    status=r.status,
+                    created_at=r.created_at,
+                    updated_at=r.updated_at
+                )
+            )
+        return records
+
+
+@app.post("/transcript/{id}/insights", response_model=TranscriptAnalysisRecord)
+def update_transcript_insights(id: int, request: TranscriptInsightsUpdateRequest) -> TranscriptAnalysisRecord:
+    with SessionLocal() as session:
+        db_record = session.query(TranscriptAnalysis).filter(TranscriptAnalysis.id == id).first()
+        if not db_record:
+            raise HTTPException(status_code=404, detail="Transcript record not found.")
+        
+        db_record.extracted_insights = json.dumps(request.extracted_insights.model_dump(mode="json"))
+        db_record.updated_at = datetime.now()
+        session.commit()
+        session.refresh(db_record)
+        
+        record = TranscriptAnalysisRecord(
+            id=db_record.id,
+            filename=db_record.filename,
+            raw_text=db_record.raw_text,
+            extracted_insights=request.extracted_insights,
+            status=db_record.status,
+            created_at=db_record.created_at,
+            updated_at=db_record.updated_at
+        )
+        return record
+
+
+@app.post("/transcript/{id}/status", response_model=TranscriptAnalysisRecord)
+def update_transcript_status(id: int, request: TranscriptStatusUpdateRequest) -> TranscriptAnalysisRecord:
+    with SessionLocal() as session:
+        db_record = session.query(TranscriptAnalysis).filter(TranscriptAnalysis.id == id).first()
+        if not db_record:
+            raise HTTPException(status_code=404, detail="Transcript record not found.")
+        
+        db_record.status = request.status
+        db_record.updated_at = datetime.now()
+        session.commit()
+        session.refresh(db_record)
+        
+        try:
+            insights_dict = json.loads(db_record.extracted_insights or "{}")
+        except Exception:
+            insights_dict = {}
+            
+        record = TranscriptAnalysisRecord(
+            id=db_record.id,
+            filename=db_record.filename,
+            raw_text=db_record.raw_text,
+            extracted_insights=TranscriptInsights(**insights_dict),
+            status=db_record.status,
+            created_at=db_record.created_at,
+            updated_at=db_record.updated_at
+        )
+    log_activity("Transcript Status Updated", f"Transcript '{db_record.filename}' marked as {request.status}.")
+    return record
+
+
+@app.delete("/transcript/{id}")
+def delete_transcript(id: int) -> dict[str, str]:
+    with SessionLocal() as session:
+        db_record = session.query(TranscriptAnalysis).filter(TranscriptAnalysis.id == id).first()
+        if not db_record:
+            raise HTTPException(status_code=404, detail="Transcript record not found.")
+        
+        filename = db_record.filename
+        session.delete(db_record)
+        session.commit()
+        
+    log_activity("Transcript Deleted", f"Transcript '{filename}' deleted.")
+    return {"status": "success", "message": f"Transcript '{filename}' deleted."}
 
 
 @app.post("/business-context")
@@ -228,36 +415,85 @@ def build_fallback_guidance(user_guidance: str) -> str:
         )
 
 
+def get_approved_transcripts_context() -> str:
+    with SessionLocal() as session:
+        approved = session.query(TranscriptAnalysis).filter(TranscriptAnalysis.status == "approved").all()
+        if not approved:
+            return ""
+        
+        parts = []
+        for i, t in enumerate(approved, start=1):
+            try:
+                insights = json.loads(t.extracted_insights or "{}")
+            except Exception:
+                continue
+            
+            t_str = (
+                f"--- Transcript Insights {i}: {t.filename} ---\n"
+                f"Executive Summary: {insights.get('executive_summary', '')}\n"
+                f"Strategic Priorities:\n" + "\n".join(f"  - {p}" for p in insights.get("strategic_priorities", [])) + "\n"
+                f"Business Challenges:\n" + "\n".join(f"  - {c}" for c in insights.get("business_challenges", [])) + "\n"
+                f"Key Decisions:\n" + "\n".join(f"  - {d}" for d in insights.get("key_decisions", [])) + "\n"
+                f"Action Items:\n" + "\n".join(f"  - {a}" for a in insights.get("action_items", [])) + "\n"
+                f"Risks & Dependencies:\n" + "\n".join(f"  - {r}" for r in insights.get("risks_dependencies", [])) + "\n"
+                f"Mentioned Metrics:\n" + "\n".join(f"  - {m}" for m in insights.get("mentioned_metrics", [])) + "\n"
+            )
+            parts.append(t_str)
+            
+        if not parts:
+            return ""
+            
+        return "=== APPROVED TRANSCRIPT ANALYSIS INSIGHTS ===\n" + "\n".join(parts)
+
+
 class GeneratePromptRequest(BaseModel):
     user_instructions: str = ""
 
 
 class RefinePromptRequest(BaseModel):
+    prompt: str = ""
     refinement_instructions: str
 
 
 @app.post("/generate-prompt")
 async def generate_prompt(request: GeneratePromptRequest) -> PromptRecord:
+    logger.info("=== GENERATING PROMPT ===")
+    logger.info(f"User advisory instructions input: '{request.user_instructions}'")
     context = current_context()
+    context_raw = current_context(merged=False)
     provider = get_provider()
+    
+    logger.info(f"Loaded context for industry: '{context_raw.industry}', org_level: '{context_raw.organization_level}', target count: {context_raw.kpi_count}")
     
     # Check if we are running in DemoProvider mode
     if isinstance(provider, DemoProvider):
-        # Fallback to deprecated build_kpi_prompt
+        logger.info("Using DemoProvider fallback prompt builder")
         prompt_text = build_kpi_prompt(context)
+        transcript_ctx = get_approved_transcripts_context()
+        if transcript_ctx:
+            prompt_text += f"\n\n{transcript_ctx}"
         prompt_text += build_fallback_guidance(request.user_instructions)
     else:
         # Build prompt using Gemini
         user_prompt = (
             f"=== RAW BUSINESS CONTEXT ===\n"
-            f"Industry: {context.industry}\n"
-            f"Organization Level: {context.organization_level}\n"
-            f"KPI Count: {context.kpi_count}\n"
-            f"Business Priorities:\n" + "\n".join(f"- {p}" for p in context.business_priorities) + "\n"
-            f"Business Challenges:\n" + "\n".join(f"- {c}" for c in context.business_challenges) + "\n"
-            f"Top KRAs:\n" + "\n".join(f"- {k}" for k in context.top_kras) + "\n"
-            f"Functional Areas:\n" + "\n".join(f"- {a}" for a in context.functional_areas) + "\n"
+            f"Industry: {context_raw.industry}\n"
+            f"Organization Level: {context_raw.organization_level}\n"
+            f"KPI Count: {context_raw.kpi_count}\n"
+            f"\n--- Predefined Business Priorities ---\n" + ("\n".join(f"- {p}" for p in context_raw.business_priorities) if context_raw.business_priorities else "None specified") + "\n"
+            f"\n--- Additional / Custom Business Priorities ---\n" + ("\n".join(f"- {p}" for p in context_raw.additional_business_priorities) if context_raw.additional_business_priorities else "None specified") + "\n"
+            f"\n--- Predefined Business Challenges ---\n" + ("\n".join(f"- {c}" for c in context_raw.business_challenges) if context_raw.business_challenges else "None specified") + "\n"
+            f"\n--- Additional / Custom Business Challenges ---\n" + ("\n".join(f"- {c}" for c in context_raw.additional_business_challenges) if context_raw.additional_business_challenges else "None specified") + "\n"
+            f"\n--- Predefined Top KRAs ---\n" + ("\n".join(f"- {k}" for k in context_raw.top_kras) if context_raw.top_kras else "None specified") + "\n"
+            f"\n--- Additional / Custom KRAs ---\n" + ("\n".join(f"- {k}" for k in context_raw.additional_kras) if context_raw.additional_kras else "None specified") + "\n"
+            f"\n--- Predefined Functional Areas ---\n" + ("\n".join(f"- {a}" for a in context_raw.functional_areas) if context_raw.functional_areas else "None specified") + "\n"
+            f"\n--- Additional / Custom Functional Areas ---\n" + ("\n".join(f"- {a}" for a in context_raw.additional_functional_areas) if context_raw.additional_functional_areas else "None specified") + "\n"
         )
+        
+        transcript_ctx = get_approved_transcripts_context()
+        if transcript_ctx:
+            user_prompt += f"\n{transcript_ctx}\n"
+
         if request.user_instructions:
             user_prompt += (
                 f"\n=== USER INSTRUCTIONS / STRATEGIC PREFERENCES ===\n"
@@ -267,13 +503,15 @@ async def generate_prompt(request: GeneratePromptRequest) -> PromptRecord:
         system_prompt = PROMPT_GENERATION_SYSTEM_PROMPT.format(kpi_count=context.kpi_count)
         
         try:
-            payload = await provider.generate_json(system_prompt, user_prompt)
+            logger.info(f"Sending prompt generation request to LLM using model {provider.model}...")
+            payload = await provider.generate_json(system_prompt, user_prompt, step_name="generate_prompt")
             prompt_text = payload.get("prompt", "").strip()
             if not prompt_text:
                 raise ValueError("LLM returned empty prompt text")
+            logger.info("Prompt generation succeeded.")
         except Exception as exc:
             # Fallback on failure
-            print(f"AI Prompt generation failed: {exc}. Falling back to build_kpi_prompt()")
+            logger.error(f"AI Prompt generation failed: {exc}. Falling back to build_kpi_prompt()", exc_info=True)
             prompt_text = build_kpi_prompt(context)
             prompt_text += build_fallback_guidance(request.user_instructions)
                 
@@ -286,14 +524,17 @@ async def generate_prompt(request: GeneratePromptRequest) -> PromptRecord:
     
     if not isinstance(provider, DemoProvider):
         try:
+            logger.info("Generating concise business summary from the generated prompt...")
             summary_payload = await provider.generate_json(
                 "Return a concise business summary as JSON with Business Focus, Primary Challenges, Recommended KPI Areas, Executive Summary.",
                 prompt_text,
+                step_name="generate_business_summary",
             )
             if isinstance(summary_payload, dict):
                 summary.update(summary_payload)
-        except Exception:
-            pass
+                logger.info(f"Business summary generation succeeded: {summary}")
+        except Exception as exc:
+            logger.warning(f"Business summary generation failed: {exc}", exc_info=True)
             
     record = PromptRecord(
         prompt=prompt_text,
@@ -309,35 +550,57 @@ async def generate_prompt(request: GeneratePromptRequest) -> PromptRecord:
 
 @app.post("/refine-prompt")
 async def refine_prompt(request: RefinePromptRequest) -> PromptRecord:
-    record = current_prompt()
-    provider = get_provider()
+    logger.info("=== REFINING PROMPT ===")
+    logger.info(f"Refinement instructions: '{request.refinement_instructions}'")
     
+    record = current_prompt()
+    # Use workspace text from request body, fallback to DB prompt
+    current_workspace_prompt = request.prompt if request.prompt.strip() else record.prompt
+    
+    provider = get_provider()
     context = current_context()
+    context_raw = current_context(merged=False)
+    
     if isinstance(provider, DemoProvider):
-        refined_prompt = record.prompt + f"\n\n[Refined with guidelines: {request.refinement_instructions}]"
+        logger.info("Using DemoProvider fallback prompt refiner")
+        refined_prompt = current_workspace_prompt + f"\n\n[Refined with guidelines: {request.refinement_instructions}]"
     else:
         user_prompt = (
             f"=== RAW BUSINESS CONTEXT ===\n"
-            f"Industry: {context.industry}\n"
-            f"Org Level: {context.organization_level}\n"
-            f"KPI Count: {context.kpi_count}\n"
-            f"Priorities:\n" + "\n".join(f"  * {p}" for p in context.business_priorities) + "\n"
-            f"Challenges:\n" + "\n".join(f"  * {c}" for c in context.business_challenges) + "\n"
-            f"KRAs:\n" + "\n".join(f"  * {k}" for k in context.top_kras) + "\n"
-            f"Functional Areas:\n" + "\n".join(f"  * {a}" for a in context.functional_areas) + "\n\n"
+            f"Industry: {context_raw.industry}\n"
+            f"Org Level: {context_raw.organization_level}\n"
+            f"KPI Count: {context_raw.kpi_count}\n"
+            f"\n--- Predefined Business Priorities ---\n" + ("\n".join(f"- {p}" for p in context_raw.business_priorities) if context_raw.business_priorities else "None specified") + "\n"
+            f"\n--- Additional / Custom Business Priorities ---\n" + ("\n".join(f"- {p}" for p in context_raw.additional_business_priorities) if context_raw.additional_business_priorities else "None specified") + "\n"
+            f"\n--- Predefined Business Challenges ---\n" + ("\n".join(f"- {c}" for c in context_raw.business_challenges) if context_raw.business_challenges else "None specified") + "\n"
+            f"\n--- Additional / Custom Business Challenges ---\n" + ("\n".join(f"- {c}" for c in context_raw.additional_business_challenges) if context_raw.additional_business_challenges else "None specified") + "\n"
+            f"\n--- Predefined Top KRAs ---\n" + ("\n".join(f"- {k}" for k in context_raw.top_kras) if context_raw.top_kras else "None specified") + "\n"
+            f"\n--- Additional / Custom KRAs ---\n" + ("\n".join(f"- {k}" for k in context_raw.additional_kras) if context_raw.additional_kras else "None specified") + "\n"
+            f"\n--- Predefined Functional Areas ---\n" + ("\n".join(f"- {a}" for a in context_raw.functional_areas) if context_raw.functional_areas else "None specified") + "\n"
+            f"\n--- Additional / Custom Functional Areas ---\n" + ("\n".join(f"- {a}" for a in context_raw.additional_functional_areas) if context_raw.additional_functional_areas else "None specified") + "\n\n"
+        )
+        
+        transcript_ctx = get_approved_transcripts_context()
+        if transcript_ctx:
+            user_prompt += f"{transcript_ctx}\n\n"
+
+        user_prompt += (
             f"=== CURRENT PROMPT TO REFINE ===\n"
-            f"{record.prompt}\n\n"
+            f"{current_workspace_prompt}\n\n"
             f"=== NEW REFINEMENT INSTRUCTIONS ===\n"
             f"{request.refinement_instructions}\n\n"
             f"Please refine the current prompt using the guidelines in the system instructions. Ensure that the refined prompt retains all details of the original business context and integrates the new refinement instructions seamlessly without copying them verbatim."
         )
         try:
+            logger.info(f"Sending prompt refinement request to LLM using model {provider.model}...")
             system_prompt = PROMPT_REFINEMENT_SYSTEM_PROMPT.format(kpi_count=context.kpi_count)
-            payload = await provider.generate_json(system_prompt, user_prompt)
+            payload = await provider.generate_json(system_prompt, user_prompt, step_name="refine_prompt")
             refined_prompt = payload.get("prompt", "").strip()
             if not refined_prompt:
                 raise ValueError("LLM returned empty refined prompt")
+            logger.info("Prompt refinement succeeded.")
         except Exception as exc:
+            logger.error(f"Prompt refinement failed: {exc}", exc_info=True)
             raise HTTPException(status_code=502, detail=f"Prompt refinement failed: {exc}") from exc
             
     record.prompt = refined_prompt
@@ -373,9 +636,14 @@ async def generate_kpis() -> KPILibrary:
         else:
             system_prompt = build_system_kpi_prompt(context)
             try:
+                user_prompt = prompt
+                transcript_ctx = get_approved_transcripts_context()
+                if transcript_ctx and transcript_ctx not in user_prompt:
+                    user_prompt += f"\n\n{transcript_ctx}"
                 payload = await provider.generate_json(
                     system_prompt,
-                    prompt,
+                    user_prompt,
+                    step_name="generate_kpis",
                 )
                 items = normalize_kpi_payload(payload, context)
             except Exception as exc:
@@ -402,7 +670,8 @@ async def generate_kpis() -> KPILibrary:
             )
             summary_payload = await provider.generate_json(
                 "Return a JSON object with 'summary_text': 'your summary here'. Do not return any other text.",
-                summary_prompt
+                summary_prompt,
+                step_name="generate_executive_summary",
             )
             if isinstance(summary_payload, dict) and summary_payload.get("summary_text"):
                 exec_summary_text = summary_payload["summary_text"]
@@ -500,20 +769,196 @@ def timeline() -> list[dict[str, Any]]:
     return list_activity()
 
 
+def build_mock_spec_item(kpi: KPI, context: BusinessContext) -> FunctionalSpecItem:
+    pri = context.business_priorities[0] if context.business_priorities else "Operational Excellence"
+    chal = context.business_challenges[0] if context.business_challenges else "Process variance"
+    kra = kpi.kra or (context.top_kras[0] if context.top_kras else "Operational Discipline")
+    area = kpi.functional_area or (context.functional_areas[0] if context.functional_areas else "Operations")
+
+    # Check if approved transcripts exist to inject textual trace
+    transcript_trace_note = ""
+    with SessionLocal() as session:
+        from app.database import TranscriptAnalysis
+        approved_t = session.query(TranscriptAnalysis).filter(TranscriptAnalysis.status == "approved").first()
+        if approved_t:
+            try:
+                insights_dict = json.loads(approved_t.extracted_insights or "{}")
+                decisions = insights_dict.get("key_decisions") or []
+                actions = insights_dict.get("action_items") or []
+                decision_str = f"'{decisions[0]}'" if decisions else "alignment meeting decision"
+                action_str = f"'{actions[0]}'" if actions else "the agreed roadmap action items"
+                transcript_trace_note = f" [Traceable to meeting decision: {decision_str}. Action: {action_str}]"
+            except Exception:
+                transcript_trace_note = " [Traceable to approved meeting transcript decisions]"
+
+    return FunctionalSpecItem(
+        id=kpi.id,
+        kpi_name=kpi.kpi_name,
+        kpi_category=kpi.kpi_category or "Operational",
+        functional_area=area,
+        related_kra=kra,
+        strategic_objective_supported=pri,
+        business_challenge_addressed=chal,
+        business_owner=kpi.business_owner or "VP of Operations",
+        data_owner=kpi.data_owner or "Data Analytics Lead",
+        business_purpose_relevance=(
+            f"Why it exists: Sourced directly to support strategic tracking of {kra}.\n"
+            f"Business value: Enables the steering committee to monitor process bottlenecks and drive resource efficiency.{transcript_trace_note}\n"
+            f"Decisions supported: Operational resource planning, shift schedules, and capacity allocations.\n"
+            f"Risks of not monitoring: Operational margin leakage and process variability."
+        ),
+        kpi_definition=f"Measures and evaluates the efficiency of {kpi.kpi_name} against design parameters to ensure stable throughput.",
+        formula=kpi.formula or "Good Output / Total Input",
+        numerator=kpi.numerator or f"Total conforming units of {kpi.kpi_name} produced in reporting window",
+        denominator=kpi.denominator or "Total material or time inputs scheduled for production",
+        calculation_methodology=(
+            f"1. Extract the raw transaction history from {kpi.source_system}.\n"
+            f"2. Filter out non-conforming test runs and quality checkpoints.\n"
+            f"3. Sum the daily output for the numerator.\n"
+            f"4. Divide by the total inputs in the denominator, then multiply by 100 for the percentage score."
+        ),
+        inclusion_rules="Include all validated customer orders and completed production lots.",
+        exclusion_rules="Exclude raw material waste, testing scrap, and canceled orders.",
+        sample_calculation=f"If good units = 9,500 and total started = 10,000, then KPI = (9,500 / 10,000) * 100 = 95.00%.",
+        business_rules="Standard monthly posting dates apply. Manual overrides require VP approval.",
+        data_validation_rules="KPI must lie in the range [0, 100]. Denominator must be strictly positive.",
+        exception_handling_rules="In case of zero transactions, default the metric score to Null to avoid division by zero errors.",
+        data_quality_expectations="Timeliness: Data loaded within 24 hours of period close. Completeness: >99.9%.",
+        source_systems_lineage=(
+            f"Source system: {kpi.source_system} (Module: {kpi.sap_module or 'Custom'}).\n"
+            f"Dependencies: Master transactional tables and inventory logs.\n"
+            f"Upstream: ERP transaction ledger. Downstream: C-suite dashboard."
+        ),
+        ownership_governance=(
+            f"Business Owner ({kpi.business_owner or 'VP'}): Reviews variance and coordinates corrective actions.\n"
+            f"Data Owner ({kpi.data_owner or 'Lead'}): Maintains data integration pipeline and semantic views.\n"
+            f"Governance: Subject to monthly audits by the data steering committee."
+        ),
+        assumptions_constraints=(
+            "Assumptions: Continuous data stream availability and stable ERP schemas.\n"
+            f"Constraints: Batch processing latency may delay daily refresh.{transcript_trace_note}"
+        ),
+        reporting_requirements=f"Visual layout: Gauge card and trend line showing actuals vs target of {kpi.recommended_target_range}.",
+        dashboard_recommendations="Include on the Executive Performance Dashboard as a primary card.",
+        threshold_guidance=f"Green: >= Target, Amber: Within 5% of target, Red: Below target ({kpi.recommended_threshold_range}).",
+        implementation_guidance=(
+            "Integration: Sourced via standard API endpoints.\n"
+            f"Technical Risks: Sync latency between master replica database.{transcript_trace_note}\n"
+            "Change Management: Training workshop for operations managers."
+        ),
+        business_purpose=kpi.kpi_description,
+        business_logic=f"Formula: {kpi.formula}\nNumerator: {kpi.numerator}\nDenominator: {kpi.denominator}",
+        source_system=kpi.source_system,
+        refresh_frequency=kpi.refresh_cadence,
+        assumptions=f"Assumes active data extraction from SAP module {kpi.sap_module}."
+    )
+
+
+def build_mock_executive_summary(context: BusinessContext, approved_kpis: list[KPI]) -> str:
+    pri = ", ".join(context.business_priorities[:3]) if context.business_priorities else "Operational Excellence"
+    chal = ", ".join(context.business_challenges[:3]) if context.business_challenges else "Process variance"
+    return (
+        f"This Functional Specification Document establishes the governance and calculation standards for the "
+        f"corporate KPI transformation initiative within the {context.industry} sector. Guided by executive mandates "
+        f"at the {context.organization_level} level, this initiative directly aligns with key business priorities "
+        f"including {pri}. In addressing critical challenges such as {chal}, the program deploys "
+        f"{len(approved_kpis)} approved metrics. By detailing data ownership, source systems (SAP/ERP lineage), "
+        f"and calculation boundaries, this document ensures absolute transparency and credibility, providing "
+        f"implementation-ready specifications for engineering and dashboard scripting teams."
+    )
+
+
+def load_db_spec() -> Any:
+    from app.database import FunctionalSpecification as DBFunctionalSpecification
+    with SessionLocal() as session:
+        db_spec = session.query(DBFunctionalSpecification).order_by(DBFunctionalSpecification.id.desc()).first()
+        if not db_spec:
+            db_spec = DBFunctionalSpecification(
+                executive_summary="This document outlines the governed metrics specification.",
+                draft_items="[]",
+                approved_items="[]",
+                status="draft"
+            )
+            session.add(db_spec)
+            session.commit()
+            session.refresh(db_spec)
+        return db_spec
+
+
 @app.get("/functional-spec")
 def get_functional_spec() -> dict[str, Any]:
-    return read_json(FILES["functional_spec"], {})
+    db_spec = load_db_spec()
+    import json
+    draft_items_list = json.loads(db_spec.draft_items or "[]")
+    approved_items_list = json.loads(db_spec.approved_items or "[]")
+    return {
+        "items": draft_items_list,
+        "approved_items": approved_items_list,
+        "executive_summary": db_spec.executive_summary,
+        "status": db_spec.status,
+        "updated_at": db_spec.updated_at.isoformat() if db_spec.updated_at else None
+    }
 
 
 @app.post("/functional-spec")
 def save_functional_spec(spec: FunctionalSpecification) -> FunctionalSpecification:
-    write_json(FILES["functional_spec"], spec.model_dump(mode="json"))
+    from app.database import FunctionalSpecification as DBFunctionalSpecification
+    import json
+    with SessionLocal() as session:
+        db_spec = session.query(DBFunctionalSpecification).order_by(DBFunctionalSpecification.id.desc()).first()
+        if not db_spec:
+            db_spec = DBFunctionalSpecification()
+            session.add(db_spec)
+        
+        items_json = json.dumps([item.model_dump(mode="json") for item in spec.items])
+        db_spec.draft_items = items_json
+        db_spec.executive_summary = spec.executive_summary
+        db_spec.status = "draft"  # manual edits revert status to draft
+        db_spec.updated_at = datetime.now()
+        session.commit()
+        
+        # Write to JSON for backward compatibility
+        write_json(FILES["functional_spec"], spec.model_dump(mode="json"))
+        
     log_activity("Functional Spec Saved", f"{len(spec.items)} spec items updated by consultant")
     return spec
 
 
+@app.post("/approve-spec")
+def approve_spec() -> dict[str, Any]:
+    from app.database import FunctionalSpecification as DBFunctionalSpecification
+    import json
+    with SessionLocal() as session:
+        db_spec = session.query(DBFunctionalSpecification).order_by(DBFunctionalSpecification.id.desc()).first()
+        if not db_spec:
+            raise HTTPException(status_code=400, detail="No specification found. Please generate first.")
+        
+        db_spec.approved_items = db_spec.draft_items
+        db_spec.status = "approved"
+        db_spec.updated_at = datetime.now()
+        session.commit()
+        
+        # Sync with JSON file
+        draft_items_list = json.loads(db_spec.draft_items or "[]")
+        pydantic_spec = FunctionalSpecification(
+            items=draft_items_list,
+            executive_summary=db_spec.executive_summary,
+            status="approved",
+            updated_at=db_spec.updated_at
+        )
+        write_json(FILES["functional_spec"], pydantic_spec.model_dump(mode="json"))
+        
+    log_activity("Functional Spec Approved", "The functional specification package was signed off.")
+    return {
+        "status": "success",
+        "message": "Functional specification approved",
+        "updated_at": db_spec.updated_at.isoformat()
+    }
+
+
 @app.post("/generate-spec")
-async def generate_spec() -> FunctionalSpecification:
+async def generate_spec() -> dict[str, Any]:
+    import json
     context = current_context()
     approved_data = read_json(FILES["approved_kpis"], {})
     approved_items_raw = approved_data.get("items") or []
@@ -521,108 +966,183 @@ async def generate_spec() -> FunctionalSpecification:
     if not approved_kpis:
         raise HTTPException(status_code=400, detail="No approved KPIs in library. Please approve KPIs in Step 2 first.")
     
-    prompt_parts = []
-    prompt_parts.append(f"Industry: {context.industry}")
-    prompt_parts.append(f"Organization Level: {context.organization_level}")
-    prompt_parts.append("Approved KPIs to document:")
-    for k in approved_kpis:
-        prompt_parts.append(
-            f"- ID: {k.id}\n"
-            f"  KPI Name: {k.kpi_name}\n"
-            f"  Functional Area: {k.functional_area}\n"
-            f"  Category: {k.kpi_category}\n"
-            f"  Business Definition: {k.business_definition}\n"
-            f"  Formula: {k.formula}\n"
-            f"  Numerator: {k.numerator}\n"
-            f"  Denominator: {k.denominator}\n"
-            f"  Source System: {k.source_system}\n"
-            f"  SAP Module: {k.sap_module}\n"
-            f"  Business Owner: {k.business_owner}\n"
-            f"  Data Owner: {k.data_owner}\n"
-            f"  Refresh Cadence: {k.refresh_cadence}\n"
-            f"  Target Range: {k.recommended_target_range}\n"
-            f"  Threshold Range: {k.recommended_threshold_range}\n"
-        )
-    
-    prompt_parts.append(
-        "Instructions:\n"
-        "For each approved KPI, generate the consulting-grade Business Assumptions and Reporting Visual Design Requirements. "
-        "Return ONLY a JSON list of detailed items. Do not invent synthetic names.\n"
-        "Format for each item:\n"
-        "- id: Must match the KPI's ID exactly (e.g. kpi-1).\n"
-        "- assumptions: Detailed assumptions list for calculation (no TBD/TBC).\n"
-        "- reporting_requirements: Visual presentation best practices (e.g., trend lines, gauges, dashboard guidelines).\n"
-        "\n"
-        "Return ONLY JSON with this shape:\n"
-        '{"items": [{"id": "", "assumptions": "", "reporting_requirements": ""}]}'
-    )
-    
-    prompt = "\n".join(prompt_parts)
     provider = get_provider()
     
-    enriched_data = {}
-    try:
-        if isinstance(provider, DemoProvider):
-            for k in approved_kpis:
-                enriched_data[k.id] = {
-                    "assumptions": f"1. Historical transactional data is validated against standard SAP {k.sap_module} tables.\n2. Excludes adjustments or cancellations processed after the 3rd business day of month end.",
-                    "reporting_requirements": f"1. Visual: Trend line comparing actuals vs target range ({k.recommended_target_range}).\n2. Drilldowns: Region, Business Unit, Product Category."
-                }
-        else:
-            payload = await provider.generate_json(
-                "You are an Enterprise Analytics Architect. Enrich the approved KPIs with assumptions and reporting requirements as JSON.",
-                prompt
-            )
-            raw_items = payload.get("items") or []
-            for item in raw_items:
-                enriched_data[str(item.get("id"))] = {
-                    "assumptions": str(item.get("assumptions") or "No special assumptions documented."),
-                    "reporting_requirements": str(item.get("reporting_requirements") or "Default tabular visualization.")
-                }
-    except Exception:
+    from app.services.spec_validator import validate_spec_item
+
+    if isinstance(provider, DemoProvider):
+        executive_summary = build_mock_executive_summary(context, approved_kpis)
+        spec_items = []
         for k in approved_kpis:
-            enriched_data[k.id] = {
-                "assumptions": f"1. Underlying raw transaction files are loaded from SAP {k.sap_module} nightly.\n2. Financial metrics align with GAAP standard reporting schedules.",
-                "reporting_requirements": f"1. Visual Layout: Target comparison bar/gauge card.\n2. Dimensions: Corporate hierarchy drilldown."
-            }
+            item = build_mock_spec_item(k, context)
+            item.validation_warnings = validate_spec_item(item, k)
+            spec_items.append(item)
+    else:
+        # Load curated advisory prompt from step 1/2
+        try:
+            advisory_prompt_rec = current_prompt()
+            advisory_prompt = advisory_prompt_rec.prompt
+        except Exception:
+            advisory_prompt = "No approved advisory prompt available."
+
+        # Compile approved KPIs metadata
+        kpi_metadata_list = []
+        for k in approved_kpis:
+            kpi_metadata_list.append({
+                "id": k.id,
+                "kpi_name": k.kpi_name,
+                "kra": k.kra,
+                "kpi_category": k.kpi_category,
+                "business_definition": k.business_definition,
+                "kpi_description": k.kpi_description,
+                "formula": k.formula,
+                "numerator": k.numerator,
+                "denominator": k.denominator,
+                "business_owner": k.business_owner,
+                "data_owner": k.data_owner,
+                "source_system": k.source_system,
+                "sap_module": k.sap_module,
+                "refresh_cadence": k.refresh_cadence,
+                "recommended_target_range": k.recommended_target_range,
+                "recommended_threshold_range": k.recommended_threshold_range,
+                "notes": k.notes
+            })
+        kpi_metadata_str = json.dumps(kpi_metadata_list, indent=2)
+
+        transcript_ctx = get_approved_transcripts_context()
+        transcript_ctx_part = f"=== APPROVED TRANSCRIPT ANALYSIS INSIGHTS ===\n{transcript_ctx}\n\n" if transcript_ctx else ""
+
+        user_prompt = (
+            f"=== BUSINESS CONTEXT ===\n"
+            f"Industry: {context.industry}\n"
+            f"Organization Level: {context.organization_level}\n"
+            f"Strategic Objectives / Priorities:\n"
+            + "\n".join(f"- {p}" for p in context.business_priorities) + "\n"
+            f"Business Challenges:\n"
+            + "\n".join(f"- {c}" for c in context.business_challenges) + "\n"
+            f"Key Result Areas (KRAs):\n"
+            + "\n".join(f"- {k}" for k in context.top_kras) + "\n"
+            f"Functional Areas:\n"
+            + "\n".join(f"- {a}" for a in context.functional_areas) + "\n\n"
+            f"{transcript_ctx_part}"
+            f"=== APPROVED ADVISORY PROMPT ===\n"
+            f"{advisory_prompt}\n\n"
+            f"=== APPROVED KPIS METADATA ===\n"
+            f"{kpi_metadata_str}\n\n"
+            f"Please generate the complete Functional Specification Document. "
+            f"For each of the {len(approved_kpis)} approved KPIs, output its specification object in the 'items' array with the exact 'id' and 'kpi_name' as provided."
+        )
+
+        try:
+            logger.info("Generating complete Functional Specification Document via LLM in a single invocation...")
+            from app.services.prompting import SPEC_DOCUMENT_SYSTEM_PROMPT
             
-    spec_items = []
-    for k in approved_kpis:
-        extra = enriched_data.get(k.id, {
-            "assumptions": f"1. Values are sourced from {k.source_system} ({k.sap_module}).\n2. Calculation schedules run on standard calendar posting dates.",
-            "reporting_requirements": "Recommended display: Scorecard KPI trend indicator."
-        })
-        
-        detailed_logic = (
-            f"Business Definition: {k.business_definition}\n\n"
-            f"Calculation Parameters:\n"
-            f"- Numerator: {k.numerator or 'Count of matching transactions'}\n"
-            f"- Denominator: {k.denominator or 'Total transactions in period'}\n\n"
-            f"SAP Lineage: Module {k.sap_module or 'Custom Data'}\n"
-            f"Owner: {k.business_owner} (Business) / {k.data_owner} (Data Lead)\n"
-            f"Target: {k.recommended_target_range}\n"
-            f"Thresholds: {k.recommended_threshold_range}"
-        )
-        
-        spec_items.append(
-            FunctionalSpecItem(
-                id=k.id,
-                kpi_name=k.kpi_name,
-                business_purpose=k.kpi_description,
-                formula=k.formula,
-                business_logic=detailed_logic,
-                source_system=f"{k.source_system} (Module: {k.sap_module})",
-                data_owner=k.data_owner or k.business_owner,
-                refresh_frequency=k.refresh_cadence,
-                assumptions=extra["assumptions"],
-                reporting_requirements=extra["reporting_requirements"]
+            doc_payload = await provider.generate_json(
+                SPEC_DOCUMENT_SYSTEM_PROMPT,
+                user_prompt,
+                step_name="generate_spec_document"
             )
-        )
+            
+            executive_summary = doc_payload.get("executive_summary", "")
+            if not executive_summary:
+                executive_summary = build_mock_executive_summary(context, approved_kpis)
+                
+            items_payload = doc_payload.get("items") or []
+            # Convert items to FunctionalSpecItem
+            spec_items = []
+            payload_items_dict = {item.get("id") or item.get("kpi_name"): item for item in items_payload if isinstance(item, dict)}
+            
+            for k in approved_kpis:
+                kpi_payload = payload_items_dict.get(k.id) or payload_items_dict.get(k.kpi_name)
+                
+                if kpi_payload:
+                    spec_item = FunctionalSpecItem(
+                        id=k.id,
+                        kpi_name=k.kpi_name,
+                        kpi_category=str(kpi_payload.get("kpi_category") or k.kpi_category or ""),
+                        functional_area=str(kpi_payload.get("functional_area") or k.functional_area or ""),
+                        related_kra=str(kpi_payload.get("related_kra") or k.kra or ""),
+                        strategic_objective_supported=str(kpi_payload.get("strategic_objective_supported") or ""),
+                        business_challenge_addressed=str(kpi_payload.get("business_challenge_addressed") or ""),
+                        business_owner=str(kpi_payload.get("business_owner") or k.business_owner or ""),
+                        data_owner=str(kpi_payload.get("data_owner") or k.data_owner or ""),
+                        business_purpose_relevance=str(kpi_payload.get("business_purpose_relevance") or ""),
+                        kpi_definition=str(kpi_payload.get("kpi_definition") or k.business_definition or k.kpi_description or ""),
+                        formula=str(kpi_payload.get("formula") or k.formula or ""),
+                        numerator=str(kpi_payload.get("numerator") or k.numerator or ""),
+                        denominator=str(kpi_payload.get("denominator") or k.denominator or ""),
+                        calculation_methodology=str(kpi_payload.get("calculation_methodology") or ""),
+                        inclusion_rules=str(kpi_payload.get("inclusion_rules") or ""),
+                        exclusion_rules=str(kpi_payload.get("exclusion_rules") or ""),
+                        sample_calculation=str(kpi_payload.get("sample_calculation") or ""),
+                        business_rules=str(kpi_payload.get("business_rules") or ""),
+                        data_validation_rules=str(kpi_payload.get("data_validation_rules") or ""),
+                        exception_handling_rules=str(kpi_payload.get("exception_handling_rules") or ""),
+                        data_quality_expectations=str(kpi_payload.get("data_quality_expectations") or ""),
+                        source_systems_lineage=str(kpi_payload.get("source_systems_lineage") or ""),
+                        ownership_governance=str(kpi_payload.get("ownership_governance") or ""),
+                        assumptions_constraints=str(kpi_payload.get("assumptions_constraints") or ""),
+                        reporting_requirements=str(kpi_payload.get("reporting_requirements") or ""),
+                        dashboard_recommendations=str(kpi_payload.get("dashboard_recommendations") or ""),
+                        threshold_guidance=str(kpi_payload.get("threshold_guidance") or ""),
+                        implementation_guidance=str(kpi_payload.get("implementation_guidance") or ""),
+                        
+                        # Backward compatibility
+                        business_purpose=str(kpi_payload.get("business_purpose") or k.kpi_description or ""),
+                        business_logic=f"Formula: {k.formula}\nNumerator: {k.numerator}\nDenominator: {k.denominator}",
+                        source_system=k.source_system,
+                        refresh_frequency=k.refresh_cadence,
+                        assumptions=str(kpi_payload.get("assumptions") or k.notes or "")
+                    )
+                else:
+                    logger.warning(f"KPI '{k.kpi_name}' (ID: {k.id}) not found in LLM specification payload. Using mock fallback.")
+                    spec_item = build_mock_spec_item(k, context)
+                
+                spec_item.validation_warnings = validate_spec_item(spec_item, k)
+                spec_items.append(spec_item)
+                
+        except Exception as exc:
+            logger.error(f"Single-invocation LLM generate_spec failed: {exc}. Using mock fallback for all KPIs.")
+            executive_summary = build_mock_executive_summary(context, approved_kpis)
+            spec_items = []
+            for k in approved_kpis:
+                spec_item = build_mock_spec_item(k, context)
+                spec_item.validation_warnings = validate_spec_item(spec_item, k)
+                spec_items.append(spec_item)
+
+    # 3. Save to database & file
+    from app.database import FunctionalSpecification as DBFunctionalSpecification
+    import json
+    with SessionLocal() as session:
+        db_spec = session.query(DBFunctionalSpecification).order_by(DBFunctionalSpecification.id.desc()).first()
+        if not db_spec:
+            db_spec = DBFunctionalSpecification()
+            session.add(db_spec)
+            
+        items_json = json.dumps([item.model_dump(mode="json") for item in spec_items])
+        db_spec.draft_items = items_json
+        db_spec.executive_summary = executive_summary
+        db_spec.status = "draft"
+        db_spec.updated_at = datetime.now()
+        session.commit()
         
-    spec = FunctionalSpecification(items=spec_items)
-    write_json(FILES["functional_spec"], spec.model_dump(mode="json"))
+        # Write to JSON for backward compatibility
+        pydantic_spec = FunctionalSpecification(
+            items=spec_items,
+            executive_summary=executive_summary,
+            status="draft",
+            updated_at=db_spec.updated_at
+        )
+        write_json(FILES["functional_spec"], pydantic_spec.model_dump(mode="json"))
+        
     log_activity("Functional Spec Generated", f"Specifications enriched for {len(spec_items)} approved KPIs")
-    return spec
+    return {
+        "items": [item.model_dump(mode="json") for item in spec_items],
+        "executive_summary": executive_summary,
+        "status": "draft",
+        "updated_at": db_spec.updated_at.isoformat()
+    }
+
 
 
 @app.get("/exports")
@@ -677,10 +1197,10 @@ def download_export(export_id: str, fmt: str) -> FileResponse:
         path = EXPORT_DIR / f"kpi-functional-specification.{fmt}"
         if fmt == "docx":
             from app.services.doc_generators import generate_docx_spec
-            generate_docx_spec(path, spec.items, context)
+            generate_docx_spec(path, spec, context)
         elif fmt == "pdf":
             from app.services.doc_generators import generate_pdf_spec
-            generate_pdf_spec(path, spec.items, context)
+            generate_pdf_spec(path, spec, context)
         elif fmt == "json":
             import json
             path.write_text(json.dumps(spec.model_dump(mode="json"), indent=2, default=str), encoding="utf-8")

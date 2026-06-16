@@ -123,3 +123,25 @@ export type MetadataItem = {
   updated_at?: string;
 };
 
+export type TranscriptInsights = {
+  executive_summary: string;
+  strategic_priorities: string[];
+  business_challenges: string[];
+  key_decisions: string[];
+  action_items: string[];
+  risks_dependencies: string[];
+  functional_areas: string[];
+  mentioned_metrics: string[];
+  stakeholders: string[];
+};
+
+export type TranscriptAnalysisRecord = {
+  id: number;
+  filename: string;
+  raw_text: string;
+  extracted_insights: TranscriptInsights;
+  status: "draft" | "approved" | "rejected";
+  created_at: string;
+  updated_at: string;
+};
+
