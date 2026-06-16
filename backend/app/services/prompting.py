@@ -166,6 +166,7 @@ STRICT GUARDRAILS & FORMATTING RULES:
      * Detail the strategic priorities, business challenges, key decisions, action items, risks, and mentioned metrics derived from the meeting transcripts.
      * Explain how these insights map to or shape the KPI recommendations to maintain end-to-end traceability from transcript decisions to final metrics.
 
+
    - **KPI Definitions & KPI Themes**:
      * For each strategic objective, identify the KPI themes that should be measured.
      * Explain why those KPI themes matter.
@@ -281,6 +282,7 @@ STRICT GUARDRAILS & FORMATTING RULES:
      * (Include this section ONLY if meeting transcript insights are provided in the inputs or are present in the current prompt; otherwise omit it).
      * Detail the strategic priorities, business challenges, key decisions, action items, risks, and mentioned metrics derived from the meeting transcripts.
      * Explain how these insights map to or shape the KPI recommendations to maintain end-to-end traceability from transcript decisions to final metrics.
+
 
    - **KPI Definitions & KPI Themes**:
      * For each strategic objective, identify the KPI themes that should be measured.

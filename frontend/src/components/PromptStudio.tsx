@@ -45,7 +45,7 @@ export function PromptStudio({ onChange }: { onChange: () => void }) {
     setError("");
     setSuccessMsg("");
     try {
-      const data = await api.refinePrompt(userInstructions);
+      const data = await api.refinePrompt(record.prompt, userInstructions);
       setRecord(data);
       setUserInstructions(""); // Clear input on success
       setSuccessMsg("Prompt successfully refined and updated by AI!");
@@ -119,9 +119,15 @@ export function PromptStudio({ onChange }: { onChange: () => void }) {
   };
 
   const handlePromptChange = (text: string) => {
+    const schemaMarker = "**JSON Schema Compliance:**";
+    const schemaIndex = record.prompt.indexOf(schemaMarker);
+    const schemaBlock = schemaIndex !== -1 ? record.prompt.substring(schemaIndex) : "";
+
+    const fullPrompt = schemaBlock ? `${text.trim()}\n\n${schemaBlock}` : text;
+
     setRecord((prev) => ({
       ...prev,
-      prompt: text,
+      prompt: fullPrompt,
       is_approved: false
     }));
     if (successMsg) setSuccessMsg("");
@@ -170,20 +176,36 @@ export function PromptStudio({ onChange }: { onChange: () => void }) {
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && e.ctrlKey) {
-              void generatePrompt();
+              if (record.prompt) {
+                void refinePrompt();
+              } else {
+                void generatePrompt();
+              }
             }
           }}
         />
         <div className="flex justify-end">
-          <button
-            className="button-yellow flex items-center gap-2"
-            disabled={generatingPrompt}
-            onClick={generatePrompt}
-            title={record.prompt ? "Regenerate prompt from scratch using instructions" : "Generate initial prompt using instructions"}
-          >
-            <Sparkles size={15} />
-            {generatingPrompt ? "Generating..." : record.prompt ? "Regenerate Prompt" : "Generate AI Prompt"}
-          </button>
+          {record.prompt ? (
+            <button
+              className="button-yellow flex items-center gap-2"
+              disabled={refiningPrompt || !userInstructions.trim()}
+              onClick={refinePrompt}
+              title="Refine the current prompt using your instructions above"
+            >
+              <Sparkles size={15} />
+              {refiningPrompt ? "Refining..." : "Refine Prompt"}
+            </button>
+          ) : (
+            <button
+              className="button-yellow flex items-center gap-2"
+              disabled={generatingPrompt}
+              onClick={generatePrompt}
+              title="Generate initial prompt using instructions"
+            >
+              <Sparkles size={15} />
+              {generatingPrompt ? "Generating..." : "Generate AI Prompt"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -201,7 +223,7 @@ export function PromptStudio({ onChange }: { onChange: () => void }) {
             <textarea
               id="prompt-workspace"
               className={`field min-h-[380px] resize-y font-mono text-xs leading-relaxed p-4 ${record.is_approved ? 'opacity-85 bg-[#161616] cursor-not-allowed border-emerald-500/25' : ''}`}
-              value={record.prompt}
+              value={record.prompt.split("**JSON Schema Compliance:**")[0].trim()}
               onChange={(e) => handlePromptChange(e.target.value)}
               aria-label="Editable generated prompt content"
               readOnly={record.is_approved}

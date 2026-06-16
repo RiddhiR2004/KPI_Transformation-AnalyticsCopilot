@@ -17,10 +17,10 @@ export function BusinessContextPage({ onChange }: { onChange: () => void }) {
 
 function PageHeader({ eyebrow, title, text }: { eyebrow: string; title: string; text: string }) {
   return (
-    <section className="border-l-8 border-[#ffe600] bg-white p-7">
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-black/50">{eyebrow}</p>
-      <h2 className="mt-2 text-4xl font-semibold tracking-tight text-black">{title}</h2>
-      <p className="mt-3 max-w-3xl text-base leading-7 text-black/60">{text}</p>
+    <section className="border-l-8 border-[#ffe600] bg-[#1B1B1B] p-7 border border-[#303030]">
+      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#FFE600]">{eyebrow}</p>
+      <h2 className="mt-2 text-4xl font-semibold tracking-tight text-[#F5F5F5]">{title}</h2>
+      <p className="mt-3 max-w-3xl text-sm leading-6 text-[#B0B0B0]">{text}</p>
     </section>
   );
 }

@@ -1,148 +1,15 @@
 from __future__ import annotations
 
-import asyncio
-import json
-import os
-from abc import ABC, abstractmethod
 from typing import Any
-
-import httpx
-
 from app.models import BusinessContext, KPI, KPIStatus
+from app.services.llm import get_llm_service, get_llm_status
+from app.services.llm.langchain_provider import DemoProvider
 
-
-class LLMProvider(ABC):
-    name = "base"
-    model = ""
-
-    @abstractmethod
-    async def generate_json(self, system: str, prompt: str) -> dict[str, Any]:
-        raise NotImplementedError
-
-
-class OpenRouterProvider(LLMProvider):
-    name = "openrouter"
-
-    def __init__(self) -> None:
-        self.api_key = os.getenv("OPENROUTER_API_KEY", "")
-        self.model = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
-        self.base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
-
-    async def generate_json(self, system: str, prompt: str) -> dict[str, Any]:
-        if not self.api_key:
-            raise RuntimeError("OPENROUTER_API_KEY is not configured.")
-        async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.post(
-                f"{self.base_url}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": os.getenv("OPENROUTER_SITE_URL", "http://localhost:5173"),
-                    "X-Title": "KPI Transformation & Analytics Copilot",
-                },
-                json={
-                    "model": self.model,
-                    "response_format": {"type": "json_object"},
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": prompt},
-                    ],
-                },
-            )
-            response.raise_for_status()
-        content = response.json()["choices"][0]["message"]["content"]
-        return json.loads(content)
-
-
-class GeminiProvider(LLMProvider):
-    name = "gemini"
-
-    def __init__(self) -> None:
-        self.api_key = os.getenv("GEMINI_API_KEY", "")
-        self.model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-
-    async def generate_json(self, system: str, prompt: str) -> dict[str, Any]:
-        if not self.api_key:
-            raise RuntimeError("GEMINI_API_KEY is not configured.")
-        
-        models_to_try = [self.model]
-        fallbacks = ["gemini-2.5-flash-lite", "gemini-flash-latest", "gemini-2.0-flash-lite"]
-        for f in fallbacks:
-            if f not in models_to_try:
-                models_to_try.append(f)
-                
-        last_exception = None
-        for attempt_model in models_to_try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{attempt_model}:generateContent"
-            
-            max_retries = 3
-            backoff_factor = 2.0
-            
-            for attempt in range(max_retries):
-                try:
-                    async with httpx.AsyncClient(timeout=60) as client:
-                        response = await client.post(
-                            url,
-                            params={"key": self.api_key},
-                            json={
-                                "systemInstruction": {"parts": [{"text": system}]},
-                                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                                "generationConfig": {
-                                    "responseMimeType": "application/json",
-                                    "temperature": 0.2,
-                                },
-                            },
-                        )
-                        if response.status_code in (429, 503):
-                            response.raise_for_status()
-                        response.raise_for_status()
-                    text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-                    return json.loads(text)
-                except Exception as exc:
-                    last_exception = exc
-                    if attempt < max_retries - 1:
-                        sleep_time = backoff_factor ** attempt
-                        print(f"GeminiProvider: Model '{attempt_model}' call failed: {exc}. Retrying in {sleep_time}s...")
-                        await asyncio.sleep(sleep_time)
-                    else:
-                        print(f"GeminiProvider: Model '{attempt_model}' call failed: {exc}. Trying next model...")
-                
-        if last_exception:
-            raise last_exception
-
-
-class DemoProvider(LLMProvider):
-    name = "demo"
-    model = "local-demo"
-
-    async def generate_json(self, system: str, prompt: str) -> dict[str, Any]:
-        return {"summary": "Demo provider generated structured content.", "prompt": prompt[:500]}
-
-
-def get_provider() -> LLMProvider:
-    provider = os.getenv("LLM_PROVIDER", "gemini").lower()
-    if provider == "demo":
-        return DemoProvider()
-    if provider == "openrouter":
-        return OpenRouterProvider()
-    if provider == "gemini":
-        return GeminiProvider()
-    raise RuntimeError(f"Unsupported LLM_PROVIDER: {provider}")
-
+def get_provider() -> Any:
+    return get_llm_service()
 
 def llm_status() -> dict[str, Any]:
-    provider = get_provider()
-    key_name = "GEMINI_API_KEY" if provider.name == "gemini" else "OPENROUTER_API_KEY"
-    if provider.name == "demo":
-        key_name = ""
-    return {
-        "provider": provider.name,
-        "model": provider.model,
-        "uses_real_llm": provider.name != "demo",
-        "api_key_configured": True if provider.name == "demo" else bool(os.getenv(key_name)),
-        "api_key_env": key_name,
-    }
-
+    return get_llm_status()
 
 def demo_kpis(context: BusinessContext) -> list[KPI]:
     from app.services.kpi_engine import load_catalog, calculate_recommendation_score

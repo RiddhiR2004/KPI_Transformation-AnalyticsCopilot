@@ -1,10 +1,106 @@
-import { Save, Sparkles, RefreshCw } from "lucide-react";
+import { Save, Sparkles, RefreshCw, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { metadataService } from "../lib/metadataService";
 import type { BusinessContext } from "../types/api";
 import { MultiSelect } from "./MultiSelect";
+
+function CustomValueInput({
+  label,
+  value = [],
+  predefinedSelected = [],
+  onChange,
+  placeholder = "Enter custom value..."
+}: {
+  label: string;
+  value: string[];
+  predefinedSelected: string[];
+  onChange: (value: string[]) => void;
+  placeholder?: string;
+}) {
+  const [newValue, setNewValue] = useState("");
+
+  const handleAdd = () => {
+    // 1. Trim whitespace and limit to 100 characters
+    const trimmed = newValue.trim().substring(0, 100);
+    
+    // 2. Ignore empty submissions
+    if (!trimmed) return;
+
+    // 3. Case-insensitive duplicate checks
+    const lowerNew = trimmed.toLowerCase();
+    const isDupInPredefined = predefinedSelected.some(item => item.toLowerCase() === lowerNew);
+    const isDupInCustom = value.some(item => item.toLowerCase() === lowerNew);
+
+    if (!isDupInPredefined && !isDupInCustom) {
+      onChange([...value, trimmed]);
+    }
+    setNewValue("");
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAdd();
+    }
+  };
+
+  const handleRemove = (itemToRemove: string) => {
+    onChange(value.filter(item => item !== itemToRemove));
+  };
+
+  return (
+    <div className="mt-3 border-t border-[#303030]/60 pt-3">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-[#B0B0B0]">{label}</span>
+        <span className="text-[9px] text-[#808080] italic">Add custom values not available in the predefined list.</span>
+      </div>
+      
+      {/* List of current custom values */}
+      {value.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5 max-w-full">
+          {value.map((item, index) => (
+            <div 
+              key={index} 
+              className="flex items-center max-w-full gap-1.5 bg-[#1B1B1B]/80 text-[#FFE600]/90 border border-[#FFE600]/20 px-2 py-0.5 text-xs font-semibold rounded-sm"
+            >
+              <span className="truncate min-w-0" title={item}>{item}</span>
+              <button
+                type="button"
+                className="text-[#808080] hover:text-[#FFE600] transition shrink-0"
+                onClick={() => handleRemove(item)}
+              >
+                <X size={10} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Input row to add new custom value with max length 100 */}
+      <div className="mt-2 flex gap-1.5">
+        <input
+          type="text"
+          className="field text-xs font-semibold py-1 px-2.5 h-8 flex-1"
+          placeholder={placeholder}
+          maxLength={100}
+          value={newValue}
+          onChange={(e) => setNewValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+        />
+        <button
+          type="button"
+          className="button-yellow py-1 px-2.5 h-8 text-xs flex items-center justify-center gap-1 bg-[#FFE600] text-[#111111]"
+          onClick={handleAdd}
+        >
+          <Plus size={12} />
+          <span>Add</span>
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function BusinessContextStep({ onChange }: { onChange: () => void }) {
   const [form, setForm] = useState<BusinessContext>({
@@ -14,7 +110,11 @@ export function BusinessContextStep({ onChange }: { onChange: () => void }) {
     business_priorities: [],
     business_challenges: [],
     top_kras: [],
-    functional_areas: []
+    functional_areas: [],
+    additional_business_priorities: [],
+    additional_business_challenges: [],
+    additional_kras: [],
+    additional_functional_areas: []
   });
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -59,7 +159,11 @@ export function BusinessContextStep({ onChange }: { onChange: () => void }) {
         business_priorities: defaultPriorities,
         business_challenges: defaultChallenges,
         top_kras: defaultKras,
-        functional_areas: defaultAreas
+        functional_areas: defaultAreas,
+        additional_business_priorities: [],
+        additional_business_challenges: [],
+        additional_kras: [],
+        additional_functional_areas: []
       };
 
       api.getContext().then((data) => {
@@ -185,10 +289,22 @@ export function BusinessContextStep({ onChange }: { onChange: () => void }) {
       </div>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
-        <MultiSelect label="Business Priorities" options={priorities} value={form.business_priorities} onChange={(value) => setForm({ ...form, business_priorities: value })} />
-        <MultiSelect label="Current Business Challenges" options={challenges} value={form.business_challenges} onChange={(value) => setForm({ ...form, business_challenges: value })} />
-        <MultiSelect label="Top KRAs" options={kras} value={form.top_kras} onChange={(value) => setForm({ ...form, top_kras: value })} />
-        <MultiSelect label="Functional Areas" options={areas} value={form.functional_areas} onChange={(value) => setForm({ ...form, functional_areas: value })} />
+        <div className="flex flex-col justify-between border border-[#303030] bg-[#111111]/30 p-4 rounded-sm">
+          <MultiSelect label="Business Priorities" options={priorities} value={form.business_priorities} onChange={(value) => setForm({ ...form, business_priorities: value })} />
+          <CustomValueInput label="Additional Priorities" predefinedSelected={form.business_priorities} value={form.additional_business_priorities || []} onChange={(value) => setForm({ ...form, additional_business_priorities: value })} />
+        </div>
+        <div className="flex flex-col justify-between border border-[#303030] bg-[#111111]/30 p-4 rounded-sm">
+          <MultiSelect label="Current Business Challenges" options={challenges} value={form.business_challenges} onChange={(value) => setForm({ ...form, business_challenges: value })} />
+          <CustomValueInput label="Additional Challenges" predefinedSelected={form.business_challenges} value={form.additional_business_challenges || []} onChange={(value) => setForm({ ...form, additional_business_challenges: value })} />
+        </div>
+        <div className="flex flex-col justify-between border border-[#303030] bg-[#111111]/30 p-4 rounded-sm">
+          <MultiSelect label="Top KRAs" options={kras} value={form.top_kras} onChange={(value) => setForm({ ...form, top_kras: value })} />
+          <CustomValueInput label="Additional KRAs" predefinedSelected={form.top_kras} value={form.additional_kras || []} onChange={(value) => setForm({ ...form, additional_kras: value })} />
+        </div>
+        <div className="flex flex-col justify-between border border-[#303030] bg-[#111111]/30 p-4 rounded-sm">
+          <MultiSelect label="Functional Areas" options={areas} value={form.functional_areas} onChange={(value) => setForm({ ...form, functional_areas: value })} />
+          <CustomValueInput label="Additional Functional Areas" predefinedSelected={form.functional_areas} value={form.additional_functional_areas || []} onChange={(value) => setForm({ ...form, additional_functional_areas: value })} />
+        </div>
       </div>
 
       <div className="mt-6 flex items-center justify-between border-t border-[#303030] pt-4 text-xs text-[#B0B0B0]">

@@ -1,20 +1,23 @@
-import { BarChart3, ChevronRight, FileText, Network, Table2, Target, Workflow } from "lucide-react";
+import { BarChart3, ChevronRight, FileText, Network, Table2, Target, Workflow, CheckCircle } from "lucide-react";
 import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import type { ActivityEvent, ExportItem, WorkflowStatus } from "../types/api";
 
 const steps = [
-  { to: "/step-1", label: "Business Context", icon: Target },
-  { to: "/step-2", label: "KPI Library Generation", icon: Table2 },
-  { to: "/step-3", label: "Functional Specification", icon: FileText },
-  { to: "/step-4", label: "Technical Data Flow Mapping", icon: Network },
-  { to: "/step-5", label: "KPI Logic Scripting", icon: Workflow },
-  { to: "/step-6", label: "KPI Driver Tree", icon: Workflow },
-  { to: "/step-7", label: "Dashboard Prep", icon: BarChart3 }
-] as const;
+  { to: "/step-1", label: "Business Context", icon: Target, statusKey: "business_context" as keyof WorkflowStatus },
+  { to: "/step-2", label: "KPI Library Generation", icon: Table2, statusKey: "kpi_library" as keyof WorkflowStatus },
+  { to: "/step-3", label: "Functional Specification", icon: FileText, statusKey: "functional_specification" as keyof WorkflowStatus },
+  { to: "/step-4", label: "Technical Data Flow Mapping", icon: Network, statusKey: "technical_mapping" as keyof WorkflowStatus },
+  { to: "/step-5", label: "KPI Logic Scripting", icon: Workflow, statusKey: "kpi_tree" as keyof WorkflowStatus },
+  { to: "/step-6", label: "KPI Driver Tree", icon: Workflow, statusKey: "kpi_tree" as keyof WorkflowStatus },
+  { to: "/step-7", label: "Dashboard Prep", icon: BarChart3, statusKey: "dashboard" as keyof WorkflowStatus }
+];
 
 export function Shell({
   children,
+  status,
+  timeline,
+  exports,
   hideSidebar = false
 }: {
   children: ReactNode;
@@ -26,10 +29,10 @@ export function Shell({
   return (
     <div className="min-h-screen bg-[#111111] text-[#F5F5F5] font-sans antialiased">
       <header className="border-b border-[#303030] bg-[#1B1B1B]">
-        <div className="mx-auto flex max-w-[1500px] items-center justify-between px-8 py-5">
+        <div className="mx-auto flex max-w-[1500px] items-center justify-between px-8 py-3">
           <NavLink to="/" className="flex items-center gap-4">
-            <img src="/ey_logo.png" alt="EY Logo" className="h-16 w-auto object-contain" />
-            <div className="h-8 w-px bg-[#303030] mx-1" />
+            <img src="/ey_logo.png" alt="EY Logo" className="h-10 w-auto object-contain" />
+            <div className="h-6 w-px bg-[#303030] mx-1" />
             <h1 className="text-lg font-semibold tracking-tight text-[#F5F5F5]">KPI Transformation & Analytics Copilot</h1>
           </NavLink>
         </div>
@@ -44,6 +47,7 @@ export function Shell({
               <nav className="border border-[#303030] bg-[#1B1B1B]">
                 {steps.map((step, index) => {
                   const Icon = step.icon;
+                  const isStepComplete = status ? !!status[step.statusKey] : false;
                   
                   return (
                     <NavLink
@@ -57,7 +61,11 @@ export function Shell({
                             <Icon size={18} />
                             <span>{String(index + 1).padStart(2, "0")} {step.label}</span>
                           </span>
-                          <ChevronRight size={16} className={`transition-colors ${isActive ? "text-[#FFE600]" : "text-[#B0B0B0]/40 group-hover:text-[#FFE600]"}`} />
+                          {isStepComplete ? (
+                            <CheckCircle size={16} className="text-[#FFE600]" />
+                          ) : (
+                            <ChevronRight size={16} className={`transition-colors ${isActive ? "text-[#FFE600]" : "text-[#B0B0B0]/40 group-hover:text-[#FFE600]"}`} />
+                          )}
                         </>
                       )}
                     </NavLink>

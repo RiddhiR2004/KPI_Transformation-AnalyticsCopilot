@@ -60,10 +60,14 @@ def read_json(path: Path, default: Any) -> Any:
                 "industry": row.industry,
                 "organization_level": row.organization_level,
                 "kpi_count": row.kpi_count,
-                "business_priorities": json.loads(row.business_priorities),
-                "business_challenges": json.loads(row.business_challenges),
-                "top_kras": json.loads(row.top_kras),
-                "functional_areas": json.loads(row.functional_areas),
+                "business_priorities": json.loads(row.business_priorities or "[]"),
+                "business_challenges": json.loads(row.business_challenges or "[]"),
+                "top_kras": json.loads(row.top_kras or "[]"),
+                "functional_areas": json.loads(row.functional_areas or "[]"),
+                "additional_business_priorities": json.loads(row.additional_business_priorities or "[]"),
+                "additional_business_challenges": json.loads(row.additional_business_challenges or "[]"),
+                "additional_kras": json.loads(row.additional_kras or "[]"),
+                "additional_functional_areas": json.loads(row.additional_functional_areas or "[]"),
                 "updated_at": row.updated_at.isoformat() if row.updated_at else now_iso(),
             }
             
@@ -142,17 +146,24 @@ def write_json(path: Path, data: Any) -> None:
     
     with SessionLocal() as session:
         if key == "business_context":
+            from app.models import BusinessContext as PydanticBusinessContext
+            validated = PydanticBusinessContext(**data)
+            
             row = session.scalar(select(BusinessContext).filter_by(id=1))
             if not row:
                 row = BusinessContext(id=1)
                 session.add(row)
-            row.industry = data.get("industry", "")
-            row.organization_level = data.get("organization_level", "")
-            row.kpi_count = data.get("kpi_count", 8)
-            row.business_priorities = json.dumps(data.get("business_priorities", []))
-            row.business_challenges = json.dumps(data.get("business_challenges", []))
-            row.top_kras = json.dumps(data.get("top_kras", []))
-            row.functional_areas = json.dumps(data.get("functional_areas", []))
+            row.industry = validated.industry
+            row.organization_level = validated.organization_level
+            row.kpi_count = validated.kpi_count
+            row.business_priorities = json.dumps(validated.business_priorities)
+            row.business_challenges = json.dumps(validated.business_challenges)
+            row.top_kras = json.dumps(validated.top_kras)
+            row.functional_areas = json.dumps(validated.functional_areas)
+            row.additional_business_priorities = json.dumps(validated.additional_business_priorities)
+            row.additional_business_challenges = json.dumps(validated.additional_business_challenges)
+            row.additional_kras = json.dumps(validated.additional_kras)
+            row.additional_functional_areas = json.dumps(validated.additional_functional_areas)
             row.updated_at = datetime.now()
             session.commit()
             
@@ -252,6 +263,10 @@ def seed_from_dict(data: dict[str, Any]) -> None:
                 business_challenges=json.dumps(bc_data.get("business_challenges", [])),
                 top_kras=json.dumps(bc_data.get("top_kras", [])),
                 functional_areas=json.dumps(bc_data.get("functional_areas", [])),
+                additional_business_priorities=json.dumps(bc_data.get("additional_business_priorities", [])),
+                additional_business_challenges=json.dumps(bc_data.get("additional_business_challenges", [])),
+                additional_kras=json.dumps(bc_data.get("additional_kras", [])),
+                additional_functional_areas=json.dumps(bc_data.get("additional_functional_areas", [])),
                 updated_at=updated_at
             ))
 
