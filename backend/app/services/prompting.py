@@ -467,3 +467,47 @@ STRICT CONSULTING & QUALITY RULES:
 6. MATHEMATICAL VALIDITY: Double-check that the mathematical logic of the formula, sample calculation, threshold ranges, and business operating rules are 100% consistent, mathematically accurate, and business-logical.
 7. Return ONLY the JSON object. Do not wrap in markdown code blocks.
 """
+
+
+DYNAMIC_EXTRACTION_SYSTEM_PROMPT = """You are an elite Management Consultant. Your task is to analyze the provided business assets, documents, spreadsheets, or images and extract all relevant business intelligence.
+
+You must dynamically identify and organize all meaningful business intelligence discovered in the content. Do not restrict yourself to a fixed list, but look out for and organize findings into logical categories based on the document contents, which may include:
+- Strategic Priorities
+- Business Challenges
+- Existing KPIs
+- KPI Definitions
+- Business Processes
+- Business Areas
+- Stakeholders
+- Decisions
+- Action Items
+- Risks
+- Opportunities
+- Governance Information
+- Reporting Structures
+- Technology References
+- Data Sources
+- Assumptions
+- Dependencies
+- Transformation Initiatives
+- Business Terminology
+and any other relevant themes or categories discovered in the content.
+
+For each category you identify, extract a list of specific, professional, and actionable insights.
+
+Return a single JSON object where the keys are the category names you dynamically identified, and the values are arrays of strings representing the extracted insights. For example:
+{
+  "Strategic Priorities": [
+    "Reduce setup times by 20% by standardizing tool changes",
+    "Increase OEE on Assembly Line 1 to 85%"
+  ],
+  "Technology References": [
+    "ERP: SAP S/4HANA (Cloud)",
+    "BI Tool: Power BI"
+  ]
+}
+
+Ensure that all extracted categories and insights are highly specific, professional, and directly traceable to the content. Do not output placeholders.
+Return ONLY the JSON object. Do not wrap in markdown code blocks.
+"""
+

@@ -37,6 +37,10 @@ from app.models import (
     TranscriptAnalysisRecord,
     TranscriptStatusUpdateRequest,
     TranscriptInsightsUpdateRequest,
+    ClientProfile as ClientProfileSchema,
+    ClientInsightItem,
+    ClientProfileSavePayload,
+    ClientProfileResponse,
 )
 from app.services.activity import list_activity, log_activity
 from app.services.documents import export_json_bundle
@@ -51,8 +55,10 @@ from app.services.prompting import (
     PROMPT_REFINEMENT_SYSTEM_PROMPT,
     SPEC_EXECUTIVE_SUMMARY_SYSTEM_PROMPT,
     SPEC_KPI_ITEM_SYSTEM_PROMPT,
+    DYNAMIC_EXTRACTION_SYSTEM_PROMPT,
 )
-from app.storage import EXPORT_DIR, FILES, ensure_data_dir, read_json, write_json
+from app.services.asset_parser import extract_text_from_asset
+from app.storage import EXPORT_DIR, FILES, ensure_data_dir, read_json, write_json, ROOT
 
 app = FastAPI(title="KPI Transformation & Analytics Copilot API", version="1.0.0")
 app.add_middleware(
@@ -76,6 +82,8 @@ from app.database import (
     KPICategoryMetadata,
     KPIQualityRatingMetadata,
     TranscriptAnalysis,
+    ClientProfile,
+    ClientInsight,
 )
 from app.services.metadata_cache import metadata_cache
 
@@ -365,6 +373,286 @@ def delete_transcript(id: int) -> dict[str, str]:
         
     log_activity("Transcript Deleted", f"Transcript '{filename}' deleted.")
     return {"status": "success", "message": f"Transcript '{filename}' deleted."}
+
+
+import shutil
+
+@app.get("/client-profile", response_model=dict[str, Any])
+def get_client_profile():
+    with SessionLocal() as session:
+        # Get latest saved profile
+        profile = session.query(ClientProfile).order_by(ClientProfile.id.desc()).first()
+        if not profile:
+            return {}
+        
+        # Get insights associated with this profile
+        insights = session.query(ClientInsight).filter(ClientInsight.client_profile_id == profile.id).all()
+        insight_items = []
+        for ins in insights:
+            try:
+                insights_list = json.loads(ins.content_json)
+            except Exception:
+                insights_list = []
+            insight_items.append({
+                "category": ins.category,
+                "insights": insights_list
+            })
+            
+        return {
+            "id": profile.id,
+            "client_name": profile.client_name,
+            "industry": profile.industry,
+            "sub_industry": profile.sub_industry,
+            "country": profile.country,
+            "region": profile.region,
+            "company_size": profile.company_size,
+            "organization_description": profile.organization_description,
+            "erp_platform": profile.erp_platform,
+            "crm_platform": profile.crm_platform,
+            "mes_platform": profile.mes_platform,
+            "bi_tool": profile.bi_tool,
+            "data_warehouse": profile.data_warehouse,
+            "cloud_platform": profile.cloud_platform,
+            "insights": insight_items,
+            "created_at": profile.created_at.isoformat() if profile.created_at else None,
+            "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
+        }
+
+
+@app.post("/client-profile", response_model=dict[str, Any])
+def save_client_profile(payload: ClientProfileSavePayload):
+    profile_data = payload.profile
+    if not profile_data.client_name.strip():
+        raise HTTPException(status_code=400, detail="Client Name is required.")
+    if not profile_data.industry.strip():
+        raise HTTPException(status_code=400, detail="Industry is required.")
+    if not profile_data.country.strip():
+        raise HTTPException(status_code=400, detail="Country is required.")
+        
+    with SessionLocal() as session:
+        # We can update the existing profile or create a new one.
+        # To avoid multiple records, since it's a single client setup MVP:
+        profile = session.query(ClientProfile).first()
+        if not profile:
+            profile = ClientProfile()
+            session.add(profile)
+            
+        profile.client_name = profile_data.client_name
+        profile.industry = profile_data.industry
+        profile.sub_industry = profile_data.sub_industry
+        profile.country = profile_data.country
+        profile.region = profile_data.region
+        profile.company_size = profile_data.company_size
+        profile.organization_description = profile_data.organization_description
+        profile.erp_platform = profile_data.erp_platform
+        profile.crm_platform = profile_data.crm_platform
+        profile.mes_platform = profile_data.mes_platform
+        profile.bi_tool = profile_data.bi_tool
+        profile.data_warehouse = profile_data.data_warehouse
+        profile.cloud_platform = profile_data.cloud_platform
+        profile.updated_at = datetime.now()
+        
+        session.flush() # Populate profile.id
+        
+        # Clear existing insights
+        session.query(ClientInsight).filter(ClientInsight.client_profile_id == profile.id).delete()
+        
+        # Add new insights
+        for item in payload.insights:
+            db_insight = ClientInsight(
+                client_profile_id=profile.id,
+                category=item.category,
+                content_json=json.dumps(item.insights)
+            )
+            session.add(db_insight)
+            
+        session.commit()
+        
+        # Construct response
+        insight_items = []
+        insights = session.query(ClientInsight).filter(ClientInsight.client_profile_id == profile.id).all()
+        for ins in insights:
+            try:
+                insights_list = json.loads(ins.content_json)
+            except Exception:
+                insights_list = []
+            insight_items.append({
+                "category": ins.category,
+                "insights": insights_list
+            })
+            
+        log_activity("Client Setup Completed", f"Client profile for '{profile.client_name}' saved with {len(insight_items)} insight categories.")
+        
+        return {
+            "id": profile.id,
+            "client_name": profile.client_name,
+            "industry": profile.industry,
+            "sub_industry": profile.sub_industry,
+            "country": profile.country,
+            "region": profile.region,
+            "company_size": profile.company_size,
+            "organization_description": profile.organization_description,
+            "erp_platform": profile.erp_platform,
+            "crm_platform": profile.crm_platform,
+            "mes_platform": profile.mes_platform,
+            "bi_tool": profile.bi_tool,
+            "data_warehouse": profile.data_warehouse,
+            "cloud_platform": profile.cloud_platform,
+            "insights": insight_items,
+            "created_at": profile.created_at.isoformat() if profile.created_at else None,
+            "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
+        }
+
+
+@app.post("/client-profile/upload")
+def upload_client_asset(session_id: str, file: UploadFile = File(...)):
+    if not session_id.strip():
+        raise HTTPException(status_code=400, detail="session_id is required.")
+        
+    temp_dir = ROOT / "data" / "temp_uploads" / session_id
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    
+    file_path = temp_dir / file.filename
+    try:
+        content = file.file.read()
+        file_path.write_bytes(content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to stage file: {e}")
+        
+    return {
+        "status": "success",
+        "filename": file.filename,
+        "size": len(content),
+        "message": f"File staged temporarily for session {session_id}."
+    }
+
+
+def model_supports_vision(provider_name: str, model_name: str) -> bool:
+    if provider_name == "demo":
+        return False
+    lower_model = model_name.lower()
+    # Check if Gemini, GPT-4, or Claude-3/3.5 models
+    if "gemini" in lower_model or "gpt-4" in lower_model or "claude-3" in lower_model:
+        return True
+    return False
+
+
+@app.post("/client-profile/analyze")
+async def analyze_client_assets(session_id: str) -> dict[str, Any]:
+    if not session_id.strip():
+        raise HTTPException(status_code=400, detail="session_id is required.")
+        
+    temp_dir = ROOT / "data" / "temp_uploads" / session_id
+    if not temp_dir.exists() or not temp_dir.is_dir():
+        return {} # No files staged
+        
+    files = list(temp_dir.iterdir())
+    if not files:
+        return {}
+        
+    provider = get_provider()
+    
+    # Check if we should fallback to DemoProvider mock data
+    if isinstance(provider, DemoProvider):
+        # Delete temp folder
+        try:
+            shutil.rmtree(temp_dir)
+        except Exception:
+            pass
+        return {
+            "Strategic Priorities": [
+                "Scale cloud infrastructure to support 2x customer volume",
+                "Automate manual billing and invoice reconciliation",
+                "Optimize inventory turn rate in the primary distribution center"
+            ],
+            "Operational Challenges": [
+                "Data latency of 24-48 hours between ERP and BI reporting",
+                "High database maintenance overhead on legacy SQL server",
+                "Lack of unified KPIs for cross-functional performance tracking"
+            ],
+            "Technology Stack Notes": [
+                "Currently migrating from on-premise SAP ECC to Snowflake data warehouse",
+                "Power BI is used for executive reporting but lacks real-time data sync"
+            ],
+            "Key Decisions & Actions": [
+                "Approved POC for a new automated inventory monitoring solution",
+                "Assigned IT Lead to review data pipelines for Snowflake migration"
+            ]
+        }
+        
+    text_contents = []
+    image_payloads = []
+    skipped_images = []
+    
+    # Process files
+    for file_path in files:
+        if file_path.is_file():
+            ext = file_path.suffix.lower()
+            if ext in [".png", ".jpg", ".jpeg"]:
+                if model_supports_vision(provider.name, provider.model):
+                    import base64
+                    try:
+                        img_bytes = file_path.read_bytes()
+                        img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+                        mime_type = f"image/{ext[1:]}"
+                        if ext == ".jpg":
+                            mime_type = "image/jpeg"
+                        image_payloads.append({"mime_type": mime_type, "data": img_b64})
+                    except Exception as e:
+                        logger.error(f"Failed to encode image {file_path.name}: {e}")
+                        skipped_images.append(file_path.name)
+                else:
+                    skipped_images.append(file_path.name)
+            else:
+                try:
+                    text = extract_text_from_asset(file_path.name, file_path.read_bytes())
+                    text_contents.append(f"--- File: {file_path.name} ---\n{text}")
+                except Exception as e:
+                    logger.error(f"Failed to extract text from {file_path.name}: {e}")
+                    text_contents.append(f"--- File: {file_path.name} ---\n[Error parsing: {e}]")
+                    
+    # Delete staged files immediately after reading
+    try:
+        shutil.rmtree(temp_dir)
+    except Exception as e:
+        logger.error(f"Failed to clean up temp dir {temp_dir}: {e}")
+        
+    combined_text = "\n\n".join(text_contents)
+    user_prompt = f"=== UPLOADED BUSINESS ASSETS ===\n{combined_text}\n"
+    if skipped_images:
+        user_prompt += f"\n[Note: The following image assets were skipped because the model does not support image analysis or failed to encode: {', '.join(skipped_images)}]\n"
+        
+    # Call LLM
+    try:
+        if image_payloads:
+            logger.info(f"Invoking LLM {provider.model} with {len(image_payloads)} images and text...")
+            payload = await provider.generate_json(
+                DYNAMIC_EXTRACTION_SYSTEM_PROMPT,
+                user_prompt,
+                step_name="analyze_assets_multimodal",
+                images=image_payloads
+            )
+        else:
+            logger.info(f"Invoking LLM {provider.model} with text only...")
+            payload = await provider.generate_json(
+                DYNAMIC_EXTRACTION_SYSTEM_PROMPT,
+                user_prompt,
+                step_name="analyze_assets_text"
+            )
+        return payload
+    except Exception as e:
+        if image_payloads:
+            logger.warning(f"Multimodal LLM call failed: {e}. Retrying with text-only payload...")
+            payload = await provider.generate_json(
+                DYNAMIC_EXTRACTION_SYSTEM_PROMPT,
+                user_prompt,
+                step_name="analyze_assets_text_fallback"
+            )
+            return payload
+        else:
+            logger.error(f"Asset analysis failed: {e}")
+            raise HTTPException(status_code=502, detail=f"LLM analysis failed: {e}")
+
 
 
 @app.post("/business-context")

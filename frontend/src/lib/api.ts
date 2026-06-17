@@ -10,7 +10,10 @@ import type {
   FunctionalSpecification,
   MetadataItem,
   TranscriptInsights,
-  TranscriptAnalysisRecord
+  TranscriptAnalysisRecord,
+  ClientProfile,
+  ClientInsightItem,
+  ClientProfileSavePayload
 } from "../types/api";
 
 const jsonHeaders = { "Content-Type": "application/json" };
@@ -86,6 +89,26 @@ export const api = {
   deleteTranscript: (id: number) =>
     request<{ status: string; message: string }>(`/transcript/${id}`, {
       method: "DELETE"
+    }),
+
+  getClientProfile: () => request<ClientProfile & { insights: ClientInsightItem[] }>("/client-profile"),
+  saveClientProfile: (body: ClientProfileSavePayload) =>
+    request<ClientProfile & { insights: ClientInsightItem[] }>("/client-profile", {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify(body)
+    }),
+  uploadClientAsset: (file: File, sessionId: string) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request<{ status: string; filename: string; size: number }>(`/client-profile/upload?session_id=${encodeURIComponent(sessionId)}`, {
+      method: "POST",
+      body: formData
+    });
+  },
+  analyzeClientAssets: (sessionId: string) =>
+    request<Record<string, string[]>>(`/client-profile/analyze?session_id=${encodeURIComponent(sessionId)}`, {
+      method: "POST"
     })
 };
 

@@ -4,8 +4,9 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text, create_engine
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, create_engine, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "data"
@@ -17,6 +18,16 @@ engine = create_engine(
     connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    if DATABASE_URL.startswith("sqlite"):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 
 class Base(DeclarativeBase):
@@ -117,6 +128,38 @@ class TranscriptAnalysis(Base):
     raw_text: Mapped[str] = mapped_column(Text, default="")
     extracted_insights: Mapped[str] = mapped_column(Text, default="{}")  # JSON string
     status: Mapped[str] = mapped_column(String(50), default="draft")  # "draft", "approved", "rejected"
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+class ClientProfile(Base):
+    __tablename__ = "client_profile"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    client_name: Mapped[str] = mapped_column(String(255), default="")
+    industry: Mapped[str] = mapped_column(String(255), default="")
+    sub_industry: Mapped[str] = mapped_column(String(255), default="")
+    country: Mapped[str] = mapped_column(String(255), default="")
+    region: Mapped[str] = mapped_column(String(255), default="")
+    company_size: Mapped[str] = mapped_column(String(255), default="")
+    organization_description: Mapped[str] = mapped_column(Text, default="")
+    erp_platform: Mapped[str] = mapped_column(String(255), default="")
+    crm_platform: Mapped[str] = mapped_column(String(255), default="")
+    mes_platform: Mapped[str] = mapped_column(String(255), default="")
+    bi_tool: Mapped[str] = mapped_column(String(255), default="")
+    data_warehouse: Mapped[str] = mapped_column(String(255), default="")
+    cloud_platform: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+class ClientInsight(Base):
+    __tablename__ = "client_insights"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    client_profile_id: Mapped[int] = mapped_column(ForeignKey("client_profile.id", ondelete="CASCADE"), nullable=False)
+    category: Mapped[str] = mapped_column(String(255), default="")
+    content_json: Mapped[str] = mapped_column(Text, default="[]")  # JSON string array
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 

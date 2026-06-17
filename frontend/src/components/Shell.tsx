@@ -1,4 +1,4 @@
-import { BarChart3, ChevronRight, FileText, Network, Table2, Target, Workflow, CheckCircle } from "lucide-react";
+import { BarChart3, ChevronRight, FileText, Network, Table2, Target, Workflow, CheckCircle, Building2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import type { ActivityEvent, ExportItem, WorkflowStatus } from "../types/api";
@@ -45,6 +45,16 @@ export function Shell({
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-[300px_1fr]">
             <aside className="space-y-5">
               <nav className="border border-[#303030] bg-[#1B1B1B]">
+                <NavLink
+                  to="/"
+                  className={({ isActive }) => `group flex items-center justify-between border-b-4 px-4 py-4 text-sm font-semibold transition-all border-b-[#303030]/40 ${isActive ? "bg-[#111111] text-[#FFE600] border-b-[#FFE600]" : "text-[#F5F5F5] hover:bg-[#111111] hover:text-[#FFE600] hover:border-b-[#FFE600]"}`}
+                >
+                  <span className="flex items-center gap-3">
+                    <Building2 size={18} />
+                    <span>Client Setup & Onboarding</span>
+                  </span>
+                  <ChevronRight size={16} className="text-[#B0B0B0]/40 group-hover:text-[#FFE600]" />
+                </NavLink>
                 {steps.map((step, index) => {
                   const Icon = step.icon;
                   const isStepComplete = status ? !!status[step.statusKey] : false;

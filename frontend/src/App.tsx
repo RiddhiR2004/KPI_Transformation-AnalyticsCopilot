@@ -35,7 +35,7 @@ export default function App() {
   return (
     <Shell status={status} timeline={timeline} exports={exports} hideSidebar={isLandingPage}>
       <Routes>
-        <Route path="/" element={<LandingPage status={status} />} />
+        <Route path="/" element={<LandingPage />} />
         <Route path="/step-1" element={<BusinessContextPage onChange={refresh} />} />
         <Route path="/step-2" element={<KpiLibraryPage onChange={refresh} exports={exports} />} />
         <Route path="/step-3" element={<FunctionalSpecificationPage onChange={refresh} exports={exports} />} />

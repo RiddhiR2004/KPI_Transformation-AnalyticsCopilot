@@ -200,3 +200,36 @@ export type TranscriptAnalysisRecord = {
   updated_at: string;
 };
 
+
+export type ClientProfile = {
+  id?: number;
+  client_name: string;
+  industry: string;
+  sub_industry?: string;
+  country: string;
+  region?: string;
+  company_size?: string;
+  organization_description?: string;
+  erp_platform?: string;
+  crm_platform?: string;
+  mes_platform?: string;
+  bi_tool?: string;
+  data_warehouse?: string;
+  cloud_platform?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+
+export type ClientInsightItem = {
+  category: string;
+  insights: string[];
+};
+
+
+export type ClientProfileSavePayload = {
+  profile: ClientProfile;
+  insights: ClientInsightItem[];
+};
+
+

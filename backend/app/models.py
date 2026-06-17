@@ -266,3 +266,50 @@ class ExportItem(BaseModel):
     description: str
     formats: list[str]
     available: bool
+
+
+class ClientProfile(BaseModel):
+    client_name: str
+    industry: str
+    sub_industry: str = ""
+    country: str
+    region: str = ""
+    company_size: str = ""
+    organization_description: str = ""
+    erp_platform: str = ""
+    crm_platform: str = ""
+    mes_platform: str = ""
+    bi_tool: str = ""
+    data_warehouse: str = ""
+    cloud_platform: str = ""
+
+
+class ClientInsightItem(BaseModel):
+    category: str
+    insights: list[str]
+
+
+class ClientProfileSavePayload(BaseModel):
+    profile: ClientProfile
+    insights: list[ClientInsightItem]
+
+
+class ClientProfileResponse(BaseModel):
+    id: int
+    client_name: str
+    industry: str
+    sub_industry: str
+    country: str
+    region: str
+    company_size: str
+    organization_description: str
+    erp_platform: str
+    crm_platform: str
+    mes_platform: str
+    bi_tool: str
+    data_warehouse: str
+    cloud_platform: str
+    insights: list[ClientInsightItem]
+    created_at: datetime
+    updated_at: datetime
+

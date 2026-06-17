@@ -104,8 +104,9 @@ class BaseLLMProvider(ABC):
         pass
 
     @abstractmethod
-    async def generate_json(self, system_prompt: str, user_prompt: str, step_name: str = "generic") -> dict[str, Any]:
+    async def generate_json(self, system_prompt: str, user_prompt: str, step_name: str = "generic", images: Optional[list[dict]] = None) -> dict[str, Any]:
         pass
+
 
 
 class LangChainProvider(BaseLLMProvider):
@@ -126,7 +127,7 @@ class LangChainProvider(BaseLLMProvider):
     def is_demo(self) -> bool:
         return False
 
-    async def generate_json(self, system_prompt: str, user_prompt: str, step_name: str = "generic") -> dict[str, Any]:
+    async def generate_json(self, system_prompt: str, user_prompt: str, step_name: str = "generic", images: Optional[list[dict]] = None) -> dict[str, Any]:
         start_time = time.time()
         success = False
         error_msg = None
@@ -137,15 +138,31 @@ class LangChainProvider(BaseLLMProvider):
         payload = {}
 
         try:
-            chat_template = ChatPromptTemplate.from_messages([
-                ("system", "{system_instruction}"),
-                ("user", "{user_instruction}")
-            ])
-            
-            formatted_messages = chat_template.format_messages(
-                system_instruction=system_prompt,
-                user_instruction=user_prompt
-            )
+            from langchain_core.messages import SystemMessage, HumanMessage
+
+            if images:
+                # Construct messages manually with multimodal inputs
+                content = [{"type": "text", "text": user_prompt}]
+                for img in images:
+                    content.append({
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{img['mime_type']};base64,{img['data']}"
+                        }
+                    })
+                formatted_messages = [
+                    SystemMessage(content=system_prompt),
+                    HumanMessage(content=content)
+                ]
+            else:
+                chat_template = ChatPromptTemplate.from_messages([
+                    ("system", "{system_instruction}"),
+                    ("user", "{user_instruction}")
+                ])
+                formatted_messages = chat_template.format_messages(
+                    system_instruction=system_prompt,
+                    user_instruction=user_prompt
+                )
             
             response = await self._chat_model.ainvoke(formatted_messages)
             
@@ -240,7 +257,7 @@ class DemoProvider(BaseLLMProvider):
     def is_demo(self) -> bool:
         return True
 
-    async def generate_json(self, system_prompt: str, user_prompt: str, step_name: str = "generic") -> dict[str, Any]:
+    async def generate_json(self, system_prompt: str, user_prompt: str, step_name: str = "generic", images: Optional[list[dict]] = None) -> dict[str, Any]:
         start_time = time.time()
         # Return mock JSON matching various workflows
         if "concise business summary" in system_prompt.lower() or "concise business summary" in user_prompt.lower():

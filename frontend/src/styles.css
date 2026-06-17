@@ -57,3 +57,21 @@ select {
     @apply inline-flex h-9 w-9 items-center justify-center border border-[#303030] bg-[#1B1B1B] text-[#B0B0B0] transition hover:border-[#FFE600] hover:bg-[#FFE600] hover:text-[#111111];
   }
 }
+
+/* Global placeholder styling to prevent bright white text on empty fields */
+input::placeholder,
+textarea::placeholder {
+  color: #666666 !important;
+  opacity: 1 !important; /* Overrides default browser opacity */
+}
+
+/* Style default select options when empty */
+select option[value=""] {
+  color: #666666;
+}
+
+select option {
+  color: #F5F5F5;
+  background-color: #111111;
+}
+
