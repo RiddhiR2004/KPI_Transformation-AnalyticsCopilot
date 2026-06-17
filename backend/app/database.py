@@ -6,6 +6,9 @@ from pathlib import Path
 
 from sqlalchemy import Boolean, DateTime, Integer, String, Text, create_engine, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+import contextvars
+
+active_engagement_id_ctx = contextvars.ContextVar("active_engagement_id", default=None)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -38,6 +41,7 @@ class BusinessContext(Base):
     __tablename__ = "business_context"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    engagement_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     industry: Mapped[str] = mapped_column(String(200), default="")
     organization_level: Mapped[str] = mapped_column(String(200), default="")
     kpi_count: Mapped[int] = mapped_column(Integer, default=8)
@@ -57,6 +61,7 @@ class Prompt(Base):
     __tablename__ = "prompt"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    engagement_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     prompt: Mapped[str] = mapped_column(Text, default="")
     original_prompt: Mapped[str] = mapped_column(Text, default="")
     user_instructions: Mapped[str] = mapped_column(Text, default="")
@@ -70,6 +75,7 @@ class KPILibrary(Base):
     __tablename__ = "kpi_library"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    engagement_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     items: Mapped[str] = mapped_column(Text, default="[]")  # JSON string
     quality: Mapped[str] = mapped_column(Text, default="{}")  # JSON string
     recommendations: Mapped[str] = mapped_column(Text, default="{}")  # JSON string
@@ -82,6 +88,7 @@ class KPITree(Base):
     __tablename__ = "kpi_tree"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    engagement_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     name: Mapped[str] = mapped_column(String(100), default="Default Tree")
     data: Mapped[str] = mapped_column(Text, default="{}")  # JSON string
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
@@ -102,6 +109,7 @@ class FunctionalSpecification(Base):
     __tablename__ = "functional_specification"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    engagement_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     items: Mapped[str] = mapped_column(Text, default="[]")  # JSON string
     executive_summary: Mapped[str] = mapped_column(Text, default="")
     draft_items: Mapped[str] = mapped_column(Text, default="[]")  # JSON string
@@ -115,6 +123,7 @@ class ApprovedKPIs(Base):
     __tablename__ = "approved_kpis"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    engagement_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     items: Mapped[str] = mapped_column(Text, default="[]")  # JSON string
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
@@ -365,22 +374,38 @@ def init_db() -> None:
             for col_name, col_def in new_cols_fs:
                 if col_name not in existing_cols_fs:
                     conn.exec_driver_sql(f"ALTER TABLE functional_specification ADD COLUMN {col_name} {col_def}")
-        # engagements table migration — add table if it doesn't exist
-        conn.exec_driver_sql(
-            """
-            CREATE TABLE IF NOT EXISTS engagements (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                client_profile_id INTEGER NOT NULL
-                    REFERENCES client_profile(id) ON DELETE CASCADE,
-                name VARCHAR(255) DEFAULT '',
-                engagement_id VARCHAR(100) DEFAULT '',
-                description TEXT DEFAULT '',
-                status VARCHAR(50) DEFAULT 'active',
-                created_at DATETIME,
-                updated_at DATETIME
+            
+            # engagements table migration — add table if it doesn't exist
+            conn.exec_driver_sql(
+                """
+                CREATE TABLE IF NOT EXISTS engagements (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    client_profile_id INTEGER NOT NULL
+                        REFERENCES client_profile(id) ON DELETE CASCADE,
+                    name VARCHAR(255) DEFAULT '',
+                    engagement_id VARCHAR(100) DEFAULT '',
+                    description TEXT DEFAULT '',
+                    status VARCHAR(50) DEFAULT 'active',
+                    created_at DATETIME,
+                    updated_at DATETIME
+                )
+                """
             )
-            """
-        )
+
+            # Dynamic engagement_id column migration for step tables
+            tables_to_migrate = [
+                "business_context",
+                "prompt",
+                "kpi_library",
+                "kpi_tree",
+                "functional_specification",
+                "approved_kpis"
+            ]
+            for table_name in tables_to_migrate:
+                cursor_table = conn.exec_driver_sql(f"PRAGMA table_info({table_name})")
+                cols = [row[1] for row in cursor_table.fetchall()]
+                if "engagement_id" not in cols:
+                    conn.exec_driver_sql(f"ALTER TABLE {table_name} ADD COLUMN engagement_id INTEGER")
     except Exception as e:
         print(f"Error performing SQLite migrations: {e}")
         

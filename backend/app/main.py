@@ -71,6 +71,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from fastapi import Request
+from app.database import active_engagement_id_ctx
+
+@app.middleware("http")
+async def add_engagement_context(request: Request, call_next):
+    eng_id_str = request.headers.get("X-Engagement-ID")
+    eng_id = None
+    if eng_id_str:
+        try:
+            eng_id = int(eng_id_str)
+        except ValueError:
+            pass
+    token = active_engagement_id_ctx.set(eng_id)
+    try:
+        response = await call_next(request)
+        return response
+    finally:
+        active_engagement_id_ctx.reset(token)
+
 from datetime import datetime
 from sqlalchemy import select
 from app.database import (
@@ -663,6 +682,12 @@ async def analyze_client_assets(session_id: str) -> dict[str, Any]:
 @app.get("/engagements", response_model=list[EngagementRecord])
 def list_engagements():
     """Return all engagements for the current client profile, newest first."""
+    from app.database import (
+        BusinessContext as DBBusinessContext,
+        Prompt as DBPrompt,
+        KPILibrary as DBKPILibrary,
+        FunctionalSpecification as DBFunctionalSpecification,
+    )
     with SessionLocal() as session:
         profile = session.query(ClientProfile).order_by(ClientProfile.id.desc()).first()
         if not profile:
@@ -673,19 +698,49 @@ def list_engagements():
             .order_by(Engagement.created_at.desc())
             .all()
         )
-        return [
-            EngagementRecord(
-                id=r.id,
-                client_profile_id=r.client_profile_id,
-                name=r.name,
-                engagement_id=r.engagement_id,
-                description=r.description,
-                status=r.status,
-                created_at=r.created_at,
-                updated_at=r.updated_at,
+        
+        records = []
+        for r in rows:
+            # Check step completion for this engagement
+            context = bool(session.scalar(select(DBBusinessContext).filter_by(engagement_id=r.id).limit(1)))
+            prompt = bool(session.scalar(select(DBPrompt).filter_by(engagement_id=r.id).limit(1)))
+            
+            lib_row = session.scalar(select(DBKPILibrary).filter_by(engagement_id=r.id).limit(1))
+            library = False
+            if lib_row:
+                try:
+                    library = bool(json.loads(lib_row.items or "[]"))
+                except Exception:
+                    pass
+                    
+            spec_row = session.scalar(select(DBFunctionalSpecification).filter_by(engagement_id=r.id).limit(1))
+            spec = False
+            if spec_row:
+                try:
+                    spec = bool(json.loads(spec_row.items or "[]"))
+                except Exception:
+                    pass
+            
+            wf_status = WorkflowStatus(
+                business_context=context,
+                prompt_generation=prompt,
+                kpi_library=library,
+                functional_specification=spec,
             )
-            for r in rows
-        ]
+            records.append(
+                EngagementRecord(
+                    id=r.id,
+                    client_profile_id=r.client_profile_id,
+                    name=r.name,
+                    engagement_id=r.engagement_id,
+                    description=r.description,
+                    status=r.status,
+                    created_at=r.created_at,
+                    updated_at=r.updated_at,
+                    workflow_status=wf_status,
+                )
+            )
+        return records
 
 
 @app.post("/engagements", response_model=EngagementRecord)

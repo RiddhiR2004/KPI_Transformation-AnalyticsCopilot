@@ -21,7 +21,15 @@ import type {
 const jsonHeaders = { "Content-Type": "application/json" };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, init);
+  const headers = new Headers(init?.headers);
+  const activeEngId = localStorage.getItem("active_engagement_id");
+  if (activeEngId) {
+    headers.set("X-Engagement-ID", activeEngId);
+  }
+  const response = await fetch(`/api${path}`, {
+    ...init,
+    headers,
+  });
   if (!response.ok) {
     const detail = await response.json().catch(() => ({ detail: response.statusText }));
     throw new Error(detail.detail ?? "Request failed");

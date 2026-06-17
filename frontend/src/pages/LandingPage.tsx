@@ -17,7 +17,8 @@ import {
   Briefcase,
   ChevronRight,
   Calendar,
-  Activity
+  Activity,
+  Lock
 } from "lucide-react";
 import { api } from "../lib/api";
 import type { ClientProfile, ClientInsightItem, WorkflowStatus } from "../types/api";
@@ -611,110 +612,7 @@ export function LandingPage() {
         </div>
       )}
 
-      {/* Engagements Section — appears below the banner once profile is saved */}
-      {isSaved && (
-        <section className="border border-[#303030] bg-[#1B1B1B] p-6 rounded-sm space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#303030] pb-4">
-            <div className="flex items-center gap-2">
-              <Briefcase className="text-[#FFE600]" size={18} />
-              <h3 className="text-sm font-bold uppercase tracking-wider text-[#F5F5F5]">Engagements</h3>
-              <span className="text-[10px] bg-[#FFE600]/10 text-[#FFE600] border border-[#FFE600]/20 px-2 py-0.5 rounded-full font-semibold">
-                {engagements.length}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={openEngagementModal}
-              className="button-secondary flex items-center gap-1.5 text-xs py-2 px-4"
-            >
-              <Plus size={14} />
-              New Engagement
-            </button>
-          </div>
 
-          {engagements.length === 0 ? (
-            <div className="py-10 flex flex-col items-center justify-center text-center gap-3">
-              <div className="h-12 w-12 rounded-full bg-[#252525] border border-[#303030] flex items-center justify-center">
-                <Briefcase className="text-[#555]" size={22} />
-              </div>
-              <p className="text-xs text-[#666] leading-relaxed max-w-sm">
-                No engagements yet. Click <strong className="text-[#FFE600]">New Engagement</strong> to create your first project and begin Step 1.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {engagements.map((eng) => {
-                // Determine the current step label from workflowStatus
-                let stepLabel = "Not started";
-                let stepColor = "text-[#555] border-[#333] bg-[#1a1a1a]";
-                if (workflowStatus) {
-                  if (workflowStatus.functional_specification) {
-                    stepLabel = "Step 3 — Functional Spec";
-                    stepColor = "text-emerald-400 border-emerald-800 bg-emerald-950/30";
-                  } else if (workflowStatus.kpi_library) {
-                    stepLabel = "Step 2 — KPI Library";
-                    stepColor = "text-[#FFE600] border-[#FFE600]/30 bg-[#FFE600]/5";
-                  } else if (workflowStatus.business_context) {
-                    stepLabel = "Step 1 — Business Context";
-                    stepColor = "text-[#FFE600] border-[#FFE600]/30 bg-[#FFE600]/5";
-                  }
-                }
-
-                return (
-                  <div
-                    key={eng.id}
-                    className="group border border-[#303030] hover:border-[#FFE600]/40 bg-[#111] rounded-sm p-5 space-y-3 transition-all duration-200 hover:bg-[#161616] relative"
-                  >
-                    {/* Delete button */}
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteEngagement(eng.id)}
-                      title="Delete engagement"
-                      className="absolute top-3 right-3 text-[#444] hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-
-                    {/* Card header */}
-                    <div className="space-y-1 pr-6">
-                      <h4 className="text-sm font-bold text-[#F5F5F5] leading-tight">{eng.name}</h4>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="inline-block text-[10px] font-mono text-[#FFE600] bg-[#FFE600]/10 border border-[#FFE600]/20 px-2 py-0.5 rounded-sm">
-                          {eng.engagement_id}
-                        </span>
-                        {/* Progress badge */}
-                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold border px-2 py-0.5 rounded-sm ${stepColor}`}>
-                          <Activity size={9} />
-                          {stepLabel}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Description */}
-                    {eng.description && (
-                      <p className="text-[11px] text-[#888] leading-relaxed line-clamp-2">{eng.description}</p>
-                    )}
-
-                    {/* Footer */}
-                    <div className="flex items-center justify-between pt-1 border-t border-[#222]">
-                      <span className="flex items-center gap-1.5 text-[10px] text-[#555]">
-                        <Calendar size={11} />
-                        {new Date(eng.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                      </span>
-                      <a
-                        href="/step-1"
-                        className="inline-flex items-center gap-1.5 text-[11px] font-bold text-black bg-[#FFE600] hover:bg-[#FFE600]/90 px-3 py-1.5 rounded-sm transition-all hover:translate-x-0.5"
-                      >
-                        Open <ChevronRight size={13} />
-                      </a>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      )}
 
       {/* Notifications */}
       {error && (
@@ -1197,6 +1095,136 @@ export function LandingPage() {
           <AddCategoryForm onAddCategory={handleAddCategory} />
         </section>
       )}
+
+      {/* Engagements Section */}
+      <section className={`border border-[#303030] bg-[#1B1B1B] p-6 rounded-sm space-y-4 ${!isSaved ? "opacity-75" : ""}`}>
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#303030] pb-4">
+          <div className="flex items-center gap-2">
+            <Briefcase className="text-[#FFE600]" size={18} />
+            <h3 className="text-sm font-bold uppercase tracking-wider text-[#F5F5F5]">Engagements</h3>
+            {isSaved && (
+              <span className="text-[10px] bg-[#FFE600]/10 text-[#FFE600] border border-[#FFE600]/20 px-2 py-0.5 rounded-full font-semibold">
+                {engagements.length}
+              </span>
+            )}
+            {!isSaved && (
+              <span className="flex items-center gap-1 text-[10px] bg-red-950/20 text-red-400 border border-red-900/30 px-2 py-0.5 rounded-full font-semibold">
+                <Lock size={10} /> Locked
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={openEngagementModal}
+            disabled={!isSaved}
+            className={`flex items-center gap-1.5 text-xs py-2 px-4 rounded-sm font-semibold transition-all ${
+              isSaved
+                ? "button-secondary"
+                : "border border-[#333] text-[#555] bg-[#1a1a1a] cursor-not-allowed opacity-50"
+            }`}
+          >
+            <Plus size={14} />
+            New Engagement
+          </button>
+        </div>
+
+        {!isSaved ? (
+          <div className="py-12 flex flex-col items-center justify-center text-center gap-3 bg-[#111111]/30 border border-[#303030]/30 rounded-sm">
+            <div className="h-12 w-12 rounded-full bg-[#252525] border border-[#303030] flex items-center justify-center">
+              <Lock className="text-[#666]" size={22} />
+            </div>
+            <h4 className="text-sm font-semibold text-[#F5F5F5]">Engagements Locked</h4>
+            <p className="text-xs text-[#666] leading-relaxed max-w-sm">
+              Please complete and save the client profile setup above to enable and manage engagements.
+            </p>
+          </div>
+        ) : engagements.length === 0 ? (
+          <div className="py-10 flex flex-col items-center justify-center text-center gap-3">
+            <div className="h-12 w-12 rounded-full bg-[#252525] border border-[#303030] flex items-center justify-center">
+              <Briefcase className="text-[#555]" size={22} />
+            </div>
+            <p className="text-xs text-[#666] leading-relaxed max-w-sm">
+              No engagements yet. Click <strong className="text-[#FFE600]">New Engagement</strong> to create your first project and begin Step 1.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {engagements.map((eng) => {
+              // Determine the current step label from eng.workflow_status
+              let stepLabel = "Not started";
+              let stepColor = "text-[#555] border-[#333] bg-[#1a1a1a]";
+              const ws = eng.workflow_status;
+              if (ws) {
+                if (ws.functional_specification) {
+                  stepLabel = "Step 3 — Functional Spec";
+                  stepColor = "text-emerald-400 border-emerald-800 bg-emerald-950/30";
+                } else if (ws.kpi_library) {
+                  stepLabel = "Step 2 — KPI Library";
+                  stepColor = "text-[#FFE600] border-[#FFE600]/30 bg-[#FFE600]/5";
+                } else if (ws.business_context) {
+                  stepLabel = "Step 1 — Business Context";
+                  stepColor = "text-[#FFE600] border-[#FFE600]/30 bg-[#FFE600]/5";
+                }
+              }
+
+              return (
+                <div
+                  key={eng.id}
+                  className="group border border-[#303030] hover:border-[#FFE600]/40 bg-[#111] rounded-sm p-5 space-y-3 transition-all duration-200 hover:bg-[#161616] relative"
+                >
+                  {/* Delete button */}
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteEngagement(eng.id)}
+                    title="Delete engagement"
+                    className="absolute top-3 right-3 text-[#444] hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+
+                  {/* Card header */}
+                  <div className="space-y-1 pr-6">
+                    <h4 className="text-sm font-bold text-[#F5F5F5] leading-tight">{eng.name}</h4>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="inline-block text-[10px] font-mono text-[#FFE600] bg-[#FFE600]/10 border border-[#FFE600]/20 px-2 py-0.5 rounded-sm">
+                        {eng.engagement_id}
+                      </span>
+                      {/* Progress badge */}
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-semibold border px-2 py-0.5 rounded-sm ${stepColor}`}>
+                        <Activity size={9} />
+                        {stepLabel}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  {eng.description && (
+                    <p className="text-[11px] text-[#888] leading-relaxed line-clamp-2">{eng.description}</p>
+                  )}
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-1 border-t border-[#222]">
+                    <span className="flex items-center gap-1.5 text-[10px] text-[#555]">
+                      <Calendar size={11} />
+                      {new Date(eng.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </span>
+                    <a
+                      href="/step-1"
+                      onClick={() => {
+                        localStorage.setItem("active_engagement_id", String(eng.id));
+                        localStorage.setItem("active_engagement_name", eng.name);
+                      }}
+                      className="inline-flex items-center gap-1.5 text-[11px] font-bold text-black bg-[#FFE600] hover:bg-[#FFE600]/90 px-3 py-1.5 rounded-sm transition-all hover:translate-x-0.5"
+                    >
+                      Open <ChevronRight size={13} />
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

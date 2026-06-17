@@ -1,4 +1,4 @@
-import { BarChart3, ChevronRight, FileText, Network, Table2, Target, Workflow, CheckCircle, Building2 } from "lucide-react";
+import { BarChart3, ChevronRight, FileText, Network, Table2, Target, Workflow, CheckCircle, Building2, Briefcase } from "lucide-react";
 import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import type { ActivityEvent, ExportItem, WorkflowStatus } from "../types/api";
@@ -26,15 +26,31 @@ export function Shell({
   exports: ExportItem[];
   hideSidebar?: boolean;
 }) {
+  const activeEngName = localStorage.getItem("active_engagement_name");
+
   return (
     <div className="min-h-screen bg-[#111111] text-[#F5F5F5] font-sans antialiased">
       <header className="border-b border-[#303030] bg-[#1B1B1B]">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between px-8 py-3">
-          <NavLink to="/" className="flex items-center gap-4">
+          <NavLink
+            to="/"
+            onClick={() => {
+              localStorage.removeItem("active_engagement_id");
+              localStorage.removeItem("active_engagement_name");
+            }}
+            className="flex items-center gap-4"
+          >
             <img src="/ey_logo.png" alt="EY Logo" className="h-10 w-auto object-contain" />
             <div className="h-6 w-px bg-[#303030] mx-1" />
             <h1 className="text-lg font-semibold tracking-tight text-[#F5F5F5]">KPI Transformation & Analytics Copilot</h1>
           </NavLink>
+
+          {activeEngName && !hideSidebar && (
+            <div className="flex items-center gap-2 text-xs text-[#B0B0B0] bg-[#111] border border-[#303030] px-3 py-1.5 rounded-sm font-semibold">
+              <Briefcase size={12} className="text-[#FFE600]" />
+              <span>Active: <strong className="text-[#FFE600]">{activeEngName}</strong></span>
+            </div>
+          )}
         </div>
       </header>
 

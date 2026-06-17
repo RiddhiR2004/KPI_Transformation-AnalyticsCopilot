@@ -249,4 +249,5 @@ export type EngagementRecord = {
   status: string;
   created_at: string;
   updated_at: string;
+  workflow_status?: WorkflowStatus;
 };

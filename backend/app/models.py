@@ -329,3 +329,4 @@ class EngagementRecord(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
+    workflow_status: WorkflowStatus = Field(default_factory=WorkflowStatus)

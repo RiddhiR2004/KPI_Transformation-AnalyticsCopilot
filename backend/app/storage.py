@@ -18,6 +18,7 @@ from app.database import (
     ApprovedKPIs,
     DATA_DIR,
     TranscriptAnalysis,
+    active_engagement_id_ctx,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -50,10 +51,14 @@ def ensure_data_dir() -> None:
 def read_json(path: Path, default: Any) -> Any:
     ensure_data_dir()
     key = _key_for_path(path)
+    eng_id = active_engagement_id_ctx.get()
     
     with SessionLocal() as session:
         if key == "business_context":
-            row = session.scalar(select(BusinessContext).filter_by(id=1))
+            if eng_id is not None:
+                row = session.scalar(select(BusinessContext).filter_by(engagement_id=eng_id))
+            else:
+                row = session.scalar(select(BusinessContext).filter_by(id=1))
             if not row:
                 return default
             return {
@@ -72,7 +77,10 @@ def read_json(path: Path, default: Any) -> Any:
             }
             
         elif key == "prompts":
-            row = session.scalar(select(Prompt).filter_by(id=1))
+            if eng_id is not None:
+                row = session.scalar(select(Prompt).filter_by(engagement_id=eng_id))
+            else:
+                row = session.scalar(select(Prompt).filter_by(id=1))
             if not row:
                 return default
             return {
@@ -85,7 +93,10 @@ def read_json(path: Path, default: Any) -> Any:
             }
             
         elif key == "kpi_library":
-            row = session.scalar(select(KPILibrary).filter_by(id=1))
+            if eng_id is not None:
+                row = session.scalar(select(KPILibrary).filter_by(engagement_id=eng_id))
+            else:
+                row = session.scalar(select(KPILibrary).filter_by(id=1))
             if not row:
                 return default
             return {
@@ -97,7 +108,10 @@ def read_json(path: Path, default: Any) -> Any:
             }
             
         elif key == "functional_spec":
-            row = session.scalar(select(FunctionalSpecification).filter_by(id=1))
+            if eng_id is not None:
+                row = session.scalar(select(FunctionalSpecification).filter_by(engagement_id=eng_id))
+            else:
+                row = session.scalar(select(FunctionalSpecification).filter_by(id=1))
             if not row:
                 return default
             return {
@@ -106,7 +120,10 @@ def read_json(path: Path, default: Any) -> Any:
             }
             
         elif key == "approved_kpis":
-            row = session.scalar(select(ApprovedKPIs).filter_by(id=1))
+            if eng_id is not None:
+                row = session.scalar(select(ApprovedKPIs).filter_by(engagement_id=eng_id))
+            else:
+                row = session.scalar(select(ApprovedKPIs).filter_by(id=1))
             if not row:
                 return default
             return {
@@ -127,7 +144,10 @@ def read_json(path: Path, default: Any) -> Any:
             ]
             
         elif key == "kpi_tree":
-            row = session.scalar(select(KPITree).filter_by(id=1))
+            if eng_id is not None:
+                row = session.scalar(select(KPITree).filter_by(engagement_id=eng_id))
+            else:
+                row = session.scalar(select(KPITree).filter_by(id=1))
             if not row:
                 return default
             return {
@@ -143,16 +163,23 @@ def read_json(path: Path, default: Any) -> Any:
 def write_json(path: Path, data: Any) -> None:
     ensure_data_dir()
     key = _key_for_path(path)
+    eng_id = active_engagement_id_ctx.get()
     
     with SessionLocal() as session:
         if key == "business_context":
             from app.models import BusinessContext as PydanticBusinessContext
             validated = PydanticBusinessContext(**data)
             
-            row = session.scalar(select(BusinessContext).filter_by(id=1))
-            if not row:
-                row = BusinessContext(id=1)
-                session.add(row)
+            if eng_id is not None:
+                row = session.scalar(select(BusinessContext).filter_by(engagement_id=eng_id))
+                if not row:
+                    row = BusinessContext(engagement_id=eng_id)
+                    session.add(row)
+            else:
+                row = session.scalar(select(BusinessContext).filter_by(id=1))
+                if not row:
+                    row = BusinessContext(id=1)
+                    session.add(row)
             row.industry = validated.industry
             row.organization_level = validated.organization_level
             row.kpi_count = validated.kpi_count
@@ -168,10 +195,16 @@ def write_json(path: Path, data: Any) -> None:
             session.commit()
             
         elif key == "prompts":
-            row = session.scalar(select(Prompt).filter_by(id=1))
-            if not row:
-                row = Prompt(id=1)
-                session.add(row)
+            if eng_id is not None:
+                row = session.scalar(select(Prompt).filter_by(engagement_id=eng_id))
+                if not row:
+                    row = Prompt(engagement_id=eng_id)
+                    session.add(row)
+            else:
+                row = session.scalar(select(Prompt).filter_by(id=1))
+                if not row:
+                    row = Prompt(id=1)
+                    session.add(row)
             row.prompt = data.get("prompt", "")
             row.original_prompt = data.get("original_prompt", "")
             row.user_instructions = data.get("user_instructions", "")
@@ -181,10 +214,16 @@ def write_json(path: Path, data: Any) -> None:
             session.commit()
             
         elif key == "kpi_library":
-            row = session.scalar(select(KPILibrary).filter_by(id=1))
-            if not row:
-                row = KPILibrary(id=1)
-                session.add(row)
+            if eng_id is not None:
+                row = session.scalar(select(KPILibrary).filter_by(engagement_id=eng_id))
+                if not row:
+                    row = KPILibrary(engagement_id=eng_id)
+                    session.add(row)
+            else:
+                row = session.scalar(select(KPILibrary).filter_by(id=1))
+                if not row:
+                    row = KPILibrary(id=1)
+                    session.add(row)
             row.items = json.dumps(data.get("items", []))
             row.quality = json.dumps(data.get("quality", {}))
             row.recommendations = json.dumps(data.get("recommendations", {}))
@@ -193,19 +232,31 @@ def write_json(path: Path, data: Any) -> None:
             session.commit()
             
         elif key == "functional_spec":
-            row = session.scalar(select(FunctionalSpecification).filter_by(id=1))
-            if not row:
-                row = FunctionalSpecification(id=1)
-                session.add(row)
+            if eng_id is not None:
+                row = session.scalar(select(FunctionalSpecification).filter_by(engagement_id=eng_id))
+                if not row:
+                    row = FunctionalSpecification(engagement_id=eng_id)
+                    session.add(row)
+            else:
+                row = session.scalar(select(FunctionalSpecification).filter_by(id=1))
+                if not row:
+                    row = FunctionalSpecification(id=1)
+                    session.add(row)
             row.items = json.dumps(data.get("items", []))
             row.updated_at = datetime.now()
             session.commit()
             
         elif key == "approved_kpis":
-            row = session.scalar(select(ApprovedKPIs).filter_by(id=1))
-            if not row:
-                row = ApprovedKPIs(id=1)
-                session.add(row)
+            if eng_id is not None:
+                row = session.scalar(select(ApprovedKPIs).filter_by(engagement_id=eng_id))
+                if not row:
+                    row = ApprovedKPIs(engagement_id=eng_id)
+                    session.add(row)
+            else:
+                row = session.scalar(select(ApprovedKPIs).filter_by(id=1))
+                if not row:
+                    row = ApprovedKPIs(id=1)
+                    session.add(row)
             row.items = json.dumps(data.get("items", []))
             row.updated_at = datetime.now()
             session.commit()
@@ -229,10 +280,16 @@ def write_json(path: Path, data: Any) -> None:
             session.commit()
             
         elif key == "kpi_tree":
-            row = session.scalar(select(KPITree).filter_by(id=1))
-            if not row:
-                row = KPITree(id=1)
-                session.add(row)
+            if eng_id is not None:
+                row = session.scalar(select(KPITree).filter_by(engagement_id=eng_id))
+                if not row:
+                    row = KPITree(engagement_id=eng_id)
+                    session.add(row)
+            else:
+                row = session.scalar(select(KPITree).filter_by(id=1))
+                if not row:
+                    row = KPITree(id=1)
+                    session.add(row)
             row.name = data.get("name", "Default Tree")
             row.data = json.dumps(data.get("data", {}))
             row.updated_at = datetime.now()
