@@ -1,9 +1,9 @@
-import { Save, Sparkles, RefreshCw, Plus, X } from "lucide-react";
+import { Save, Sparkles, RefreshCw, Plus, X, Building2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { metadataService } from "../lib/metadataService";
-import type { BusinessContext } from "../types/api";
+import type { BusinessContext, ClientProfile } from "../types/api";
 import { MultiSelect } from "./MultiSelect";
 
 function CustomValueInput({
@@ -128,6 +128,7 @@ export function BusinessContextStep({ onChange }: { onChange: () => void }) {
   const [kras, setKras] = useState<string[]>([]);
   const [areas, setAreas] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -168,9 +169,24 @@ export function BusinessContextStep({ onChange }: { onChange: () => void }) {
 
       api.getContext().then((data) => {
         if (data.industry) {
+          // Existing business context saved — use it as-is
           setForm({ ...dynamicDefaults, ...data } as BusinessContext);
         } else {
-          setForm(dynamicDefaults);
+          // No business context yet — seed industry from client profile if available
+          api.getClientProfile().then((profile) => {
+            setClientProfile(profile);
+            const profileIndustry = profile?.industry || "";
+            // Try to match client profile industry to metadata list (case-insensitive)
+            const matchedIndustry =
+              profileIndustry
+                ? (ind.find((i) => i.toLowerCase() === profileIndustry.toLowerCase()) ||
+                   ind.find((i) => i.toLowerCase().includes(profileIndustry.toLowerCase().split(" ")[0])) ||
+                   defaultIndustry)
+                : defaultIndustry;
+            setForm({ ...dynamicDefaults, industry: matchedIndustry });
+          }).catch(() => {
+            setForm(dynamicDefaults);
+          });
         }
         setLoading(false);
       });
@@ -178,6 +194,11 @@ export function BusinessContextStep({ onChange }: { onChange: () => void }) {
       console.error("Failed to load metadata lists", err);
       setLoading(false);
     });
+
+    // Also load client profile to show the context banner
+    api.getClientProfile().then((profile) => {
+      setClientProfile(profile);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -235,6 +256,24 @@ export function BusinessContextStep({ onChange }: { onChange: () => void }) {
 
   return (
     <section className="panel p-7">
+      {/* Client Context Banner */}
+      {clientProfile?.client_name && (
+        <div className="mb-6 flex flex-wrap items-center gap-3 border border-[#FFE600]/20 bg-[#FFE600]/5 px-4 py-3 rounded-sm">
+          <div className="flex items-center gap-2 shrink-0">
+            <Building2 size={14} className="text-[#FFE600]" />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#FFE600]">Client Context</span>
+          </div>
+          <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-[#B0B0B0]">
+            <span><span className="text-[#F5F5F5] font-semibold">{clientProfile.client_name}</span></span>
+            {clientProfile.industry && <span>Industry: <span className="text-[#F5F5F5]">{clientProfile.industry}</span></span>}
+            {clientProfile.country && <span>Country: <span className="text-[#F5F5F5]">{clientProfile.country}</span></span>}
+            {clientProfile.erp_platform && <span>ERP: <span className="text-[#F5F5F5]">{clientProfile.erp_platform}</span></span>}
+            {clientProfile.crm_platform && <span>CRM: <span className="text-[#F5F5F5]">{clientProfile.crm_platform}</span></span>}
+            {clientProfile.company_size && <span>Size: <span className="text-[#F5F5F5]">{clientProfile.company_size}</span></span>}
+          </div>
+        </div>
+      )}
+
       <div className="mb-7 flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#FFE600]">Context Intake</p>

@@ -1,8 +1,8 @@
-import { AlertCircle, ArrowLeft, CheckCircle, Download, Edit3, FileText, Play, Save, RefreshCw, ChevronDown, ChevronRight, Check, Printer } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle, Download, Edit3, FileText, Play, Save, RefreshCw, ChevronDown, ChevronRight, Check, Printer, Building2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, exportUrl } from "../lib/api";
-import type { ExportItem, FunctionalSpecification, FunctionalSpecItem, KPILibrary, BusinessContext } from "../types/api";
+import type { ExportItem, FunctionalSpecification, FunctionalSpecItem, KPILibrary, BusinessContext, ClientProfile } from "../types/api";
 
 const sectionConfigs = [
   {
@@ -142,7 +142,7 @@ export function KpiLandscapeTree({ categoriesMap, specItems, theme }: KpiLandsca
       items.forEach((item, idx) => {
         const overallIndex = specItems.findIndex(x => x.id === item.id) + 1;
         kpisLayout[item.id] = {
-          x: 640,
+          x: 660,
           y: topPadding + (currentKpiIndex + idx) * kpiGap,
           index: overallIndex,
           category
@@ -197,7 +197,7 @@ export function KpiLandscapeTree({ categoriesMap, specItems, theme }: KpiLandsca
       }`}
     >
       <div 
-        className="relative min-w-[960px] select-none transition-all duration-300 print:bg-white"
+        className="relative min-w-[1080px] select-none transition-all duration-300 print:bg-white"
         style={{ height: `${layout.height}px` }}
       >
         {/* SVG Background for connection curves */}
@@ -272,7 +272,7 @@ export function KpiLandscapeTree({ categoriesMap, specItems, theme }: KpiLandsca
 
               const isHigh = !isAnyHovered || isKpiHighlighted(item.id);
 
-              const x1 = catPos.x + 180; // right of category card
+              const x1 = catPos.x + 200; // right of category card
               const y1 = catPos.y;
               const x2 = kpiPos.x;
               const y2 = kpiPos.y;
@@ -334,9 +334,9 @@ export function KpiLandscapeTree({ categoriesMap, specItems, theme }: KpiLandsca
                 className="absolute pointer-events-auto transition-all duration-300"
                 style={{ 
                   left: `${catPos.x}px`, 
-                  top: `${catPos.y - 25}px`,
-                  width: '180px',
-                  height: '50px'
+                  top: `${catPos.y - 30}px`,
+                  width: '200px',
+                  height: '60px'
                 }}
                 onMouseEnter={() => setHoveredCatId(category)}
                 onMouseLeave={() => setHoveredCatId(null)}
@@ -383,7 +383,7 @@ export function KpiLandscapeTree({ categoriesMap, specItems, theme }: KpiLandsca
                   style={{ 
                     left: `${kpiPos.x}px`, 
                     top: `${kpiPos.y - 22}px`,
-                    width: '260px',
+                    width: '340px',
                     height: '44px'
                   }}
                   onMouseEnter={() => setHoveredKpiId(item.id)}
@@ -447,6 +447,7 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
   const [isEditingExec, setIsEditingExec] = useState(false);
   const [execSummaryValue, setExecSummaryValue] = useState("");
   const [saveStatus, setSaveStatus] = useState("");
+  const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null);
 
   const handleFieldChange = (key: keyof FunctionalSpecItem, value: string) => {
     if (!editingItem) return;
@@ -497,6 +498,11 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
       if (contextData) {
         setContext(contextData);
       }
+      // Load client profile for context banner
+      try {
+        const prof = await api.getClientProfile();
+        setClientProfile(prof);
+      } catch { /* ignore if not set */ }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
@@ -698,6 +704,22 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
         <p className="mt-3 max-w-3xl text-sm leading-6 text-[#B0B0B0]">
           Enrich and formalize approved KPI definitions into comprehensive consulting-grade functional specifications. Manage drafts, edit sections, approve deliverables, and export client-ready documentation.
         </p>
+        {/* Client Context Banner */}
+        {clientProfile?.client_name && (
+          <div className="mt-5 flex flex-wrap items-center gap-3 border border-[#FFE600]/20 bg-[#FFE600]/5 px-4 py-3 rounded-sm">
+            <div className="flex items-center gap-2 shrink-0">
+              <Building2 size={14} className="text-[#FFE600]" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[#FFE600]">Client Context</span>
+            </div>
+            <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-[#B0B0B0]">
+              <span><span className="text-[#F5F5F5] font-semibold">{clientProfile.client_name}</span></span>
+              {clientProfile.industry && <span>Industry: <span className="text-[#F5F5F5]">{clientProfile.industry}</span></span>}
+              {clientProfile.country && <span>Country: <span className="text-[#F5F5F5]">{clientProfile.country}</span></span>}
+              {clientProfile.erp_platform && <span>ERP: <span className="text-[#F5F5F5]">{clientProfile.erp_platform}</span></span>}
+              {clientProfile.crm_platform && <span>CRM: <span className="text-[#F5F5F5]">{clientProfile.crm_platform}</span></span>}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Error Alert */}
