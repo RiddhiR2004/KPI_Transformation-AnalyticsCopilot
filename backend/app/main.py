@@ -399,46 +399,104 @@ def delete_transcript(id: int) -> dict[str, str]:
 
 import shutil
 
+def _profile_to_dict(profile, session) -> dict[str, Any]:
+    """Helper: serialize a ClientProfile row + its insights."""
+    insights = session.query(ClientInsight).filter(ClientInsight.client_profile_id == profile.id).all()
+    insight_items = []
+    for ins in insights:
+        try:
+            insights_list = json.loads(ins.content_json)
+        except Exception:
+            insights_list = []
+        insight_items.append({"category": ins.category, "insights": insights_list})
+    return {
+        "id": profile.id,
+        "client_name": profile.client_name,
+        "industry": profile.industry,
+        "sub_industry": profile.sub_industry,
+        "country": profile.country,
+        "region": profile.region,
+        "company_size": profile.company_size,
+        "organization_description": profile.organization_description,
+        "erp_platform": profile.erp_platform,
+        "crm_platform": profile.crm_platform,
+        "mes_platform": profile.mes_platform,
+        "bi_tool": profile.bi_tool,
+        "data_warehouse": profile.data_warehouse,
+        "cloud_platform": profile.cloud_platform,
+        "insights": insight_items,
+        "created_at": profile.created_at.isoformat() if profile.created_at else None,
+        "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
+    }
+
+
+@app.get("/clients")
+def list_clients():
+    """Return all client profiles with engagement counts."""
+    with SessionLocal() as session:
+        profiles = session.query(ClientProfile).order_by(ClientProfile.updated_at.desc()).all()
+        results = []
+        for p in profiles:
+            eng_count = session.query(Engagement).filter(Engagement.client_profile_id == p.id).count()
+            results.append({
+                **_profile_to_dict(p, session),
+                "engagement_count": eng_count,
+            })
+        return results
+
+
+@app.get("/clients/{client_id}")
+def get_client_by_id(client_id: int):
+    """Return a specific client profile by ID."""
+    with SessionLocal() as session:
+        profile = session.query(ClientProfile).filter(ClientProfile.id == client_id).first()
+        if not profile:
+            raise HTTPException(status_code=404, detail="Client not found.")
+        return _profile_to_dict(profile, session)
+
+
+@app.delete("/clients/{client_id}")
+def delete_client(client_id: int):
+    """Delete a client profile, its engagements, and all associated engagement data."""
+    with SessionLocal() as session:
+        profile = session.query(ClientProfile).filter(ClientProfile.id == client_id).first()
+        if not profile:
+            raise HTTPException(status_code=404, detail="Client not found.")
+            
+        engagements = session.query(Engagement).filter(Engagement.client_profile_id == client_id).all()
+        eng_ids = [e.id for e in engagements]
+        
+        if eng_ids:
+            from app.database import (
+                BusinessContext as DBBusinessContext,
+                Prompt as DBPrompt,
+                KPILibrary as DBKPILibrary,
+                KPITree as DBKPITree,
+                FunctionalSpecification as DBFunctionalSpecification,
+                ApprovedKPIs as DBApprovedKPIs,
+            )
+            # Delete orphaned engagement-level records manually since they lack a strict foreign key cascade
+            session.query(DBBusinessContext).filter(DBBusinessContext.engagement_id.in_(eng_ids)).delete(synchronize_session=False)
+            session.query(DBPrompt).filter(DBPrompt.engagement_id.in_(eng_ids)).delete(synchronize_session=False)
+            session.query(DBKPILibrary).filter(DBKPILibrary.engagement_id.in_(eng_ids)).delete(synchronize_session=False)
+            session.query(DBKPITree).filter(DBKPITree.engagement_id.in_(eng_ids)).delete(synchronize_session=False)
+            session.query(DBFunctionalSpecification).filter(DBFunctionalSpecification.engagement_id.in_(eng_ids)).delete(synchronize_session=False)
+            session.query(DBApprovedKPIs).filter(DBApprovedKPIs.engagement_id.in_(eng_ids)).delete(synchronize_session=False)
+            
+        # SQLite with PRAGMA foreign_keys=ON will cascade delete engagements and client_insights
+        session.delete(profile)
+        session.commit()
+        return {"status": "success", "message": f"Client {profile.client_name} and related data deleted."}
+
+
+
 @app.get("/client-profile", response_model=dict[str, Any])
 def get_client_profile():
     with SessionLocal() as session:
-        # Get latest saved profile
         profile = session.query(ClientProfile).order_by(ClientProfile.id.desc()).first()
         if not profile:
             return {}
-        
-        # Get insights associated with this profile
-        insights = session.query(ClientInsight).filter(ClientInsight.client_profile_id == profile.id).all()
-        insight_items = []
-        for ins in insights:
-            try:
-                insights_list = json.loads(ins.content_json)
-            except Exception:
-                insights_list = []
-            insight_items.append({
-                "category": ins.category,
-                "insights": insights_list
-            })
-            
-        return {
-            "id": profile.id,
-            "client_name": profile.client_name,
-            "industry": profile.industry,
-            "sub_industry": profile.sub_industry,
-            "country": profile.country,
-            "region": profile.region,
-            "company_size": profile.company_size,
-            "organization_description": profile.organization_description,
-            "erp_platform": profile.erp_platform,
-            "crm_platform": profile.crm_platform,
-            "mes_platform": profile.mes_platform,
-            "bi_tool": profile.bi_tool,
-            "data_warehouse": profile.data_warehouse,
-            "cloud_platform": profile.cloud_platform,
-            "insights": insight_items,
-            "created_at": profile.created_at.isoformat() if profile.created_at else None,
-            "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
-        }
+        return _profile_to_dict(profile, session)
 
 
 @app.post("/client-profile", response_model=dict[str, Any])
@@ -452,9 +510,10 @@ def save_client_profile(payload: ClientProfileSavePayload):
         raise HTTPException(status_code=400, detail="Country is required.")
         
     with SessionLocal() as session:
-        # We can update the existing profile or create a new one.
-        # To avoid multiple records, since it's a single client setup MVP:
-        profile = session.query(ClientProfile).first()
+        # If the payload includes an id, update that profile; else create new
+        profile = None
+        if profile_data.id:
+            profile = session.query(ClientProfile).filter(ClientProfile.id == profile_data.id).first()
         if not profile:
             profile = ClientProfile()
             session.add(profile)
@@ -679,9 +738,11 @@ async def analyze_client_assets(session_id: str) -> dict[str, Any]:
 
 # ─── Engagement Endpoints ──────────────────────────────────────────────────────
 
+from fastapi import Query as FastQuery
+
 @app.get("/engagements", response_model=list[EngagementRecord])
-def list_engagements():
-    """Return all engagements for the current client profile, newest first."""
+def list_engagements(client_id: int | None = FastQuery(default=None)):
+    """Return engagements. If client_id is given, scope to that client; else return all."""
     from app.database import (
         BusinessContext as DBBusinessContext,
         Prompt as DBPrompt,
@@ -689,15 +750,10 @@ def list_engagements():
         FunctionalSpecification as DBFunctionalSpecification,
     )
     with SessionLocal() as session:
-        profile = session.query(ClientProfile).order_by(ClientProfile.id.desc()).first()
-        if not profile:
-            return []
-        rows = (
-            session.query(Engagement)
-            .filter(Engagement.client_profile_id == profile.id)
-            .order_by(Engagement.created_at.desc())
-            .all()
-        )
+        q = session.query(Engagement)
+        if client_id is not None:
+            q = q.filter(Engagement.client_profile_id == client_id)
+        rows = q.order_by(Engagement.created_at.desc()).all()
         
         records = []
         for r in rows:
@@ -745,12 +801,16 @@ def list_engagements():
 
 @app.post("/engagements", response_model=EngagementRecord)
 def create_engagement(payload: EngagementCreate):
-    """Create a new engagement linked to the current client profile."""
+    """Create a new engagement linked to a specific client profile."""
     if not payload.name.strip():
         raise HTTPException(status_code=400, detail="Engagement name is required.")
 
     with SessionLocal() as session:
-        profile = session.query(ClientProfile).order_by(ClientProfile.id.desc()).first()
+        # Use client_profile_id from payload if provided, else fall back to latest profile
+        if payload.client_profile_id:
+            profile = session.query(ClientProfile).filter(ClientProfile.id == payload.client_profile_id).first()
+        else:
+            profile = session.query(ClientProfile).order_by(ClientProfile.id.desc()).first()
         if not profile:
             raise HTTPException(
                 status_code=400,

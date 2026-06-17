@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Shell } from "./components/Shell";
+import { ClientsDashboard } from "./pages/ClientsDashboard";
 import { LandingPage } from "./pages/LandingPage";
 import { BusinessContextPage } from "./pages/BusinessContextPage";
 import { KpiLibraryPage } from "./pages/KpiLibraryPage";
 import { FunctionalSpecificationPage } from "./pages/FunctionalSpecificationPage";
 import { RestrictedStepPage } from "./pages/RestrictedStepPage";
+import { ClientSelectionPage } from "./pages/ClientSelectionPage";
 import { api } from "./lib/api";
 import type { ActivityEvent, ExportItem, WorkflowStatus } from "./types/api";
 
@@ -30,12 +32,22 @@ export default function App() {
     void refresh();
   }, [refresh]);
 
-  const isLandingPage = location.pathname === "/";
+  // Hide sidebar on the dashboard and onboarding pages
+  const isFullWidthPage = location.pathname === "/" || location.pathname === "/dashboard" || location.pathname === "/select-client" || location.pathname.startsWith("/onboarding");
 
   return (
-    <Shell status={status} timeline={timeline} exports={exports} hideSidebar={isLandingPage}>
+    <Shell status={status} timeline={timeline} exports={exports} hideSidebar={isFullWidthPage}>
       <Routes>
-        <Route path="/" element={<LandingPage />} />
+        {/* New: ClientSelectionPage is the default landing page */}
+        <Route path="/" element={<ClientSelectionPage />} />
+        <Route path="/select-client" element={<Navigate to="/" replace />} />
+        <Route path="/dashboard" element={<ClientsDashboard />} />
+
+        {/* Onboarding / Client Setup — for new or editing existing client profiles */}
+        <Route path="/onboarding" element={<LandingPage />} />
+        <Route path="/onboarding/:clientId" element={<LandingPage />} />
+
+        {/* Workflow Steps */}
         <Route path="/step-1" element={<BusinessContextPage onChange={refresh} />} />
         <Route path="/step-2" element={<KpiLibraryPage onChange={refresh} exports={exports} />} />
         <Route path="/step-3" element={<FunctionalSpecificationPage onChange={refresh} exports={exports} />} />

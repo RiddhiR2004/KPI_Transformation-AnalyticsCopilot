@@ -14,6 +14,7 @@ import type {
   ClientProfile,
   ClientInsightItem,
   ClientProfileSavePayload,
+  ClientProfileWithCount,
   EngagementCreate,
   EngagementRecord,
 } from "../types/api";
@@ -73,7 +74,7 @@ export const api = {
   getLlmStatus: () =>
     request<{ provider: string; model: string; uses_real_llm: boolean; api_key_configured: boolean; api_key_env: string }>("/llm-status"),
   getMetadata: (category: string) => request<MetadataItem[]>(`/metadata/${category}`),
-  
+
   // Transcripts API
   getTranscripts: () => request<TranscriptAnalysisRecord[]>("/transcript/list"),
   uploadTranscript: (file: File) => {
@@ -101,6 +102,13 @@ export const api = {
       method: "DELETE"
     }),
 
+  // Multi-client API
+  getClients: () => request<ClientProfileWithCount[]>("/clients"),
+  getClientById: (id: number) => request<ClientProfileWithCount>(`/clients/${id}`),
+  deleteClient: (id: number) => 
+    request<{ status: string; message: string }>(`/clients/${id}`, { method: "DELETE" }),
+
+
   getClientProfile: () => request<ClientProfile & { insights: ClientInsightItem[] }>("/client-profile"),
   saveClientProfile: (body: ClientProfileSavePayload) =>
     request<ClientProfile & { insights: ClientInsightItem[] }>("/client-profile", {
@@ -122,7 +130,10 @@ export const api = {
     }),
 
   // Engagement API
-  getEngagements: () => request<EngagementRecord[]>("/engagements"),
+  getEngagements: (clientId?: number) => {
+    const qs = clientId != null ? `?client_id=${clientId}` : "";
+    return request<EngagementRecord[]>(`/engagements${qs}`);
+  },
   createEngagement: (body: EngagementCreate) =>
     request<EngagementRecord>("/engagements", {
       method: "POST",
