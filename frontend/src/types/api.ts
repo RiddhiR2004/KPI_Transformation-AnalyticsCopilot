@@ -234,6 +234,7 @@ export type ClientProfileSavePayload = {
 
 
 export type EngagementCreate = {
+  client_profile_id?: number;
   name: string;
   engagement_id?: string;
   description?: string;
@@ -250,4 +251,10 @@ export type EngagementRecord = {
   created_at: string;
   updated_at: string;
   workflow_status?: WorkflowStatus;
+};
+
+
+export type ClientProfileWithCount = ClientProfile & {
+  insights?: ClientInsightItem[];
+  engagement_count: number;
 };

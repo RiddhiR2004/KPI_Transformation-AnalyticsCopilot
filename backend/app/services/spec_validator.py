@@ -8,7 +8,7 @@ logger.setLevel(logging.INFO)
 
 def clean_number(s: str) -> float:
     """Removes commas, percentage signs, currency symbols, and converts to float."""
-    cleaned = re.sub(r"[^\d\.]", "", s)
+    cleaned = re.sub(r"[^\d\.-]", "", s)
     return float(cleaned) if cleaned else 0.0
 
 def validate_spec_item(item: FunctionalSpecItem, kpi: KPI) -> List[str]:
@@ -54,9 +54,9 @@ def validate_spec_item(item: FunctionalSpecItem, kpi: KPI) -> List[str]:
     threshold_text = item.threshold_guidance or item.reporting_requirements or ""
     # Look for numbers associated with Red, Amber, Green
     # E.g. "Red < 10%", "Amber 10-15%", "Green > 15%"
-    red_match = re.search(r"red\s*(?:<|>|<=|>=|equals|is|:|under|over)?\s*(\d+(?:\.\d+)?%?)", threshold_text, re.IGNORECASE)
-    green_match = re.search(r"green\s*(?:<|>|<=|>=|equals|is|:|under|over)?\s*(\d+(?:\.\d+)?%?)", threshold_text, re.IGNORECASE)
-    amber_match = re.search(r"amber\s*(?:[a-zA-Z\s\:-]*)(\d+(?:\.\d+)?%?)", threshold_text, re.IGNORECASE)
+    red_match = re.search(r"red\s*(?:<|>|<=|>=|equals|is|:|under|over)?\s*(-?\d+(?:\.\d+)?%?)", threshold_text, re.IGNORECASE)
+    green_match = re.search(r"green\s*(?:<|>|<=|>=|equals|is|:|under|over)?\s*(-?\d+(?:\.\d+)?%?)", threshold_text, re.IGNORECASE)
+    amber_match = re.search(r"amber\s*(?:[a-zA-Z\s\:-]*)(-?\d+(?:\.\d+)?%?)", threshold_text, re.IGNORECASE)
     
     if red_match and green_match:
         try:

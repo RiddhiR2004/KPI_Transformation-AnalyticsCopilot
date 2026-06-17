@@ -1,6 +1,6 @@
-import { BarChart3, ChevronRight, FileText, Network, Table2, Target, Workflow, CheckCircle, Building2, Briefcase } from "lucide-react";
+import { BarChart3, ChevronRight, FileText, Network, Table2, Target, Workflow, CheckCircle, Building2, Briefcase, Home } from "lucide-react";
 import type { ReactNode } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import type { ActivityEvent, ExportItem, WorkflowStatus } from "../types/api";
 
 const steps = [
@@ -26,7 +26,9 @@ export function Shell({
   exports: ExportItem[];
   hideSidebar?: boolean;
 }) {
+  const location = useLocation();
   const activeEngName = localStorage.getItem("active_engagement_name");
+  const activeClientName = localStorage.getItem("active_client_name");
 
   return (
     <div className="min-h-screen bg-[#111111] text-[#F5F5F5] font-sans antialiased">
@@ -37,6 +39,8 @@ export function Shell({
             onClick={() => {
               localStorage.removeItem("active_engagement_id");
               localStorage.removeItem("active_engagement_name");
+              localStorage.removeItem("active_client_id");
+              localStorage.removeItem("active_client_name");
             }}
             className="flex items-center gap-4"
           >
@@ -45,10 +49,32 @@ export function Shell({
             <h1 className="text-lg font-semibold tracking-tight text-[#F5F5F5]">KPI Transformation & Analytics Copilot</h1>
           </NavLink>
 
-          {activeEngName && !hideSidebar && (
-            <div className="flex items-center gap-2 text-xs text-[#B0B0B0] bg-[#111] border border-[#303030] px-3 py-1.5 rounded-sm font-semibold">
-              <Briefcase size={12} className="text-[#FFE600]" />
-              <span>Active: <strong className="text-[#FFE600]">{activeEngName}</strong></span>
+          {/* Breadcrumb: Client → Engagement */}
+          {(activeClientName || activeEngName) && location.pathname !== "/select-client" && (
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 text-xs text-[#B0B0B0] bg-[#111] border border-[#303030] px-3 py-1.5 rounded-sm font-semibold">
+                {activeClientName && (
+                  <>
+                    <Building2 size={12} className="text-[#FFE600]" />
+                    <span className="text-[#F5F5F5]">{activeClientName}</span>
+                  </>
+                )}
+                {activeClientName && activeEngName && (
+                  <ChevronRight size={10} className="text-[#555]" />
+                )}
+                {activeEngName && (
+                  <>
+                    <Briefcase size={12} className="text-[#FFE600]" />
+                    <span className="text-[#FFE600]">{activeEngName}</span>
+                  </>
+                )}
+              </div>
+              <NavLink
+                to="/"
+                className="text-xs font-bold text-[#111] bg-[#FFE600] hover:bg-[#FFE600]/90 px-3 py-1.5 rounded-sm transition-colors"
+              >
+                Switch Client
+              </NavLink>
             </div>
           )}
         </div>
@@ -62,12 +88,12 @@ export function Shell({
             <aside className="space-y-5">
               <nav className="border border-[#303030] bg-[#1B1B1B]">
                 <NavLink
-                  to="/"
+                  to="/dashboard"
                   className={({ isActive }) => `group flex items-center justify-between border-b-4 px-4 py-4 text-sm font-semibold transition-all border-b-[#303030]/40 ${isActive ? "bg-[#111111] text-[#FFE600] border-b-[#FFE600]" : "text-[#F5F5F5] hover:bg-[#111111] hover:text-[#FFE600] hover:border-b-[#FFE600]"}`}
                 >
                   <span className="flex items-center gap-3">
-                    <Building2 size={18} />
-                    <span>Client Setup & Onboarding</span>
+                    <Home size={18} />
+                    <span>Clients & Engagements</span>
                   </span>
                   <ChevronRight size={16} className="text-[#B0B0B0]/40 group-hover:text-[#FFE600]" />
                 </NavLink>

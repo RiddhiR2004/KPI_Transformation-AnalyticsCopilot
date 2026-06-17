@@ -269,6 +269,7 @@ class ExportItem(BaseModel):
 
 
 class ClientProfile(BaseModel):
+    id: int | None = None
     client_name: str
     industry: str
     sub_industry: str = ""
@@ -315,6 +316,7 @@ class ClientProfileResponse(BaseModel):
 
 
 class EngagementCreate(BaseModel):
+    client_profile_id: int | None = None
     name: str
     engagement_id: str = ""
     description: str = ""

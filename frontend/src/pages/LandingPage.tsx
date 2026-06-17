@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { 
   Building2, 
   Database, 
@@ -14,15 +15,10 @@ import {
   X,
   RefreshCw,
   FolderOpen,
-  Briefcase,
-  ChevronRight,
-  Calendar,
-  Activity,
-  Lock
+  ArrowLeft
 } from "lucide-react";
 import { api } from "../lib/api";
-import type { ClientProfile, ClientInsightItem, WorkflowStatus } from "../types/api";
-import type { EngagementRecord } from "../types/api";
+import type { ClientProfile, ClientInsightItem } from "../types/api";
 
 const industryOptions = ["Manufacturing", "Retail", "Financial Services", "Energy", "Healthcare", "Technology", "Other"];
 const companySizeOptions = ["< 100", "100 - 1000", "1000 - 5000", "5000 - 10000", "> 10000"];
@@ -35,6 +31,14 @@ const dwOptions = ["Snowflake", "Databricks", "Google BigQuery", "Amazon Redshif
 const cloudOptions = ["Amazon Web Services (AWS)", "Microsoft Azure", "Google Cloud Platform (GCP)", "Private Cloud", "Other"];
 
 export function LandingPage() {
+  const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
+  const editingClientId = clientIdParam ? parseInt(clientIdParam, 10) : null;
+  const navigate = useNavigate();
+
+  const handleCancel = () => {
+    navigate(-1); // Go back to the previous page (Dashboard or Selection Page)
+  };
+
   // Session ID for staging files
   const [sessionId] = useState(() => Math.random().toString(36).substring(2, 15));
 
@@ -77,23 +81,13 @@ export function LandingPage() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
-  // Engagement State
-  const [engagements, setEngagements] = useState<EngagementRecord[]>([]);
-  const [showEngagementModal, setShowEngagementModal] = useState(false);
-  const [engName, setEngName] = useState("");
-  const [engId, setEngId] = useState("");
-  const [engDesc, setEngDesc] = useState("");
-  const [engSaving, setEngSaving] = useState(false);
-  const [engError, setEngError] = useState("");
-
-  // Workflow progress (for step badge on engagement cards)
-  const [workflowStatus, setWorkflowStatus] = useState<WorkflowStatus | null>(null);
-
-  // Load Saved Profile on Mount
+  // Load Saved Profile on Mount (only when editing an existing client)
   useEffect(() => {
+    if (!editingClientId) return; // New client — nothing to load
+
     async function loadProfile() {
       try {
-        const data = await api.getClientProfile();
+        const data = await api.getClientById(editingClientId!);
         if (data && data.client_name) {
           setClientName(data.client_name);
           
@@ -175,29 +169,7 @@ export function LandingPage() {
       }
     }
     void loadProfile();
-
-    // Load existing engagements
-    async function loadEngagements() {
-      try {
-        const data = await api.getEngagements();
-        setEngagements(data);
-      } catch (e) {
-        console.error("Failed to load engagements:", e);
-      }
-    }
-    void loadEngagements();
-
-    // Load workflow status for progress badge
-    async function loadWorkflow() {
-      try {
-        const ws = await api.getWorkflowStatus();
-        setWorkflowStatus(ws);
-      } catch (e) {
-        console.error("Failed to load workflow status:", e);
-      }
-    }
-    void loadWorkflow();
-  }, []);
+  }, [editingClientId]);
 
   // Compute Onboarding Progress
   const getProgress = () => {
@@ -364,6 +336,7 @@ export function LandingPage() {
     }
 
     const payloadProfile: ClientProfile = {
+      id: editingClientId || undefined,
       client_name: clientName.trim(),
       industry: activeIndustry.trim(),
       sub_industry: subIndustry.trim(),
@@ -386,55 +359,12 @@ export function LandingPage() {
         profile: payloadProfile,
         insights: payloadInsights
       });
-      setSuccess("Client onboarding profile and approved insights saved successfully!");
+      setSuccess("Client profile saved successfully!");
       setIsSaved(true);
-      // Refresh engagements list when profile is saved (in case first save)
-      const engs = await api.getEngagements();
-      setEngagements(engs);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      // Navigate back to the dashboard after a brief delay
+      setTimeout(() => navigate("/"), 600);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save profile.");
-    }
-  };
-
-  // Engagement handlers
-  const openEngagementModal = () => {
-    setEngName("");
-    setEngId("");
-    setEngDesc("");
-    setEngError("");
-    setShowEngagementModal(true);
-  };
-
-  const handleCreateEngagement = async () => {
-    if (!engName.trim()) {
-      setEngError("Engagement name is required.");
-      return;
-    }
-    setEngSaving(true);
-    setEngError("");
-    try {
-      const created = await api.createEngagement({
-        name: engName.trim(),
-        engagement_id: engId.trim(),
-        description: engDesc.trim(),
-      });
-      setEngagements(prev => [created, ...prev]);
-      setShowEngagementModal(false);
-    } catch (err) {
-      setEngError(err instanceof Error ? err.message : "Failed to create engagement.");
-    } finally {
-      setEngSaving(false);
-    }
-  };
-
-  const handleDeleteEngagement = async (id: number) => {
-    if (!window.confirm("Delete this engagement? This cannot be undone.")) return;
-    try {
-      await api.deleteEngagement(id);
-      setEngagements(prev => prev.filter(e => e.id !== id));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete engagement.");
     }
   };
 
@@ -476,11 +406,20 @@ export function LandingPage() {
       <section className="border border-[#303030] bg-[#1B1B1B] p-8 rounded-sm">
         <div className="flex flex-wrap items-center justify-between gap-6">
           <div className="space-y-1">
+            <div className="flex items-center gap-3 mb-2">
+              <button
+                onClick={() => navigate("/")}
+                className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#B0B0B0] hover:text-[#FFE600] border border-[#303030] hover:border-[#FFE600]/40 px-3 py-1.5 rounded-sm transition-all"
+              >
+                <ArrowLeft size={12} />
+                Back to Clients
+              </button>
+            </div>
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#FFE600]">
-              Onboarding & Client Setup
+              {editingClientId ? "Edit Client Profile" : "New Client Setup"}
             </p>
             <h2 className="text-3xl font-semibold leading-tight tracking-tight text-[#F5F5F5]">
-              Establish Enterprise Profile & Strategy Context
+              {editingClientId ? "Update Enterprise Profile" : "Establish Enterprise Profile & Strategy Context"}
             </h2>
             <p className="max-w-2xl text-xs text-[#B0B0B0] leading-relaxed">
               Capture organization profile, technology platform landscape, and stage raw business documents. 
@@ -508,106 +447,19 @@ export function LandingPage() {
         </div>
       </section>
       
-      {/* Onboarding Completed Top Banner — informational only, no action buttons */}
+      {/* Save Success Banner */}
       {isSaved && (
         <div className="border border-[#FFE600]/20 bg-[#FFE600]/5 p-5 rounded-sm flex items-center gap-4 transition-all duration-300">
           <div className="h-10 w-10 bg-[#FFE600]/10 rounded-full flex items-center justify-center border border-[#FFE600]/30 shrink-0">
             <CheckCircle className="text-[#FFE600]" size={22} />
           </div>
-          <div className="space-y-0.5">
-            <h4 className="text-sm font-bold text-[#F5F5F5] uppercase tracking-wider">Client Onboarding Completed</h4>
+          <div className="space-y-0.5 flex-1">
+            <h4 className="text-sm font-bold text-[#F5F5F5] uppercase tracking-wider">
+              {editingClientId ? "Client Profile Updated" : "Client Profile Saved"}
+            </h4>
             <p className="text-xs text-[#B0B0B0] leading-relaxed">
-              Client profile setup is fully persisted. Use the <span className="text-[#FFE600] font-semibold">Engagements</span> section below to create or open a project.
+              Redirecting to the Clients & Engagements dashboard...
             </p>
-          </div>
-        </div>
-      )}
-
-      {/* Create Engagement Modal */}
-      {showEngagementModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-[#1B1B1B] border border-[#303030] rounded-sm p-8 w-full max-w-lg shadow-2xl space-y-5">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-[#303030] pb-4">
-              <div className="flex items-center gap-2">
-                <Briefcase className="text-[#FFE600]" size={18} />
-                <h3 className="text-sm font-bold uppercase tracking-wider text-[#F5F5F5]">New Engagement</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowEngagementModal(false)}
-                className="text-[#666] hover:text-[#F5F5F5] transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Error */}
-            {engError && (
-              <div className="flex items-center gap-2 text-xs text-red-400 bg-red-950/20 border border-red-900 p-3 rounded-sm">
-                <AlertCircle size={14} />
-                {engError}
-              </div>
-            )}
-
-            {/* Fields */}
-            <div className="space-y-4">
-              <div>
-                <label className="label">Engagement Name *</label>
-                <input
-                  type="text"
-                  className="field"
-                  placeholder="e.g. Phase 1 KPI Rollout"
-                  value={engName}
-                  onChange={(e) => setEngName(e.target.value)}
-                  autoFocus
-                  autoComplete="off"
-                />
-              </div>
-              <div>
-                <label className="label">Engagement ID <span className="text-[#666] font-normal">(auto-generated if left blank)</span></label>
-                <input
-                  type="text"
-                  className="field"
-                  placeholder="e.g. ENG-001"
-                  value={engId}
-                  onChange={(e) => setEngId(e.target.value)}
-                  autoComplete="off"
-                />
-              </div>
-              <div>
-                <label className="label">Description <span className="text-[#666] font-normal">(optional)</span></label>
-                <textarea
-                  className="field min-h-[80px]"
-                  placeholder="Brief description of this engagement's scope or objectives..."
-                  value={engDesc}
-                  onChange={(e) => setEngDesc(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={handleCreateEngagement}
-                disabled={engSaving}
-                className="button-yellow flex items-center gap-2 flex-1 justify-center"
-              >
-                {engSaving ? (
-                  <><Loader2 size={15} className="animate-spin" /> Saving...</>
-                ) : (
-                  <><Save size={15} /> Save Engagement</>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowEngagementModal(false)}
-                className="button-secondary px-5"
-              >
-                Cancel
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -1015,6 +867,15 @@ export function LandingPage() {
               <button
                 type="button"
                 className="button-secondary flex items-center gap-2"
+                onClick={handleCancel}
+              >
+                <X size={16} />
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                className="button-secondary flex items-center gap-2"
                 onClick={handleAnalyzeAssets}
                 disabled={stagedFiles.length === 0 || uploading || analyzing}
               >
@@ -1038,7 +899,7 @@ export function LandingPage() {
                   Onboarding Complete
                 </div>
                 <p className="text-[11px] text-[#B0B0B0] leading-relaxed">
-                  Profile saved. Use the <strong className="text-[#FFE600]">Engagements</strong> section to create or open an engagement.
+                  Profile saved. Redirecting to the dashboard...
                 </p>
               </div>
             ) : (
@@ -1065,15 +926,24 @@ export function LandingPage() {
               </p>
             </div>
             
-            <button
-              type="button"
-              className="button-yellow flex items-center gap-1.5"
-              onClick={handleSaveProfile}
-              disabled={uploading || analyzing}
-            >
-              <Save size={14} />
-              Save Approved Insights
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                className="button-yellow flex items-center gap-1.5"
+                onClick={handleSaveProfile}
+                disabled={uploading || analyzing}
+              >
+                <Save size={14} />
+                Save Approved Insights
+              </button>
+              <button
+                type="button"
+                className="button-secondary flex items-center gap-1.5"
+                onClick={handleCancel}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
 
           {/* Categories Grid */}
@@ -1096,135 +966,7 @@ export function LandingPage() {
         </section>
       )}
 
-      {/* Engagements Section */}
-      <section className={`border border-[#303030] bg-[#1B1B1B] p-6 rounded-sm space-y-4 ${!isSaved ? "opacity-75" : ""}`}>
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#303030] pb-4">
-          <div className="flex items-center gap-2">
-            <Briefcase className="text-[#FFE600]" size={18} />
-            <h3 className="text-sm font-bold uppercase tracking-wider text-[#F5F5F5]">Engagements</h3>
-            {isSaved && (
-              <span className="text-[10px] bg-[#FFE600]/10 text-[#FFE600] border border-[#FFE600]/20 px-2 py-0.5 rounded-full font-semibold">
-                {engagements.length}
-              </span>
-            )}
-            {!isSaved && (
-              <span className="flex items-center gap-1 text-[10px] bg-red-950/20 text-red-400 border border-red-900/30 px-2 py-0.5 rounded-full font-semibold">
-                <Lock size={10} /> Locked
-              </span>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={openEngagementModal}
-            disabled={!isSaved}
-            className={`flex items-center gap-1.5 text-xs py-2 px-4 rounded-sm font-semibold transition-all ${
-              isSaved
-                ? "button-secondary"
-                : "border border-[#333] text-[#555] bg-[#1a1a1a] cursor-not-allowed opacity-50"
-            }`}
-          >
-            <Plus size={14} />
-            New Engagement
-          </button>
-        </div>
 
-        {!isSaved ? (
-          <div className="py-12 flex flex-col items-center justify-center text-center gap-3 bg-[#111111]/30 border border-[#303030]/30 rounded-sm">
-            <div className="h-12 w-12 rounded-full bg-[#252525] border border-[#303030] flex items-center justify-center">
-              <Lock className="text-[#666]" size={22} />
-            </div>
-            <h4 className="text-sm font-semibold text-[#F5F5F5]">Engagements Locked</h4>
-            <p className="text-xs text-[#666] leading-relaxed max-w-sm">
-              Please complete and save the client profile setup above to enable and manage engagements.
-            </p>
-          </div>
-        ) : engagements.length === 0 ? (
-          <div className="py-10 flex flex-col items-center justify-center text-center gap-3">
-            <div className="h-12 w-12 rounded-full bg-[#252525] border border-[#303030] flex items-center justify-center">
-              <Briefcase className="text-[#555]" size={22} />
-            </div>
-            <p className="text-xs text-[#666] leading-relaxed max-w-sm">
-              No engagements yet. Click <strong className="text-[#FFE600]">New Engagement</strong> to create your first project and begin Step 1.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {engagements.map((eng) => {
-              // Determine the current step label from eng.workflow_status
-              let stepLabel = "Not started";
-              let stepColor = "text-[#555] border-[#333] bg-[#1a1a1a]";
-              const ws = eng.workflow_status;
-              if (ws) {
-                if (ws.functional_specification) {
-                  stepLabel = "Step 3 — Functional Spec";
-                  stepColor = "text-emerald-400 border-emerald-800 bg-emerald-950/30";
-                } else if (ws.kpi_library) {
-                  stepLabel = "Step 2 — KPI Library";
-                  stepColor = "text-[#FFE600] border-[#FFE600]/30 bg-[#FFE600]/5";
-                } else if (ws.business_context) {
-                  stepLabel = "Step 1 — Business Context";
-                  stepColor = "text-[#FFE600] border-[#FFE600]/30 bg-[#FFE600]/5";
-                }
-              }
-
-              return (
-                <div
-                  key={eng.id}
-                  className="group border border-[#303030] hover:border-[#FFE600]/40 bg-[#111] rounded-sm p-5 space-y-3 transition-all duration-200 hover:bg-[#161616] relative"
-                >
-                  {/* Delete button */}
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteEngagement(eng.id)}
-                    title="Delete engagement"
-                    className="absolute top-3 right-3 text-[#444] hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                  >
-                    <Trash2 size={13} />
-                  </button>
-
-                  {/* Card header */}
-                  <div className="space-y-1 pr-6">
-                    <h4 className="text-sm font-bold text-[#F5F5F5] leading-tight">{eng.name}</h4>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="inline-block text-[10px] font-mono text-[#FFE600] bg-[#FFE600]/10 border border-[#FFE600]/20 px-2 py-0.5 rounded-sm">
-                        {eng.engagement_id}
-                      </span>
-                      {/* Progress badge */}
-                      <span className={`inline-flex items-center gap-1 text-[10px] font-semibold border px-2 py-0.5 rounded-sm ${stepColor}`}>
-                        <Activity size={9} />
-                        {stepLabel}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  {eng.description && (
-                    <p className="text-[11px] text-[#888] leading-relaxed line-clamp-2">{eng.description}</p>
-                  )}
-
-                  {/* Footer */}
-                  <div className="flex items-center justify-between pt-1 border-t border-[#222]">
-                    <span className="flex items-center gap-1.5 text-[10px] text-[#555]">
-                      <Calendar size={11} />
-                      {new Date(eng.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                    </span>
-                    <a
-                      href="/step-1"
-                      onClick={() => {
-                        localStorage.setItem("active_engagement_id", String(eng.id));
-                        localStorage.setItem("active_engagement_name", eng.name);
-                      }}
-                      className="inline-flex items-center gap-1.5 text-[11px] font-bold text-black bg-[#FFE600] hover:bg-[#FFE600]/90 px-3 py-1.5 rounded-sm transition-all hover:translate-x-0.5"
-                    >
-                      Open <ChevronRight size={13} />
-                    </a>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
     </div>
   );
 }
