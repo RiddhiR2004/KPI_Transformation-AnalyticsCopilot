@@ -41,6 +41,8 @@ from app.models import (
     ClientInsightItem,
     ClientProfileSavePayload,
     ClientProfileResponse,
+    EngagementCreate,
+    EngagementRecord,
 )
 from app.services.activity import list_activity, log_activity
 from app.services.documents import export_json_bundle
@@ -84,6 +86,7 @@ from app.database import (
     TranscriptAnalysis,
     ClientProfile,
     ClientInsight,
+    Engagement,
 )
 from app.services.metadata_cache import metadata_cache
 
@@ -654,6 +657,100 @@ async def analyze_client_assets(session_id: str) -> dict[str, Any]:
             raise HTTPException(status_code=502, detail=f"LLM analysis failed: {e}")
 
 
+
+# ─── Engagement Endpoints ──────────────────────────────────────────────────────
+
+@app.get("/engagements", response_model=list[EngagementRecord])
+def list_engagements():
+    """Return all engagements for the current client profile, newest first."""
+    with SessionLocal() as session:
+        profile = session.query(ClientProfile).order_by(ClientProfile.id.desc()).first()
+        if not profile:
+            return []
+        rows = (
+            session.query(Engagement)
+            .filter(Engagement.client_profile_id == profile.id)
+            .order_by(Engagement.created_at.desc())
+            .all()
+        )
+        return [
+            EngagementRecord(
+                id=r.id,
+                client_profile_id=r.client_profile_id,
+                name=r.name,
+                engagement_id=r.engagement_id,
+                description=r.description,
+                status=r.status,
+                created_at=r.created_at,
+                updated_at=r.updated_at,
+            )
+            for r in rows
+        ]
+
+
+@app.post("/engagements", response_model=EngagementRecord)
+def create_engagement(payload: EngagementCreate):
+    """Create a new engagement linked to the current client profile."""
+    if not payload.name.strip():
+        raise HTTPException(status_code=400, detail="Engagement name is required.")
+
+    with SessionLocal() as session:
+        profile = session.query(ClientProfile).order_by(ClientProfile.id.desc()).first()
+        if not profile:
+            raise HTTPException(
+                status_code=400,
+                detail="Client profile not found. Please save the client profile first.",
+            )
+
+        # Auto-generate an engagement ID if not provided
+        eng_id = payload.engagement_id.strip()
+        if not eng_id:
+            import time
+            eng_id = f"ENG-{int(time.time())}"
+
+        now = datetime.now()
+        eng = Engagement(
+            client_profile_id=profile.id,
+            name=payload.name.strip(),
+            engagement_id=eng_id,
+            description=payload.description.strip(),
+            status="active",
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(eng)
+        session.commit()
+        session.refresh(eng)
+
+        log_activity("Engagement Created", f"Engagement '{eng.name}' ({eng.engagement_id}) created.")
+
+        return EngagementRecord(
+            id=eng.id,
+            client_profile_id=eng.client_profile_id,
+            name=eng.name,
+            engagement_id=eng.engagement_id,
+            description=eng.description,
+            status=eng.status,
+            created_at=eng.created_at,
+            updated_at=eng.updated_at,
+        )
+
+
+@app.delete("/engagements/{engagement_id_path}")
+def delete_engagement(engagement_id_path: int):
+    """Delete a specific engagement by its database ID."""
+    with SessionLocal() as session:
+        eng = session.query(Engagement).filter(Engagement.id == engagement_id_path).first()
+        if not eng:
+            raise HTTPException(status_code=404, detail="Engagement not found.")
+        name = eng.name
+        session.delete(eng)
+        session.commit()
+    log_activity("Engagement Deleted", f"Engagement '{name}' deleted.")
+    return {"status": "success", "message": f"Engagement '{name}' deleted."}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 
 @app.post("/business-context")
 def save_business_context(context: BusinessContext) -> BusinessContext:

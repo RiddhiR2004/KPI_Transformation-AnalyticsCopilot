@@ -164,6 +164,19 @@ class ClientInsight(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
+class Engagement(Base):
+    __tablename__ = "engagements"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    client_profile_id: Mapped[int] = mapped_column(ForeignKey("client_profile.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), default="")          # e.g. "Phase 1 Rollout"
+    engagement_id: Mapped[str] = mapped_column(String(100), default="") # e.g. "ENG-001"
+    description: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(50), default="active")   # active / archived
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
 class LLMUsageLog(Base):
     __tablename__ = "llm_usage_logs"
 
@@ -352,6 +365,22 @@ def init_db() -> None:
             for col_name, col_def in new_cols_fs:
                 if col_name not in existing_cols_fs:
                     conn.exec_driver_sql(f"ALTER TABLE functional_specification ADD COLUMN {col_name} {col_def}")
+        # engagements table migration — add table if it doesn't exist
+        conn.exec_driver_sql(
+            """
+            CREATE TABLE IF NOT EXISTS engagements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_profile_id INTEGER NOT NULL
+                    REFERENCES client_profile(id) ON DELETE CASCADE,
+                name VARCHAR(255) DEFAULT '',
+                engagement_id VARCHAR(100) DEFAULT '',
+                description TEXT DEFAULT '',
+                status VARCHAR(50) DEFAULT 'active',
+                created_at DATETIME,
+                updated_at DATETIME
+            )
+            """
+        )
     except Exception as e:
         print(f"Error performing SQLite migrations: {e}")
         

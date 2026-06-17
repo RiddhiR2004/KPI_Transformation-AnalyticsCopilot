@@ -13,10 +13,15 @@ import {
   Plus,
   X,
   RefreshCw,
-  FolderOpen
+  FolderOpen,
+  Briefcase,
+  ChevronRight,
+  Calendar,
+  Activity
 } from "lucide-react";
 import { api } from "../lib/api";
-import type { ClientProfile, ClientInsightItem } from "../types/api";
+import type { ClientProfile, ClientInsightItem, WorkflowStatus } from "../types/api";
+import type { EngagementRecord } from "../types/api";
 
 const industryOptions = ["Manufacturing", "Retail", "Financial Services", "Energy", "Healthcare", "Technology", "Other"];
 const companySizeOptions = ["< 100", "100 - 1000", "1000 - 5000", "5000 - 10000", "> 10000"];
@@ -70,6 +75,18 @@ export function LandingPage() {
   const [analysisWarning, setAnalysisWarning] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+
+  // Engagement State
+  const [engagements, setEngagements] = useState<EngagementRecord[]>([]);
+  const [showEngagementModal, setShowEngagementModal] = useState(false);
+  const [engName, setEngName] = useState("");
+  const [engId, setEngId] = useState("");
+  const [engDesc, setEngDesc] = useState("");
+  const [engSaving, setEngSaving] = useState(false);
+  const [engError, setEngError] = useState("");
+
+  // Workflow progress (for step badge on engagement cards)
+  const [workflowStatus, setWorkflowStatus] = useState<WorkflowStatus | null>(null);
 
   // Load Saved Profile on Mount
   useEffect(() => {
@@ -157,6 +174,28 @@ export function LandingPage() {
       }
     }
     void loadProfile();
+
+    // Load existing engagements
+    async function loadEngagements() {
+      try {
+        const data = await api.getEngagements();
+        setEngagements(data);
+      } catch (e) {
+        console.error("Failed to load engagements:", e);
+      }
+    }
+    void loadEngagements();
+
+    // Load workflow status for progress badge
+    async function loadWorkflow() {
+      try {
+        const ws = await api.getWorkflowStatus();
+        setWorkflowStatus(ws);
+      } catch (e) {
+        console.error("Failed to load workflow status:", e);
+      }
+    }
+    void loadWorkflow();
   }, []);
 
   // Compute Onboarding Progress
@@ -348,9 +387,53 @@ export function LandingPage() {
       });
       setSuccess("Client onboarding profile and approved insights saved successfully!");
       setIsSaved(true);
+      // Refresh engagements list when profile is saved (in case first save)
+      const engs = await api.getEngagements();
+      setEngagements(engs);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save profile.");
+    }
+  };
+
+  // Engagement handlers
+  const openEngagementModal = () => {
+    setEngName("");
+    setEngId("");
+    setEngDesc("");
+    setEngError("");
+    setShowEngagementModal(true);
+  };
+
+  const handleCreateEngagement = async () => {
+    if (!engName.trim()) {
+      setEngError("Engagement name is required.");
+      return;
+    }
+    setEngSaving(true);
+    setEngError("");
+    try {
+      const created = await api.createEngagement({
+        name: engName.trim(),
+        engagement_id: engId.trim(),
+        description: engDesc.trim(),
+      });
+      setEngagements(prev => [created, ...prev]);
+      setShowEngagementModal(false);
+    } catch (err) {
+      setEngError(err instanceof Error ? err.message : "Failed to create engagement.");
+    } finally {
+      setEngSaving(false);
+    }
+  };
+
+  const handleDeleteEngagement = async (id: number) => {
+    if (!window.confirm("Delete this engagement? This cannot be undone.")) return;
+    try {
+      await api.deleteEngagement(id);
+      setEngagements(prev => prev.filter(e => e.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete engagement.");
     }
   };
 
@@ -424,27 +507,213 @@ export function LandingPage() {
         </div>
       </section>
       
-      {/* Onboarding Completed Top Banner */}
+      {/* Onboarding Completed Top Banner — informational only, no action buttons */}
       {isSaved && (
-        <div className="border border-[#FFE600]/20 bg-[#FFE600]/5 p-5 rounded-sm flex flex-wrap items-center justify-between gap-6 transition-all duration-300">
-          <div className="flex items-center gap-4">
-            <div className="h-10 w-10 bg-[#FFE600]/10 rounded-full flex items-center justify-center border border-[#FFE600]/30 shrink-0">
-              <CheckCircle className="text-[#FFE600]" size={22} />
+        <div className="border border-[#FFE600]/20 bg-[#FFE600]/5 p-5 rounded-sm flex items-center gap-4 transition-all duration-300">
+          <div className="h-10 w-10 bg-[#FFE600]/10 rounded-full flex items-center justify-center border border-[#FFE600]/30 shrink-0">
+            <CheckCircle className="text-[#FFE600]" size={22} />
+          </div>
+          <div className="space-y-0.5">
+            <h4 className="text-sm font-bold text-[#F5F5F5] uppercase tracking-wider">Client Onboarding Completed</h4>
+            <p className="text-xs text-[#B0B0B0] leading-relaxed">
+              Client profile setup is fully persisted. Use the <span className="text-[#FFE600] font-semibold">Engagements</span> section below to create or open a project.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Create Engagement Modal */}
+      {showEngagementModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-[#1B1B1B] border border-[#303030] rounded-sm p-8 w-full max-w-lg shadow-2xl space-y-5">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-[#303030] pb-4">
+              <div className="flex items-center gap-2">
+                <Briefcase className="text-[#FFE600]" size={18} />
+                <h3 className="text-sm font-bold uppercase tracking-wider text-[#F5F5F5]">New Engagement</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEngagementModal(false)}
+                className="text-[#666] hover:text-[#F5F5F5] transition-colors"
+              >
+                <X size={18} />
+              </button>
             </div>
-            <div className="space-y-1">
-              <h4 className="text-sm font-bold text-[#F5F5F5] uppercase tracking-wider">Client Onboarding Completed</h4>
-              <p className="text-xs text-[#B0B0B0] max-w-2xl leading-relaxed">
-                Client profile setup is fully persisted. You can now proceed to define business context and extract the KPI library.
-              </p>
+
+            {/* Error */}
+            {engError && (
+              <div className="flex items-center gap-2 text-xs text-red-400 bg-red-950/20 border border-red-900 p-3 rounded-sm">
+                <AlertCircle size={14} />
+                {engError}
+              </div>
+            )}
+
+            {/* Fields */}
+            <div className="space-y-4">
+              <div>
+                <label className="label">Engagement Name *</label>
+                <input
+                  type="text"
+                  className="field"
+                  placeholder="e.g. Phase 1 KPI Rollout"
+                  value={engName}
+                  onChange={(e) => setEngName(e.target.value)}
+                  autoFocus
+                  autoComplete="off"
+                />
+              </div>
+              <div>
+                <label className="label">Engagement ID <span className="text-[#666] font-normal">(auto-generated if left blank)</span></label>
+                <input
+                  type="text"
+                  className="field"
+                  placeholder="e.g. ENG-001"
+                  value={engId}
+                  onChange={(e) => setEngId(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+              <div>
+                <label className="label">Description <span className="text-[#666] font-normal">(optional)</span></label>
+                <textarea
+                  className="field min-h-[80px]"
+                  placeholder="Brief description of this engagement's scope or objectives..."
+                  value={engDesc}
+                  onChange={(e) => setEngDesc(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handleCreateEngagement}
+                disabled={engSaving}
+                className="button-yellow flex items-center gap-2 flex-1 justify-center"
+              >
+                {engSaving ? (
+                  <><Loader2 size={15} className="animate-spin" /> Saving...</>
+                ) : (
+                  <><Save size={15} /> Save Engagement</>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowEngagementModal(false)}
+                className="button-secondary px-5"
+              >
+                Cancel
+              </button>
             </div>
           </div>
-          <a
-            href="/step-1"
-            className="inline-flex items-center gap-2 bg-[#FFE600] hover:bg-[#FFE600]/90 text-black text-xs font-bold py-2.5 px-5 rounded-sm transition-all hover:translate-x-1 shrink-0 shadow-lg"
-          >
-            Proceed to Step 1: Business Context ➔
-          </a>
         </div>
+      )}
+
+      {/* Engagements Section — appears below the banner once profile is saved */}
+      {isSaved && (
+        <section className="border border-[#303030] bg-[#1B1B1B] p-6 rounded-sm space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#303030] pb-4">
+            <div className="flex items-center gap-2">
+              <Briefcase className="text-[#FFE600]" size={18} />
+              <h3 className="text-sm font-bold uppercase tracking-wider text-[#F5F5F5]">Engagements</h3>
+              <span className="text-[10px] bg-[#FFE600]/10 text-[#FFE600] border border-[#FFE600]/20 px-2 py-0.5 rounded-full font-semibold">
+                {engagements.length}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={openEngagementModal}
+              className="button-secondary flex items-center gap-1.5 text-xs py-2 px-4"
+            >
+              <Plus size={14} />
+              New Engagement
+            </button>
+          </div>
+
+          {engagements.length === 0 ? (
+            <div className="py-10 flex flex-col items-center justify-center text-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-[#252525] border border-[#303030] flex items-center justify-center">
+                <Briefcase className="text-[#555]" size={22} />
+              </div>
+              <p className="text-xs text-[#666] leading-relaxed max-w-sm">
+                No engagements yet. Click <strong className="text-[#FFE600]">New Engagement</strong> to create your first project and begin Step 1.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {engagements.map((eng) => {
+                // Determine the current step label from workflowStatus
+                let stepLabel = "Not started";
+                let stepColor = "text-[#555] border-[#333] bg-[#1a1a1a]";
+                if (workflowStatus) {
+                  if (workflowStatus.functional_specification) {
+                    stepLabel = "Step 3 — Functional Spec";
+                    stepColor = "text-emerald-400 border-emerald-800 bg-emerald-950/30";
+                  } else if (workflowStatus.kpi_library) {
+                    stepLabel = "Step 2 — KPI Library";
+                    stepColor = "text-[#FFE600] border-[#FFE600]/30 bg-[#FFE600]/5";
+                  } else if (workflowStatus.business_context) {
+                    stepLabel = "Step 1 — Business Context";
+                    stepColor = "text-[#FFE600] border-[#FFE600]/30 bg-[#FFE600]/5";
+                  }
+                }
+
+                return (
+                  <div
+                    key={eng.id}
+                    className="group border border-[#303030] hover:border-[#FFE600]/40 bg-[#111] rounded-sm p-5 space-y-3 transition-all duration-200 hover:bg-[#161616] relative"
+                  >
+                    {/* Delete button */}
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteEngagement(eng.id)}
+                      title="Delete engagement"
+                      className="absolute top-3 right-3 text-[#444] hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+
+                    {/* Card header */}
+                    <div className="space-y-1 pr-6">
+                      <h4 className="text-sm font-bold text-[#F5F5F5] leading-tight">{eng.name}</h4>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="inline-block text-[10px] font-mono text-[#FFE600] bg-[#FFE600]/10 border border-[#FFE600]/20 px-2 py-0.5 rounded-sm">
+                          {eng.engagement_id}
+                        </span>
+                        {/* Progress badge */}
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold border px-2 py-0.5 rounded-sm ${stepColor}`}>
+                          <Activity size={9} />
+                          {stepLabel}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    {eng.description && (
+                      <p className="text-[11px] text-[#888] leading-relaxed line-clamp-2">{eng.description}</p>
+                    )}
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-between pt-1 border-t border-[#222]">
+                      <span className="flex items-center gap-1.5 text-[10px] text-[#555]">
+                        <Calendar size={11} />
+                        {new Date(eng.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      </span>
+                      <a
+                        href="/step-1"
+                        className="inline-flex items-center gap-1.5 text-[11px] font-bold text-black bg-[#FFE600] hover:bg-[#FFE600]/90 px-3 py-1.5 rounded-sm transition-all hover:translate-x-0.5"
+                      >
+                        Open <ChevronRight size={13} />
+                      </a>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
       )}
 
       {/* Notifications */}
@@ -865,21 +1134,14 @@ export function LandingPage() {
               </button>
             </div>
             {isSaved ? (
-              <div className="mt-4 p-4 border border-[#FFE600]/30 bg-[#FFE600]/5 rounded-sm space-y-3">
+              <div className="mt-4 p-4 border border-[#FFE600]/30 bg-[#FFE600]/5 rounded-sm space-y-2">
                 <div className="flex items-center gap-2 text-xs font-bold text-[#FFE600] uppercase tracking-wider">
                   <CheckCircle size={16} />
                   Onboarding Complete
                 </div>
                 <p className="text-[11px] text-[#B0B0B0] leading-relaxed">
-                  Your profile and technical configurations are saved. Click the button below to proceed to the next stage of context mapping.
+                  Profile saved. Use the <strong className="text-[#FFE600]">Engagements</strong> section to create or open an engagement.
                 </p>
-                <a 
-                  href="/step-1" 
-                  className="flex items-center justify-between bg-[#FFE600] hover:bg-[#FFE600]/90 text-black text-xs font-bold py-2.5 px-4 rounded-sm transition-all shadow-md hover:translate-x-1"
-                >
-                  <span>Proceed to Step 1: Business Context</span>
-                  <span className="text-sm font-semibold">➔</span>
-                </a>
               </div>
             ) : (
               <p className="text-[11px] text-[#666] italic mt-2">

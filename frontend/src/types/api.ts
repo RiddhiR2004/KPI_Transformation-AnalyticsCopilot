@@ -233,3 +233,20 @@ export type ClientProfileSavePayload = {
 };
 
 
+export type EngagementCreate = {
+  name: string;
+  engagement_id?: string;
+  description?: string;
+};
+
+
+export type EngagementRecord = {
+  id: number;
+  client_profile_id: number;
+  name: string;
+  engagement_id: string;
+  description: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};

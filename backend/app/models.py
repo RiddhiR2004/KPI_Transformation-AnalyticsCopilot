@@ -313,3 +313,19 @@ class ClientProfileResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
+class EngagementCreate(BaseModel):
+    name: str
+    engagement_id: str = ""
+    description: str = ""
+
+
+class EngagementRecord(BaseModel):
+    id: int
+    client_profile_id: int
+    name: str
+    engagement_id: str
+    description: str
+    status: str
+    created_at: datetime
+    updated_at: datetime

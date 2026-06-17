@@ -13,7 +13,9 @@ import type {
   TranscriptAnalysisRecord,
   ClientProfile,
   ClientInsightItem,
-  ClientProfileSavePayload
+  ClientProfileSavePayload,
+  EngagementCreate,
+  EngagementRecord,
 } from "../types/api";
 
 const jsonHeaders = { "Content-Type": "application/json" };
@@ -109,7 +111,20 @@ export const api = {
   analyzeClientAssets: (sessionId: string) =>
     request<Record<string, string[]>>(`/client-profile/analyze?session_id=${encodeURIComponent(sessionId)}`, {
       method: "POST"
-    })
+    }),
+
+  // Engagement API
+  getEngagements: () => request<EngagementRecord[]>("/engagements"),
+  createEngagement: (body: EngagementCreate) =>
+    request<EngagementRecord>("/engagements", {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify(body),
+    }),
+  deleteEngagement: (id: number) =>
+    request<{ status: string; message: string }>(`/engagements/${id}`, {
+      method: "DELETE",
+    }),
 };
 
 export function exportUrl(id: string, format: string) {
