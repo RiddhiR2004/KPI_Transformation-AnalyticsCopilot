@@ -105,6 +105,21 @@ export function Shell({
                     <span>Home</span>
                   </NavLink>
                 )}
+                {location.pathname === "/dashboard" && (
+                  <NavLink
+                    to="/"
+                    onClick={() => {
+                      localStorage.removeItem("active_engagement_id");
+                      localStorage.removeItem("active_engagement_name");
+                      localStorage.removeItem("active_client_id");
+                      localStorage.removeItem("active_client_name");
+                    }}
+                    className="flex items-center gap-1.5 text-xs font-bold text-[#B0B0B0] hover:text-[#FFE600] border border-[#303030] hover:border-[#FFE600]/40 px-3 py-1.5 rounded-sm transition-colors bg-[#111]"
+                  >
+                    <Home size={12} className="text-[#FFE600]" />
+                    <span>Home</span>
+                  </NavLink>
+                )}
                 <NavLink
                   to="/"
                   className="text-xs font-bold text-[#111] bg-[#FFE600] hover:bg-[#FFE600]/90 px-3 py-1.5 rounded-sm transition-colors"
