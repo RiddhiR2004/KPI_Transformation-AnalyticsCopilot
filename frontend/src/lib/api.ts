@@ -27,6 +27,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (activeEngId) {
     headers.set("X-Engagement-ID", activeEngId);
   }
+  
+  // Set custom user headers for audit log tracking
+  const userName = localStorage.getItem("user_name") || "riddhi.r";
+  const userEmail = localStorage.getItem("user_email") || "riddhi.r@example.com";
+  headers.set("X-User-Name", userName);
+  headers.set("X-User-Email", userEmail);
+
   const response = await fetch(`/api${path}`, {
     ...init,
     headers,
@@ -150,10 +157,54 @@ export const api = {
     request<{ status: string; message: string }>(`/engagements/${id}`, {
       method: "DELETE",
     }),
+
+  // Audit API
+  getAuditLogs: (filters?: {
+    client_id?: number;
+    engagement_id?: number;
+    user?: string;
+    module?: string;
+    start_date?: string;
+    end_date?: string;
+    q?: string;
+  }) => {
+    const params = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, val]) => {
+        if (val !== undefined && val !== null && val !== "") {
+          params.append(key, String(val));
+        }
+      });
+    }
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    return request<any[]>(`/audit-logs${qs}`);
+  },
+  logAuditEvent: (body: {
+    module: string;
+    action: string;
+    status: string;
+    entity_type?: string;
+    entity_name?: string;
+    previous_value?: string;
+    new_value?: string;
+    client_id?: number;
+    engagement_id?: number;
+  }) =>
+    request<{ status: string }>("/audit-logs/event", {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify(body)
+    }),
 };
 
 export function exportUrl(id: string, format: string) {
   const activeEngId = localStorage.getItem("active_engagement_id");
+  const userName = encodeURIComponent(localStorage.getItem("user_name") || "riddhi.r");
+  const userEmail = encodeURIComponent(localStorage.getItem("user_email") || "riddhi.r@example.com");
   const base = `/api/exports/${id}/${format.toLowerCase()}`;
-  return activeEngId ? `${base}?engagement_id=${activeEngId}` : base;
+  let qs = `?user_name=${userName}&user_email=${userEmail}`;
+  if (activeEngId) {
+    qs += `&engagement_id=${activeEngId}`;
+  }
+  return `${base}${qs}`;
 }

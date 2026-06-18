@@ -105,6 +105,27 @@ class ActivityLog(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    user_name: Mapped[str] = mapped_column(String(255), default="")
+    user_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    action_type: Mapped[str] = mapped_column(String(100), default="")
+    entity_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    entity_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    previous_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    new_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    client_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    client_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    engagement_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    engagement_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    module: Mapped[str] = mapped_column(String(100), default="")
+    action: Mapped[str] = mapped_column(String(100), default="")
+    status: Mapped[str] = mapped_column(String(50), default="Success")
+
+
 class FunctionalSpecification(Base):
     __tablename__ = "functional_specification"
 
@@ -388,6 +409,30 @@ def init_db() -> None:
                     status VARCHAR(50) DEFAULT 'active',
                     created_at DATETIME,
                     updated_at DATETIME
+                )
+                """
+            )
+
+            # audit_logs table migration — add table if it doesn't exist
+            conn.exec_driver_sql(
+                """
+                CREATE TABLE IF NOT EXISTS audit_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp DATETIME,
+                    user_name VARCHAR(255) DEFAULT '',
+                    user_email VARCHAR(255),
+                    action_type VARCHAR(100) DEFAULT '',
+                    entity_type VARCHAR(100),
+                    entity_name VARCHAR(255),
+                    previous_value TEXT,
+                    new_value TEXT,
+                    client_id INTEGER,
+                    client_name VARCHAR(255),
+                    engagement_id INTEGER,
+                    engagement_name VARCHAR(255),
+                    module VARCHAR(100) DEFAULT '',
+                    action VARCHAR(100) DEFAULT '',
+                    status VARCHAR(50) DEFAULT 'Success'
                 )
                 """
             )

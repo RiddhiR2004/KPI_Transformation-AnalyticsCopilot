@@ -106,8 +106,11 @@ from app.database import (
     ClientProfile,
     ClientInsight,
     Engagement,
+    AuditLog,
 )
 from app.services.metadata_cache import metadata_cache
+from app.services.audit import log_audit, write_audit_log, get_user_info
+
 
 METADATA_MODELS = {
     "industries": IndustryMetadata,
@@ -227,6 +230,114 @@ def health() -> dict[str, str]:
 @app.get("/llm-status")
 def get_llm_status() -> dict[str, Any]:
     return llm_status()
+
+
+class AuditLogEventPayload(BaseModel):
+    module: str
+    action: str
+    status: str = "Success"
+    entity_type: str | None = None
+    entity_name: str | None = None
+    previous_value: str | None = None
+    new_value: str | None = None
+    client_id: int | None = None
+    engagement_id: int | None = None
+
+
+@app.get("/audit-logs")
+def get_audit_logs(
+    request: Request,
+    client_id: int | None = None,
+    engagement_id: int | None = None,
+    user: str | None = None,
+    module: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    q: str | None = None,
+):
+    with SessionLocal() as session:
+        query = select(AuditLog)
+        
+        if client_id is not None:
+            query = query.where(AuditLog.client_id == client_id)
+        if engagement_id is not None:
+            query = query.where(AuditLog.engagement_id == engagement_id)
+        if user:
+            query = query.where((AuditLog.user_name.like(f"%{user}%")) | (AuditLog.user_email.like(f"%{user}%")))
+        if module:
+            query = query.where(AuditLog.module == module)
+        if start_date:
+            try:
+                start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+                query = query.where(AuditLog.timestamp >= start_dt)
+            except ValueError:
+                pass
+        if end_date:
+            try:
+                end_dt = datetime.strptime(f"{end_date} 23:59:59", "%Y-%m-%d %H:%M:%S")
+                query = query.where(AuditLog.timestamp <= end_dt)
+            except ValueError:
+                pass
+        if q:
+            search_pattern = f"%{q}%"
+            query = query.where(
+                (AuditLog.user_name.like(search_pattern)) |
+                (AuditLog.user_email.like(search_pattern)) |
+                (AuditLog.client_name.like(search_pattern)) |
+                (AuditLog.engagement_name.like(search_pattern)) |
+                (AuditLog.module.like(search_pattern)) |
+                (AuditLog.action.like(search_pattern)) |
+                (AuditLog.status.like(search_pattern)) |
+                (AuditLog.entity_name.like(search_pattern)) |
+                (AuditLog.entity_type.like(search_pattern)) |
+                (AuditLog.previous_value.like(search_pattern)) |
+                (AuditLog.new_value.like(search_pattern))
+            )
+            
+        query = query.order_by(AuditLog.timestamp.desc())
+        results = session.scalars(query).all()
+        
+        return [
+            {
+                "id": log.id,
+                "timestamp": log.timestamp.strftime("%d-%b-%Y %I:%M %p") if log.timestamp else "",
+                "user_name": log.user_name,
+                "user_email": log.user_email,
+                "action_type": log.action_type,
+                "entity_type": log.entity_type,
+                "entity_name": log.entity_name,
+                "previous_value": log.previous_value,
+                "new_value": log.new_value,
+                "client_id": log.client_id,
+                "client_name": log.client_name,
+                "engagement_id": log.engagement_id,
+                "engagement_name": log.engagement_name,
+                "module": log.module,
+                "action": log.action,
+                "status": log.status
+            }
+            for log in results
+        ]
+
+
+@app.post("/audit-logs/event")
+def create_custom_audit_event(
+    request: Request,
+    payload: AuditLogEventPayload
+):
+    log_audit(
+        request=request,
+        action=payload.action,
+        module=payload.module,
+        entity_type=payload.entity_type,
+        entity_name=payload.entity_name,
+        previous_value=payload.previous_value,
+        new_value=payload.new_value,
+        status=payload.status,
+        client_id=payload.client_id,
+        engagement_id=payload.engagement_id
+    )
+    return {"status": "success"}
 
 
 @app.post("/transcript/upload", response_model=TranscriptAnalysisRecord)
@@ -456,12 +567,23 @@ def get_client_by_id(client_id: int):
 
 
 @app.delete("/clients/{client_id}")
-def delete_client(client_id: int):
+def delete_client(request: Request, client_id: int):
     """Delete a client profile, its engagements, and all associated engagement data."""
     with SessionLocal() as session:
         profile = session.query(ClientProfile).filter(ClientProfile.id == client_id).first()
         if not profile:
             raise HTTPException(status_code=404, detail="Client not found.")
+            
+        client_name = profile.client_name
+        log_audit(
+            request=request,
+            action="Delete",
+            module="Client Profile",
+            entity_type="Client",
+            entity_name=client_name,
+            client_id=client_id,
+            db_session=session
+        )
             
         engagements = session.query(Engagement).filter(Engagement.client_profile_id == client_id).all()
         eng_ids = [e.id for e in engagements]
@@ -486,7 +608,7 @@ def delete_client(client_id: int):
         # SQLite with PRAGMA foreign_keys=ON will cascade delete engagements and client_insights
         session.delete(profile)
         session.commit()
-        return {"status": "success", "message": f"Client {profile.client_name} and related data deleted."}
+        return {"status": "success", "message": f"Client {client_name} and related data deleted."}
 
 
 
@@ -507,7 +629,7 @@ def get_client_profile():
 
 
 @app.post("/client-profile", response_model=dict[str, Any])
-def save_client_profile(payload: ClientProfileSavePayload):
+def save_client_profile(request: Request, payload: ClientProfileSavePayload):
     profile_data = payload.profile
     if not profile_data.client_name.strip():
         raise HTTPException(status_code=400, detail="Client Name is required.")
@@ -519,8 +641,29 @@ def save_client_profile(payload: ClientProfileSavePayload):
     with SessionLocal() as session:
         # If the payload includes an id, update that profile; else create new
         profile = None
+        is_create = True
+        previous_profile_data = None
+        
         if profile_data.id:
             profile = session.query(ClientProfile).filter(ClientProfile.id == profile_data.id).first()
+            if profile:
+                is_create = False
+                previous_profile_data = {
+                    "client_name": profile.client_name,
+                    "industry": profile.industry,
+                    "sub_industry": profile.sub_industry,
+                    "country": profile.country,
+                    "region": profile.region,
+                    "company_size": profile.company_size,
+                    "organization_description": profile.organization_description,
+                    "erp_platform": profile.erp_platform,
+                    "crm_platform": profile.crm_platform,
+                    "mes_platform": profile.mes_platform,
+                    "bi_tool": profile.bi_tool,
+                    "data_warehouse": profile.data_warehouse,
+                    "cloud_platform": profile.cloud_platform,
+                }
+                
         if not profile:
             profile = ClientProfile()
             session.add(profile)
@@ -555,6 +698,65 @@ def save_client_profile(payload: ClientProfileSavePayload):
             session.add(db_insight)
             
         session.commit()
+
+        # Audit logging
+        if is_create:
+            # Client created
+            log_audit(
+                request=request,
+                action="Create",
+                module="Client Profile",
+                entity_type="Client",
+                entity_name=profile.client_name,
+                new_value=json.dumps({"client_name": profile.client_name, "industry": profile.industry, "country": profile.country}),
+                client_id=profile.id,
+                db_session=session
+            )
+        else:
+            # Client updated
+            log_audit(
+                request=request,
+                action="Update",
+                module="Client Profile",
+                entity_type="Client",
+                entity_name=profile.client_name,
+                previous_value=json.dumps(previous_profile_data),
+                new_value=json.dumps({k: getattr(profile, k) for k in previous_profile_data.keys()}),
+                client_id=profile.id,
+                db_session=session
+            )
+            
+            # Check for Client Profile Info changes
+            profile_fields = ["client_name", "industry", "sub_industry", "country", "region", "company_size", "organization_description"]
+            profile_changed = any(previous_profile_data[f] != getattr(profile, f) for f in profile_fields)
+            if profile_changed:
+                log_audit(
+                    request=request,
+                    action="Update",
+                    module="Client Profile",
+                    entity_type="Client",
+                    entity_name=profile.client_name,
+                    previous_value=json.dumps({f: previous_profile_data[f] for f in profile_fields}),
+                    new_value=json.dumps({f: getattr(profile, f) for f in profile_fields}),
+                    client_id=profile.id,
+                    db_session=session
+                )
+                
+            # Check for Technology Landscape updates
+            tech_fields = ["erp_platform", "crm_platform", "mes_platform", "bi_tool", "data_warehouse", "cloud_platform"]
+            tech_changed = any(previous_profile_data[f] != getattr(profile, f) for f in tech_fields)
+            if tech_changed:
+                log_audit(
+                    request=request,
+                    action="Update",
+                    module="Technology Landscape",
+                    entity_type="Client",
+                    entity_name=profile.client_name,
+                    previous_value=json.dumps({f: previous_profile_data[f] for f in tech_fields}),
+                    new_value=json.dumps({f: getattr(profile, f) for f in tech_fields}),
+                    client_id=profile.id,
+                    db_session=session
+                )
         
         # Construct response
         insight_items = []
@@ -807,7 +1009,7 @@ def list_engagements(client_id: int | None = FastQuery(default=None)):
 
 
 @app.post("/engagements", response_model=EngagementRecord)
-def create_engagement(payload: EngagementCreate):
+def create_engagement(request: Request, payload: EngagementCreate):
     """Create a new engagement linked to a specific client profile."""
     if not payload.name.strip():
         raise HTTPException(status_code=400, detail="Engagement name is required.")
@@ -868,6 +1070,17 @@ def create_engagement(payload: EngagementCreate):
         session.commit()
         session.refresh(eng)
 
+        log_audit(
+            request=request,
+            action="Create",
+            module="Engagement Management",
+            entity_type="Engagement",
+            entity_name=eng.name,
+            client_id=eng.client_profile_id,
+            engagement_id=eng.id,
+            db_session=session
+        )
+
         log_activity("Engagement Created", f"Engagement '{eng.name}' ({eng.engagement_id}) created.")
 
         return EngagementRecord(
@@ -882,7 +1095,7 @@ def create_engagement(payload: EngagementCreate):
         )
 
 @app.put("/engagements/{engagement_id_path}", response_model=EngagementRecord)
-def update_engagement(engagement_id_path: int, payload: EngagementCreate):
+def update_engagement(request: Request, engagement_id_path: int, payload: EngagementCreate):
     """Update an existing engagement's name and description."""
     if not payload.name.strip():
         raise HTTPException(status_code=400, detail="Engagement name is required.")
@@ -892,12 +1105,26 @@ def update_engagement(engagement_id_path: int, payload: EngagementCreate):
         if not eng:
             raise HTTPException(status_code=404, detail="Engagement not found.")
             
+        old_name = eng.name
         eng.name = payload.name.strip()
         eng.description = payload.description.strip()
         eng.updated_at = datetime.now()
         
         session.commit()
         session.refresh(eng)
+
+        log_audit(
+            request=request,
+            action="Update",
+            module="Engagement Management",
+            entity_type="Engagement",
+            entity_name=eng.name,
+            previous_value=old_name,
+            new_value=eng.name,
+            client_id=eng.client_profile_id,
+            engagement_id=eng.id,
+            db_session=session
+        )
         
         log_activity("Engagement Updated", f"Engagement '{eng.name}' updated.")
         
@@ -947,13 +1174,26 @@ def update_engagement(engagement_id_path: int, payload: EngagementCreate):
         )
 
 @app.delete("/engagements/{engagement_id_path}")
-def delete_engagement(engagement_id_path: int):
+def delete_engagement(request: Request, engagement_id_path: int):
     """Delete a specific engagement by its database ID."""
     with SessionLocal() as session:
         eng = session.query(Engagement).filter(Engagement.id == engagement_id_path).first()
         if not eng:
             raise HTTPException(status_code=404, detail="Engagement not found.")
         name = eng.name
+        client_id = eng.client_profile_id
+        
+        log_audit(
+            request=request,
+            action="Delete",
+            module="Engagement Management",
+            entity_type="Engagement",
+            entity_name=name,
+            client_id=client_id,
+            engagement_id=engagement_id_path,
+            db_session=session
+        )
+        
         session.delete(eng)
         session.commit()
     log_activity("Engagement Deleted", f"Engagement '{name}' deleted.")
@@ -963,9 +1203,25 @@ def delete_engagement(engagement_id_path: int):
 # ──────────────────────────────────────────────────────────────────────────────
 
 @app.post("/business-context")
-def save_business_context(context: BusinessContext) -> BusinessContext:
+def save_business_context(request: Request, context: BusinessContext) -> BusinessContext:
+    try:
+        prev_data = read_json(FILES["business_context"], {})
+        previous_val = json.dumps(prev_data) if prev_data else None
+    except Exception:
+        previous_val = None
+
     write_json(FILES["business_context"], context.model_dump(mode="json"))
     log_activity("Business Context Created", f"{context.industry} / {context.organization_level}")
+    
+    log_audit(
+        request=request,
+        action="Update",
+        module="Business Context",
+        entity_type="Business Context",
+        entity_name=f"{context.industry} / {context.organization_level}",
+        previous_value=previous_val,
+        new_value=json.dumps(context.model_dump(mode="json"))
+    )
     return context
 
 
@@ -1091,9 +1347,9 @@ class RefinePromptRequest(BaseModel):
 
 
 @app.post("/generate-prompt")
-async def generate_prompt(request: GeneratePromptRequest) -> PromptRecord:
+async def generate_prompt(request: Request, gen_request: GeneratePromptRequest) -> PromptRecord:
     logger.info("=== GENERATING PROMPT ===")
-    logger.info(f"User advisory instructions input: '{request.user_instructions}'")
+    logger.info(f"User advisory instructions input: '{gen_request.user_instructions}'")
     context = current_context()
     context_raw = current_context(merged=False)
     provider = get_provider()
@@ -1110,7 +1366,7 @@ async def generate_prompt(request: GeneratePromptRequest) -> PromptRecord:
         asset_insights_ctx = get_approved_client_insights_context()
         if asset_insights_ctx:
             prompt_text += f"\n\n{asset_insights_ctx}"
-        prompt_text += build_fallback_guidance(request.user_instructions)
+        prompt_text += build_fallback_guidance(gen_request.user_instructions)
     else:
         # Build prompt using Gemini
         user_prompt = (
@@ -1136,10 +1392,10 @@ async def generate_prompt(request: GeneratePromptRequest) -> PromptRecord:
         if asset_insights_ctx:
             user_prompt += f"\n{asset_insights_ctx}\n"
 
-        if request.user_instructions:
+        if gen_request.user_instructions:
             user_prompt += (
                 f"\n=== USER INSTRUCTIONS / STRATEGIC PREFERENCES ===\n"
-                f"{request.user_instructions}\n"
+                f"{gen_request.user_instructions}\n"
             )
             
         system_prompt = PROMPT_GENERATION_SYSTEM_PROMPT.format(kpi_count=context.kpi_count)
@@ -1155,7 +1411,7 @@ async def generate_prompt(request: GeneratePromptRequest) -> PromptRecord:
             # Fallback on failure
             logger.error(f"AI Prompt generation failed: {exc}. Falling back to build_kpi_prompt()", exc_info=True)
             prompt_text = build_kpi_prompt(context)
-            prompt_text += build_fallback_guidance(request.user_instructions)
+            prompt_text += build_fallback_guidance(gen_request.user_instructions)
                 
     summary = {
         "Business Focus": f"{context.industry or 'Enterprise'} transformation for {context.organization_level or 'business'} leadership.",
@@ -1181,23 +1437,32 @@ async def generate_prompt(request: GeneratePromptRequest) -> PromptRecord:
     record = PromptRecord(
         prompt=prompt_text,
         original_prompt=prompt_text,
-        user_instructions=request.user_instructions,
+        user_instructions=gen_request.user_instructions,
         is_approved=False,
         ai_summary=summary
     )
     write_json(FILES["prompts"], record.model_dump(mode="json"))
     log_activity("Prompt Generated", "AI-driven KPI generation prompt prepared in Prompt Studio")
+    
+    log_audit(
+        request=request,
+        action="Generate",
+        module="Prompt Generation",
+        entity_type="Prompt",
+        entity_name="AI Prompt",
+        new_value=record.prompt
+    )
     return record
 
 
 @app.post("/refine-prompt")
-async def refine_prompt(request: RefinePromptRequest) -> PromptRecord:
+async def refine_prompt(request: Request, refine_request: RefinePromptRequest) -> PromptRecord:
     logger.info("=== REFINING PROMPT ===")
-    logger.info(f"Refinement instructions: '{request.refinement_instructions}'")
+    logger.info(f"Refinement instructions: '{refine_request.refinement_instructions}'")
     
     record = current_prompt()
     # Use workspace text from request body, fallback to DB prompt
-    current_workspace_prompt = request.prompt if request.prompt.strip() else record.prompt
+    current_workspace_prompt = refine_request.prompt if refine_request.prompt.strip() else record.prompt
     
     provider = get_provider()
     context = current_context()
@@ -1205,7 +1470,7 @@ async def refine_prompt(request: RefinePromptRequest) -> PromptRecord:
     
     if isinstance(provider, DemoProvider):
         logger.info("Using DemoProvider fallback prompt refiner")
-        refined_prompt = current_workspace_prompt + f"\n\n[Refined with guidelines: {request.refinement_instructions}]"
+        refined_prompt = current_workspace_prompt + f"\n\n[Refined with guidelines: {refine_request.refinement_instructions}]"
     else:
         user_prompt = (
             f"=== RAW BUSINESS CONTEXT ===\n"
@@ -1234,7 +1499,7 @@ async def refine_prompt(request: RefinePromptRequest) -> PromptRecord:
             f"=== CURRENT PROMPT TO REFINE ===\n"
             f"{current_workspace_prompt}\n\n"
             f"=== NEW REFINEMENT INSTRUCTIONS ===\n"
-            f"{request.refinement_instructions}\n\n"
+            f"{refine_request.refinement_instructions}\n\n"
             f"Please refine the current prompt using the guidelines in the system instructions. Ensure that the refined prompt retains all details of the original business context and integrates the new refinement instructions seamlessly without copying them verbatim."
         )
         try:
@@ -1256,6 +1521,16 @@ async def refine_prompt(request: RefinePromptRequest) -> PromptRecord:
     
     write_json(FILES["prompts"], record.model_dump(mode="json"))
     log_activity("Prompt Refined", "AI-driven KPI prompt refined in Prompt Studio")
+    
+    log_audit(
+        request=request,
+        action="Update",
+        module="Prompt Generation",
+        entity_type="Prompt",
+        entity_name="AI Prompt",
+        previous_value=current_workspace_prompt,
+        new_value=record.prompt
+    )
     return record
 
 
@@ -1265,14 +1540,30 @@ def get_prompt() -> dict[str, Any]:
 
 
 @app.post("/prompt")
-def save_prompt(record: PromptRecord) -> PromptRecord:
+def save_prompt(request: Request, record: PromptRecord) -> PromptRecord:
+    try:
+        prev_data = read_json(FILES["prompts"], {})
+        previous_val = prev_data.get("prompt") if prev_data else None
+    except Exception:
+        previous_val = None
+
     write_json(FILES["prompts"], record.model_dump(mode="json"))
     log_activity("Prompt Saved", "Prompt Studio edits saved")
+    
+    log_audit(
+        request=request,
+        action="Update",
+        module="Prompt Generation",
+        entity_type="Prompt",
+        entity_name="AI Prompt",
+        previous_value=previous_val,
+        new_value=record.prompt
+    )
     return record
 
 
 @app.post("/generate-kpis")
-async def generate_kpis() -> KPILibrary:
+async def generate_kpis(request: Request) -> KPILibrary:
     context = current_context()
     prompt = current_prompt().prompt
     provider = get_provider()
@@ -1349,6 +1640,15 @@ async def generate_kpis() -> KPILibrary:
     write_json(FILES["approved_kpis"], {"items": []})
     
     log_activity("KPI Library Generated", f"{len(items)} KPIs created")
+    
+    log_audit(
+        request=request,
+        action="Generate",
+        module="KPI Library",
+        entity_type="KPI Library",
+        entity_name="KPI Library",
+        new_value=f"Generated {len(library.items)} KPIs"
+    )
     return library
 
 
@@ -1358,13 +1658,13 @@ def get_kpi_library() -> dict[str, Any]:
 
 
 @app.post("/approve-kpis")
-def approve_kpis(request: KPIApprovalRequest) -> KPILibrary:
+def approve_kpis(request: Request, approval_req: KPIApprovalRequest) -> KPILibrary:
     context = current_context()
     library = current_library()
-    ids = set(request.ids)
+    ids = set(approval_req.ids)
     for item in library.items:
         if item.id in ids:
-            item.status = request.status
+            item.status = approval_req.status
     library.quality = quality_check(library.items, context)
     library.recommendations = recommendations(library.items, context)
     write_json(FILES["kpi_library"], library.model_dump(mode="json"))
@@ -1373,18 +1673,35 @@ def approve_kpis(request: KPIApprovalRequest) -> KPILibrary:
     approved_items = [item.model_dump(mode="json") for item in library.items if item.status == KPIStatus.approved]
     write_json(FILES["approved_kpis"], {"items": approved_items})
     
-    log_activity("KPI Approval Updated", f"{len(ids)} KPI(s) marked {request.status.value}")
+    log_activity("KPI Approval Updated", f"{len(ids)} KPI(s) marked {approval_req.status.value}")
+    
+    action_val = "Approve" if approval_req.status == KPIStatus.approved else "Reject"
+    log_audit(
+        request=request,
+        action=action_val,
+        module="KPI Library",
+        entity_type="KPI",
+        entity_name=f"{len(approval_req.ids)} KPIs",
+        new_value=", ".join(approval_req.ids)
+    )
     return library
 
 
 @app.post("/kpi-library/update")
-def update_kpi(request: KPIUpdateRequest) -> KPILibrary:
+def update_kpi(request: Request, update_req: KPIUpdateRequest) -> KPILibrary:
     context = current_context()
     library = current_library()
+    
+    old_item = None
+    for item in library.items:
+        if item.id == update_req.id:
+            old_item = item.model_dump(mode="json")
+            break
+
     for index, item in enumerate(library.items):
-        if item.id == request.id:
+        if item.id == update_req.id:
             data = item.model_dump()
-            data.update(request.patch)
+            data.update(update_req.patch)
             library.items[index] = type(item)(**data)
             break
     library.quality = quality_check(library.items, context)
@@ -1395,7 +1712,17 @@ def update_kpi(request: KPIUpdateRequest) -> KPILibrary:
     approved_items = [item.model_dump(mode="json") for item in library.items if item.status == KPIStatus.approved]
     write_json(FILES["approved_kpis"], {"items": approved_items})
     
-    log_activity("KPI Edited", request.id)
+    log_activity("KPI Edited", update_req.id)
+    
+    log_audit(
+        request=request,
+        action="Update",
+        module="KPI Library",
+        entity_type="KPI",
+        entity_name=update_req.id,
+        previous_value=json.dumps(old_item) if old_item else None,
+        new_value=json.dumps(update_req.patch)
+    )
     return library
 
 
@@ -1550,7 +1877,7 @@ def get_functional_spec() -> dict[str, Any]:
 
 
 @app.post("/functional-spec")
-def save_functional_spec(spec: FunctionalSpecification) -> FunctionalSpecification:
+def save_functional_spec(request: Request, spec: FunctionalSpecification) -> FunctionalSpecification:
     from app.database import FunctionalSpecification as DBFunctionalSpecification
     import json
     with SessionLocal() as session:
@@ -1569,12 +1896,22 @@ def save_functional_spec(spec: FunctionalSpecification) -> FunctionalSpecificati
         # Write to JSON for backward compatibility
         write_json(FILES["functional_spec"], spec.model_dump(mode="json"))
         
+        log_audit(
+            request=request,
+            action="Update",
+            module="Functional Specification",
+            entity_type="FSD",
+            entity_name="Functional Specification",
+            new_value=f"Updated {len(spec.items)} items",
+            db_session=session
+        )
+        
     log_activity("Functional Spec Saved", f"{len(spec.items)} spec items updated by consultant")
     return spec
 
 
 @app.post("/approve-spec")
-def approve_spec() -> dict[str, Any]:
+def approve_spec(request: Request) -> dict[str, Any]:
     from app.database import FunctionalSpecification as DBFunctionalSpecification
     import json
     with SessionLocal() as session:
@@ -1597,6 +1934,16 @@ def approve_spec() -> dict[str, Any]:
         )
         write_json(FILES["functional_spec"], pydantic_spec.model_dump(mode="json"))
         
+        log_audit(
+            request=request,
+            action="Approve",
+            module="Functional Specification",
+            entity_type="FSD",
+            entity_name="Functional Specification",
+            new_value="Approved Functional Specification Document",
+            db_session=session
+        )
+        
     log_activity("Functional Spec Approved", "The functional specification document was signed off.")
     return {
         "status": "success",
@@ -1606,7 +1953,7 @@ def approve_spec() -> dict[str, Any]:
 
 
 @app.post("/generate-spec")
-async def generate_spec() -> dict[str, Any]:
+async def generate_spec(request: Request) -> dict[str, Any]:
     import json
     context = current_context()
     approved_data = read_json(FILES["approved_kpis"], {})
@@ -1784,6 +2131,16 @@ async def generate_spec() -> dict[str, Any]:
         )
         write_json(FILES["functional_spec"], pydantic_spec.model_dump(mode="json"))
         
+        log_audit(
+            request=request,
+            action="Generate",
+            module="Functional Specification",
+            entity_type="FSD",
+            entity_name="Functional Specification",
+            new_value=f"Generated specs for {len(spec_items)} KPIs",
+            db_session=session
+        )
+        
     log_activity("Functional Spec Generated", f"Specifications enriched for {len(spec_items)} approved KPIs")
     return {
         "items": [item.model_dump(mode="json") for item in spec_items],
@@ -1808,7 +2165,7 @@ def exports() -> list[ExportItem]:
 
 
 @app.get("/exports/{export_id}/{fmt}")
-def download_export(export_id: str, fmt: str, doc_name: str | None = None) -> FileResponse:
+def download_export(request: Request, export_id: str, fmt: str, doc_name: str | None = None) -> FileResponse:
     fmt = fmt.lower()
     EXPORT_DIR.mkdir(exist_ok=True)
     if export_id == "prompt":
@@ -1905,5 +2262,15 @@ def download_export(export_id: str, fmt: str, doc_name: str | None = None) -> Fi
         base_default_name = "_".join(parts)
         base_default_name = re.sub(r'[\\/*?:"<>|]', "", base_default_name)
         download_name = f"{base_default_name}.{fmt}"
+
+    # Audit log document exports
+    log_audit(
+        request=request,
+        action="Export",
+        module="Document Export",
+        entity_type="Document",
+        entity_name=export_id,
+        new_value=f"Format: {fmt}, Filename: {download_name}"
+    )
 
     return FileResponse(path, filename=download_name)

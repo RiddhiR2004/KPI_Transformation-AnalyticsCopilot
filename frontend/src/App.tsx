@@ -8,6 +8,7 @@ import { KpiLibraryPage } from "./pages/KpiLibraryPage";
 import { FunctionalSpecificationPage } from "./pages/FunctionalSpecificationPage";
 import { RestrictedStepPage } from "./pages/RestrictedStepPage";
 import { ClientSelectionPage } from "./pages/ClientSelectionPage";
+import { AuditLogPage } from "./pages/AuditLogPage";
 import { api } from "./lib/api";
 import type { ActivityEvent, ExportItem, WorkflowStatus } from "./types/api";
 
@@ -34,8 +35,23 @@ export default function App() {
     void refresh();
   }, [refresh]);
 
-  // Hide sidebar on the dashboard and onboarding pages
-  const isFullWidthPage = location.pathname === "/" || location.pathname === "/dashboard" || location.pathname === "/select-client" || location.pathname.startsWith("/onboarding");
+  useEffect(() => {
+    // Log user login audit event once per session
+    const userName = localStorage.getItem("user_name") || "riddhi.r";
+    if (!sessionStorage.getItem("login_event_logged")) {
+      sessionStorage.setItem("login_event_logged", "true");
+      void api.logAuditEvent({
+        module: "User Management",
+        action: "Login",
+        status: "Success",
+        entity_type: "User",
+        entity_name: userName
+      });
+    }
+  }, []);
+
+  // Hide sidebar on the dashboard, onboarding, and audit log pages
+  const isFullWidthPage = location.pathname === "/" || location.pathname === "/dashboard" || location.pathname === "/select-client" || location.pathname === "/audit" || location.pathname.startsWith("/onboarding");
 
   return (
     <Shell status={status} timeline={timeline} exports={exports} hideSidebar={isFullWidthPage}>
@@ -45,6 +61,7 @@ export default function App() {
         <Route path="/select-client" element={<Navigate to="/" replace />} />
         <Route path="/dashboard" element={<ClientsDashboard />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/audit" element={<AuditLogPage />} />
 
         {/* Onboarding / Client Setup — for new or editing existing client profiles */}
         <Route path="/onboarding" element={<LandingPage />} />

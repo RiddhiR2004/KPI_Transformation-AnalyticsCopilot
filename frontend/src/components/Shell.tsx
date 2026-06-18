@@ -1,6 +1,7 @@
-import { BarChart3, ChevronRight, FileText, Network, Table2, Target, Workflow, CheckCircle, Building2, Briefcase, Home, Bell, LogOut, User, Settings } from "lucide-react";
+import { BarChart3, ChevronRight, FileText, Network, Table2, Target, Workflow, CheckCircle, Building2, Briefcase, Home, Bell, LogOut, User, Settings, Shield } from "lucide-react";
 import { useState, useRef, useEffect, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import { api } from "../lib/api";
 import type { ActivityEvent, ExportItem, WorkflowStatus } from "../types/api";
 
 const steps = [
@@ -30,6 +31,17 @@ export function Shell({
   const activeEngName = localStorage.getItem("active_engagement_name");
   const activeClientName = localStorage.getItem("active_client_name");
   
+  const userName = localStorage.getItem("user_name") || "riddhi.r";
+  const userEmail = localStorage.getItem("user_email") || "riddhi.r@example.com";
+  
+  const initials = userName
+    .split(/[\s._]+/)
+    .filter(Boolean)
+    .map(p => p[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2) || "RR";
+
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
@@ -83,7 +95,7 @@ export function Shell({
                     </>
                   )}
                 </div>
-                {location.pathname !== "/dashboard" && (
+                {location.pathname !== "/dashboard" && location.pathname !== "/audit" && (
                   <NavLink
                     to="/dashboard"
                     className="flex items-center gap-1.5 text-xs font-bold text-[#B0B0B0] hover:text-[#FFE600] border border-[#303030] hover:border-[#FFE600]/40 px-3 py-1.5 rounded-sm transition-colors bg-[#111]"
@@ -101,6 +113,28 @@ export function Shell({
               </>
             )}
 
+            {/* Home Link (Only visible when on the Audit page to allow returning to dashboard/landing) */}
+            {location.pathname === "/audit" && (
+              <NavLink
+                to={activeClientName ? "/dashboard" : "/"}
+                className="flex items-center gap-1.5 text-xs font-bold text-[#B0B0B0] hover:text-[#FFE600] border border-[#303030] hover:border-[#FFE600]/40 px-3 py-1.5 rounded-sm transition-colors bg-[#111]"
+              >
+                <Home size={12} className="text-[#FFE600]" />
+                <span>Home</span>
+              </NavLink>
+            )}
+
+            {/* Audit Log Link */}
+            <NavLink
+              to="/audit"
+              className={({ isActive }) => `flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-sm transition-all ${
+                isActive ? "text-[#FFE600] bg-[#111] border border-[#FFE600]/30" : "text-[#B0B0B0] hover:text-[#FFE600] border border-[#303030] bg-[#111] hover:border-[#FFE600]/40"
+              }`}
+            >
+              <Shield size={12} className="text-[#FFE600]" />
+              <span>Audit Log</span>
+            </NavLink>
+
             {/* Notifications */}
             <button className="relative p-2 text-[#888] hover:text-[#FFE600] transition-colors" title="Notifications">
               <Bell size={18} />
@@ -117,10 +151,10 @@ export function Shell({
                 className="flex items-center gap-3 p-1 rounded-sm hover:bg-[#111] transition-colors text-left"
               >
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#FFE600]/20 to-[#FFE600]/5 border border-[#FFE600]/30 text-[#FFE600] text-xs font-bold">
-                  KR
+                  {initials}
                 </div>
                 <div className="hidden md:block pr-2">
-                  <p className="text-xs font-semibold text-[#F5F5F5] leading-tight">Krish R.</p>
+                  <p className="text-xs font-semibold text-[#F5F5F5] leading-tight">{userName}</p>
                   <p className="text-[10px] text-[#888] leading-tight">Consultant</p>
                 </div>
               </button>
@@ -129,10 +163,10 @@ export function Shell({
               {showProfileMenu && (
                 <div className="absolute right-0 mt-2 w-48 rounded-sm bg-[#1B1B1B] border border-[#303030] shadow-2xl py-1 z-50">
                   <div className="px-4 py-2 border-b border-[#303030] mb-1">
-                    <p className="text-xs font-semibold text-[#F5F5F5]">krish.r@example.com</p>
+                    <p className="text-xs font-semibold text-[#F5F5F5] truncate">{userEmail}</p>
                   </div>
                   <NavLink
-                    to="/"
+                    to="/settings" // Let it go to settings directly to show user profile
                     onClick={() => setShowProfileMenu(false)}
                     className="flex items-center gap-2 px-4 py-2 text-xs text-[#B0B0B0] hover:text-[#FFE600] hover:bg-[#111] transition-colors"
                   >
@@ -147,7 +181,21 @@ export function Shell({
                   </NavLink>
                   <div className="border-t border-[#303030] mt-1 pt-1">
                     <button
-                      onClick={() => setShowProfileMenu(false)}
+                      onClick={async () => {
+                        setShowProfileMenu(false);
+                        try {
+                          await api.logAuditEvent({
+                            module: "User Management",
+                            action: "Logout",
+                            status: "Success",
+                            entity_type: "User",
+                            entity_name: userName
+                          });
+                        } catch (err) {
+                          console.error(err);
+                        }
+                        alert("Logged out successfully (Logged to Audit trail)");
+                      }}
                       className="w-full flex items-center gap-2 px-4 py-2 text-xs text-[#B0B0B0] hover:text-[#FFE600] hover:bg-[#111] transition-colors text-left"
                     >
                       <LogOut size={14} /> Logout
