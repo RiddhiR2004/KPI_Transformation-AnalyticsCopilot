@@ -50,8 +50,8 @@ export default function App() {
     }
   }, []);
 
-  // Hide sidebar on the dashboard, onboarding, and audit log pages
-  const isFullWidthPage = location.pathname === "/" || location.pathname === "/dashboard" || location.pathname === "/select-client" || location.pathname === "/audit" || location.pathname.startsWith("/onboarding");
+  // Hide sidebar on the dashboard, onboarding, settings, and audit log pages
+  const isFullWidthPage = location.pathname === "/" || location.pathname === "/dashboard" || location.pathname === "/select-client" || location.pathname === "/audit" || location.pathname === "/settings" || location.pathname.startsWith("/onboarding");
 
   return (
     <Shell status={status} timeline={timeline} exports={exports} hideSidebar={isFullWidthPage}>

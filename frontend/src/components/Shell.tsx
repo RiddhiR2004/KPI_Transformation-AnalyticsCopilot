@@ -96,7 +96,7 @@ export function Shell({
                     </>
                   )}
                 </div>
-                {location.pathname !== "/dashboard" && location.pathname !== "/audit" && (
+                {location.pathname !== "/dashboard" && location.pathname !== "/audit" && location.pathname !== "/settings" && (
                   <NavLink
                     to="/dashboard"
                     className="flex items-center gap-1.5 text-xs font-bold text-[#B0B0B0] hover:text-[#FFE600] border border-[#303030] hover:border-[#FFE600]/40 px-3 py-1.5 rounded-sm transition-colors bg-[#111]"
@@ -114,8 +114,8 @@ export function Shell({
               </>
             )}
 
-            {/* Home Link (Only visible when on the Audit page to allow returning to dashboard/landing) */}
-            {location.pathname === "/audit" && (
+            {/* Home Link (Only visible when on the Audit or Settings page to allow returning to dashboard/landing) */}
+            {(location.pathname === "/audit" || location.pathname === "/settings") && (
               <NavLink
                 to={activeClientName ? "/dashboard" : "/"}
                 className="flex items-center gap-1.5 text-xs font-bold text-[#B0B0B0] hover:text-[#FFE600] border border-[#303030] hover:border-[#FFE600]/40 px-3 py-1.5 rounded-sm transition-colors bg-[#111]"
