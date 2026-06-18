@@ -69,6 +69,15 @@ export function Shell({
                   </>
                 )}
               </div>
+              {location.pathname !== "/dashboard" && (
+                <NavLink
+                  to="/dashboard"
+                  className="flex items-center gap-1.5 text-xs font-bold text-[#B0B0B0] hover:text-[#FFE600] border border-[#303030] hover:border-[#FFE600]/40 px-3 py-1.5 rounded-sm transition-colors bg-[#111]"
+                >
+                  <Home size={12} className="text-[#FFE600]" />
+                  <span>Home</span>
+                </NavLink>
+              )}
               <NavLink
                 to="/"
                 className="text-xs font-bold text-[#111] bg-[#FFE600] hover:bg-[#FFE600]/90 px-3 py-1.5 rounded-sm transition-colors"
@@ -87,16 +96,7 @@ export function Shell({
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-[300px_1fr]">
             <aside className="space-y-5">
               <nav className="border border-[#303030] bg-[#1B1B1B]">
-                <NavLink
-                  to="/dashboard"
-                  className={({ isActive }) => `group flex items-center justify-between border-b-4 px-4 py-4 text-sm font-semibold transition-all border-b-[#303030]/40 ${isActive ? "bg-[#111111] text-[#FFE600] border-b-[#FFE600]" : "text-[#F5F5F5] hover:bg-[#111111] hover:text-[#FFE600] hover:border-b-[#FFE600]"}`}
-                >
-                  <span className="flex items-center gap-3">
-                    <Home size={18} />
-                    <span>Clients & Engagements</span>
-                  </span>
-                  <ChevronRight size={16} className="text-[#B0B0B0]/40 group-hover:text-[#FFE600]" />
-                </NavLink>
+
                 {steps.map((step, index) => {
                   const Icon = step.icon;
                   const isStepComplete = status ? !!status[step.statusKey] : false;

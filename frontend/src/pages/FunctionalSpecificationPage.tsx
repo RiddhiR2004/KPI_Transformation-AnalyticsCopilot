@@ -448,6 +448,15 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
   const [execSummaryValue, setExecSummaryValue] = useState("");
   const [saveStatus, setSaveStatus] = useState("");
   const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null);
+  const [docName, setDocName] = useState("");
+  const [previewPageNum, setPreviewPageNum] = useState(1);
+  const totalPages = useMemo(() => 8 + spec.items.length, [spec.items.length]);
+
+  useEffect(() => {
+    if (previewPageNum > totalPages) {
+      setPreviewPageNum(Math.max(1, totalPages));
+    }
+  }, [totalPages, previewPageNum]);
 
   const handleFieldChange = (key: keyof FunctionalSpecItem, value: string) => {
     if (!editingItem) return;
@@ -460,6 +469,20 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
   useEffect(() => {
     void loadData();
   }, []);
+
+  useEffect(() => {
+    if (clientProfile && clientProfile.client_name && (docName === "" || docName === "KPI_Functional_Specification")) {
+      const clientPart = clientProfile.client_name.trim().replace(/\s+/g, "_");
+      const industryPart = (clientProfile.industry || "").trim().replace(/\s+/g, "_");
+      const parts = [];
+      if (clientPart) parts.push(clientPart);
+      if (industryPart) parts.push(industryPart);
+      parts.push("KPI_Functional_Specification");
+      setDocName(parts.join("_"));
+    } else if (!docName) {
+      setDocName("KPI_Functional_Specification");
+    }
+  }, [clientProfile]);
 
   async function loadData() {
     setLoading(true);
@@ -525,7 +548,7 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
       });
       setExpandedKpis(initialExpanded);
 
-      setSaveStatus("Specification package generated");
+      setSaveStatus("Specification document generated");
       setTimeout(() => setSaveStatus(""), 3000);
       onChange();
     } catch (err) {
@@ -582,15 +605,15 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
   }
 
   async function approveSpecification() {
-    setSaveStatus("Approving Package...");
+    setSaveStatus("Approving Document...");
     try {
       await api.approveSpec();
       setSpec((prev) => ({ ...prev, status: "approved" }));
-      setSaveStatus("Specification Package Approved!");
+      setSaveStatus("Specification Document Approved!");
       setTimeout(() => setSaveStatus(""), 3000);
       onChange();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to approve specification package");
+      setError(err instanceof Error ? err.message : "Failed to approve specification document");
     }
   }
 
@@ -600,7 +623,7 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
       const updatedSpec = { ...spec, status: "draft" };
       await api.saveFunctionalSpec(updatedSpec);
       setSpec(updatedSpec);
-      setSaveStatus("Package status set to Draft");
+      setSaveStatus("Document status set to Draft");
       setTimeout(() => setSaveStatus(""), 3000);
       onChange();
     } catch (err) {
@@ -797,11 +820,11 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
               {isApproved ? (
                 <span className="inline-flex items-center gap-1 border border-green-500/30 bg-green-500/10 text-green-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
                   <Check size={10} />
-                  Approved Specification Package
+                  Approved Specification Document
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 border border-yellow-500/30 bg-yellow-500/10 text-yellow-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                  Draft Specification Package
+                  Draft Specification Document
                 </span>
               )}
               {saveStatus && <span className="text-xs text-[#FFE600] animate-pulse">{saveStatus}</span>}
@@ -834,13 +857,26 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
             </div>
 
             <div className="flex flex-wrap items-center gap-3 w-full md:w-auto md:justify-end">
+              {/* Document Name Customization */}
+              <div className="flex items-center gap-2 bg-[#111111] px-2 py-1.5 rounded-sm border border-[#303030]">
+                <span className="text-[10px] font-bold tracking-widest text-[#B0B0B0] uppercase whitespace-nowrap">Doc Name:</span>
+                <input
+                  type="text"
+                  value={docName}
+                  onChange={(e) => setDocName(e.target.value)}
+                  placeholder="Enter document name..."
+                  className="bg-transparent text-xs text-[#F5F5F5] placeholder-gray-600 focus:outline-none w-48 sm:w-64"
+                />
+              </div>
+
               {/* Export buttons */}
               <div className="flex items-center gap-2">
                 {specExport?.available ? (
                   specExport.formats.map((format) => (
                     <a
                       key={format}
-                      href={exportUrl("functional_document", format)}
+                      href={`${exportUrl("functional_document", format)}${exportUrl("functional_document", format).includes('?') ? '&' : '?'}doc_name=${encodeURIComponent(docName)}`}
+                      download={`${docName || "KPI_Functional_Specification"}.${format.toLowerCase()}`}
                       className="button-secondary !py-1.5 !px-3 !text-xs flex items-center gap-1.5"
                       id={`export-${format.toLowerCase()}`}
                     >
@@ -861,7 +897,7 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
                   id="approve-spec-btn"
                 >
                   <CheckCircle size={14} />
-                  Approve Package
+                  Approve Document
                 </button>
               ) : (
                 <button 
@@ -1014,7 +1050,7 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
                       setIsEditingExec(true);
                     }}
                     disabled={isApproved}
-                    title={isApproved ? "Reopen package to edit contents" : ""}
+                    title={isApproved ? "Reopen document to edit contents" : ""}
                     id="edit-exec-summary-btn"
                   >
                     <Edit3 size={12} />
@@ -1175,7 +1211,7 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
                                   setExpandedKpis(prev => ({ ...prev, [item.id]: true }));
                                 }}
                                 disabled={isApproved}
-                                title={isApproved ? "Reopen package to edit contents" : ""}
+                                title={isApproved ? "Reopen document to edit contents" : ""}
                                 id={`edit-spec-${item.id}`}
                               >
                                 <Edit3 size={12} />
@@ -1585,549 +1621,686 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
 
           </div>
           ) : (
-            <div className="bg-white text-gray-900 border border-gray-200 p-8 md:p-16 rounded-sm shadow-2xl relative font-sans max-w-4xl mx-auto space-y-10 print:p-0 print:shadow-none print:border-none">
-              {/* Gold/Yellow Top Header line (consulting accent) */}
-              <div className="absolute top-0 left-0 right-0 h-1.5 bg-[#FFE600] print:hidden" />
-              
-              {/* Document Header */}
-              <div className="border-b-2 border-gray-900 pb-4 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase">
-                <div>KPI Advisory & Analytics Copilot</div>
-                <div>KPI Functional Specification Package</div>
+            <div className="space-y-6 max-w-4xl mx-auto">
+              {/* Pagination controls for screen */}
+              <div className="flex justify-between items-center bg-[#1B1B1B] border border-[#303030] p-3 rounded-sm print:hidden shadow-lg">
+                <div className="text-xs text-[#B0B0B0] font-sans flex items-center gap-2">
+                  <span>Viewing Page</span>
+                  <select
+                    value={previewPageNum}
+                    onChange={(e) => setPreviewPageNum(Number(e.target.value))}
+                    className="bg-[#111] text-[#FFE600] border border-[#303030] rounded px-2 py-0.5 text-xs font-bold focus:border-[#FFE600] focus:outline-none cursor-pointer"
+                  >
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(num => (
+                      <option key={num} value={num} className="bg-[#1B1B1B] text-[#F5F5F5]">
+                        {num}
+                      </option>
+                    ))}
+                  </select>
+                  <span>of <span className="font-bold text-[#F5F5F5]">{totalPages}</span></span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPreviewPageNum(p => Math.max(1, p - 1))}
+                    disabled={previewPageNum === 1}
+                    className="button-secondary !py-1 !px-2 disabled:opacity-40 disabled:pointer-events-none text-xs"
+                  >
+                    &larr; Prev
+                  </button>
+                  <button
+                    onClick={() => setPreviewPageNum(p => Math.min(totalPages, p + 1))}
+                    disabled={previewPageNum === totalPages}
+                    className="button-secondary !py-1 !px-2 disabled:opacity-40 disabled:pointer-events-none text-xs"
+                  >
+                    Next &rarr;
+                  </button>
+                </div>
               </div>
 
-              {/* Cover / Title Block */}
-              <div className="space-y-6 pb-6 border-b border-gray-200">
-                <div className="space-y-2">
-                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#FFE600] drop-shadow-sm">KPI Advisory & Analytics</p>
-                  <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 font-sans">Functional Specification Document</h1>
-                  <p className="text-sm text-gray-500 italic max-w-2xl font-serif">
-                    A unified blueprint translating business strategy into governed, measurable performance metrics.
-                  </p>
-                </div>
+              {/* The Pages Container */}
+              <div className="space-y-8 print:space-y-0 print:bg-white">
+              
+              {/* PAGE 1: COVER PAGE */}
+              <div className={`${previewPageNum === 1 ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
+                {/* Gold/Yellow Top Header line (consulting accent) */}
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-[#FFE600] print:hidden" />
+                
+                <div className="h-6" />
 
-                {/* Metadata Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-6 pt-6 border-t border-gray-100 text-xs">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Document Version</p>
-                    <p className="text-sm text-gray-900 font-semibold mt-1">1.0</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Generated Date</p>
-                    <p className="text-sm text-gray-900 font-semibold mt-1">
-                      {spec.updated_at ? new Date(spec.updated_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'Draft Date'}
+                {/* Cover Body */}
+                <div className="flex-grow flex flex-col justify-center space-y-8 py-10">
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#FFE600] drop-shadow-sm">KPI Advisory & Analytics</p>
+                    <h1 className="text-3.5xl font-extrabold tracking-tight text-gray-900 font-sans">Functional Specification Document</h1>
+                    <p className="text-sm text-gray-500 italic max-w-xl font-serif">
+                      A unified blueprint translating business strategy into governed, measurable performance metrics.
                     </p>
                   </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Number of KPIs</p>
-                    <p className="text-sm text-gray-900 font-semibold mt-1">{spec.items.length} Approved Performance Metrics</p>
+
+                  {/* Accent yellow bar */}
+                  <div className="h-1 bg-[#FFE600] w-full" />
+
+                  {/* Metadata Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-6 pt-6 text-xs border-t border-gray-100">
+                    <div>
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Document Version</p>
+                      <p className="text-xs text-gray-900 font-semibold mt-1">1.0</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Generated Date</p>
+                      <p className="text-xs text-gray-900 font-semibold mt-1">
+                        {spec.updated_at ? new Date(spec.updated_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'Draft Date'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Number of KPIs</p>
+                      <p className="text-xs text-gray-900 font-semibold mt-1">{spec.items.length} Approved Performance Metrics</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Industry</p>
+                      <p className="text-xs text-gray-900 font-semibold mt-1">{context.industry || "Not Specified"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Organizational Level</p>
+                      <p className="text-xs text-gray-900 font-semibold mt-1">{context.organization_level || "Not Specified"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Approval Status</p>
+                      <div className="mt-1">
+                        {isApproved ? (
+                          <span className="inline-flex items-center gap-1 border border-green-600 bg-green-50 text-green-700 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider">
+                            Approved Spec
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 border border-yellow-600 bg-yellow-50 text-yellow-700 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider">
+                            Draft Spec
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Industry</p>
-                    <p className="text-sm text-gray-900 font-semibold mt-1">{context.industry || "Not Specified"}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Organizational Level</p>
-                    <p className="text-sm text-gray-900 font-semibold mt-1">{context.organization_level || "Not Specified"}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Approval Status</p>
-                    <div className="mt-1">
-                      {isApproved ? (
-                        <span className="inline-flex items-center gap-1 border border-green-600 bg-green-50 text-green-700 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                          Approved Spec
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 border border-yellow-600 bg-yellow-50 text-yellow-700 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                          Draft Spec
-                        </span>
-                      )}
+
+                  {/* Table of Contents */}
+                  <div className="bg-gray-50 border border-gray-200 p-6 rounded-sm space-y-4 font-sans mt-8">
+                    <p className="text-xs font-bold uppercase tracking-wider text-gray-700">Table of Contents</p>
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-[11px] text-gray-600">
+                      <div>Document Control & Metadata</div>
+                      <div>1. Executive Summary</div>
+                      <div>2. KPI Landscape Overview</div>
+                      <div>3. Strategic Traceability Matrix</div>
+                      <div>4. Individual KPI Specifications</div>
+                      <div>5. Governance Framework</div>
+                      <div>6. Reporting & Dashboard Requirements</div>
+                      <div>7. Assumptions & Constraints</div>
+                      <div>8. Implementation Considerations</div>
+                      <div>9. Appendix</div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Table of Contents */}
-              <div className="bg-gray-50 border border-gray-200 p-6 rounded-sm space-y-4 font-sans">
-                <p className="text-xs font-bold uppercase tracking-wider text-gray-700">Table of Contents</p>
-                <div className="grid md:grid-cols-2 gap-x-8 gap-y-2 text-xs text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full" />
-                    Document Control & Metadata
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full" />
-                    1. Executive Summary
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full" />
-                    2. KPI Landscape Overview
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full" />
-                    3. Strategic Traceability Matrix
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full" />
-                    4. Individual KPI Specifications
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full" />
-                    5. Governance Framework
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full" />
-                    6. Reporting & Dashboard Requirements
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full" />
-                    7. Assumptions & Constraints
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full" />
-                    8. Implementation Considerations
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full" />
-                    9. Appendix
-                  </div>
+                {/* Footer */}
+                <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase">
+                  <div>Confidential - Advisory Work Product</div>
+                  <div>Page 1 of {totalPages}</div>
                 </div>
               </div>
 
-              {/* 1. Executive Summary */}
-              <div className="space-y-4 pt-6 border-t border-gray-200">
-                <h3 className="text-lg font-bold text-gray-900 font-sans">1. Executive Summary</h3>
-                <div className="text-xs text-gray-700 leading-relaxed font-serif whitespace-pre-wrap">
-                  {execSummaryValue || "This document outlines the functional specifications for the approved performance metrics of the organization. Each metric is mapped to strategic objectives and key result areas to ensure operational alignment and governance."}
+
+              {/* PAGE 2: EXECUTIVE SUMMARY & LANDSCAPE OVERVIEW */}
+              <div className={`${previewPageNum === 2 ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
+                <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
+                  <div></div>
+                  <div>KPI Functional Specification Document</div>
+                </div>
+
+                <div className="flex-grow space-y-8">
+                  {/* 1. Executive Summary */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-gray-900 font-sans border-b border-gray-250 pb-1">1. Executive Summary</h3>
+                    <div className="text-xs text-gray-700 leading-relaxed font-serif whitespace-pre-wrap">
+                      {execSummaryValue || "This document outlines the functional specifications for the approved performance metrics of the organization. Each metric is mapped to strategic objectives and key result areas to ensure operational alignment and governance."}
+                    </div>
+                  </div>
+
+                  {/* 2. KPI Landscape Overview */}
+                  <div className="space-y-4 pt-4">
+                    <h3 className="text-lg font-bold text-gray-900 font-sans border-b border-gray-250 pb-1">2. KPI Landscape Overview</h3>
+                    <p className="text-xs text-gray-500 leading-relaxed font-serif">
+                      The visual mind-map below displays the KPI Landscape as a branching tree structure, routing from the core KPI Library through strategic Category nodes down to individual approved metrics.
+                    </p>
+
+                    <KpiLandscapeTree 
+                      categoriesMap={categoriesMap} 
+                      specItems={spec.items} 
+                      theme="light" 
+                    />
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase mt-8">
+                  <div>Confidential - Advisory Work Product</div>
+                  <div>Page 2 of {totalPages}</div>
                 </div>
               </div>
 
-              {/* 2. KPI Landscape Overview */}
-              <div className="space-y-4 pt-6 border-t border-gray-200">
-                <h3 className="text-lg font-bold text-gray-900 font-sans">2. KPI Landscape Overview</h3>
-                <p className="text-xs text-gray-500 leading-relaxed font-serif">
-                  The visual mind-map below displays the KPI Landscape as a branching tree structure, routing from the core KPI Library through strategic Category nodes down to individual approved metrics.
-                </p>
 
-                <KpiLandscapeTree 
-                  categoriesMap={categoriesMap} 
-                  specItems={spec.items} 
-                  theme="light" 
-                />
-              </div>
+              {/* PAGE 3: LANDSCAPE TABLE & STRATEGIC TRACEABILITY MATRIX */}
+              <div className={`${previewPageNum === 3 ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
+                <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
+                  <div></div>
+                  <div>KPI Functional Specification Document</div>
+                </div>
 
-              {/* 3. Strategic Traceability Matrix */}
-              <div className="space-y-4 pt-6 border-t border-gray-200">
-                <h3 className="text-lg font-bold text-gray-900 font-sans">3. Strategic Traceability Matrix</h3>
-                <p className="text-xs text-gray-500 leading-relaxed font-serif">
-                  This matrix illustrates the strategic alignment from executive objectives down to specific key performance indicators, providing visibility into strategic translation.
-                </p>
+                <div className="flex-grow space-y-8">
+                  {/* KPI Catalog Table */}
+                  <div className="space-y-3">
+                    <p className="text-xs text-gray-500 leading-relaxed font-serif">
+                      Below is the corresponding catalog view of all approved performance indicators with their respective category mapping.
+                    </p>
+                    <div className="overflow-x-auto font-sans">
+                      <table className="w-full text-left text-xs border-collapse border border-gray-300">
+                        <thead>
+                          <tr className="bg-gray-150 text-gray-800 font-bold border-b border-gray-300">
+                            <th className="p-2.5 border-r border-gray-300 w-[12%]">KPI ID</th>
+                            <th className="p-2.5 border-r border-gray-300 w-[38%]">KPI Name</th>
+                            <th className="p-2.5 border-r border-gray-300 w-[25%]">Category</th>
+                            <th className="p-2.5 w-[25%]">Functional Area</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 text-gray-700">
+                          {spec.items.map((item, idx) => (
+                            <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                              <td className="p-2.5 border-r border-gray-300 font-mono text-[11px]">KPI-{String(idx + 1).padStart(3, '0')}</td>
+                              <td className="p-2.5 border-r border-gray-300 font-semibold text-gray-900">{item.kpi_name}</td>
+                              <td className="p-2.5 border-r border-gray-300">{item.kpi_category || "Operational"}</td>
+                              <td className="p-2.5">{item.functional_area || "Operations"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
 
-                <div className="overflow-x-auto font-sans">
-                  <table className="w-full text-left text-xs border-collapse border border-gray-300">
-                    <thead>
-                      <tr className="bg-gray-50 text-gray-800 font-bold border-b border-gray-300">
-                        <th className="p-3 border-r border-gray-300 w-1/5">Strategic Objective</th>
-                        <th className="p-3 border-r border-gray-300 w-1/5">Business Challenge</th>
-                        <th className="p-3 border-r border-gray-300 w-1/5">KRA</th>
-                        <th className="p-3 border-r border-gray-300 w-1/5">Functional Area</th>
-                        <th className="p-3 w-1/5">KPI Name</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200 text-gray-700">
-                      {spec.items.map((item) => (
-                        <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="p-3 border-r border-gray-300 text-xs">{item.strategic_objective_supported || "Optimize Strategy"}</td>
-                          <td className="p-3 border-r border-gray-300 text-xs">{item.business_challenge_addressed || "Inefficient Processes"}</td>
-                          <td className="p-3 border-r border-gray-300 text-xs">{item.related_kra || "Operational Excellence"}</td>
-                          <td className="p-3 border-r border-gray-300 text-xs">{item.functional_area || "Operations"}</td>
-                          <td className="p-3 font-semibold text-gray-900 text-xs">
-                            {item.kpi_name}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  {/* 3. Strategic Traceability Matrix */}
+                  <div className="space-y-4 pt-4 border-t border-gray-200">
+                    <h3 className="text-lg font-bold text-gray-900 font-sans border-b border-gray-250 pb-1">3. Strategic Traceability Matrix</h3>
+                    <p className="text-xs text-gray-500 leading-relaxed font-serif">
+                      This matrix illustrates the strategic alignment from executive objectives down to specific key performance indicators, providing visibility into strategic translation.
+                    </p>
+
+                    <div className="overflow-x-auto font-sans">
+                      <table className="w-full text-left text-xs border-collapse border border-gray-300">
+                        <thead>
+                          <tr className="bg-gray-150 text-gray-800 font-bold border-b border-gray-300">
+                            <th className="p-2.5 border-r border-gray-300 w-1/5">Strategic Objective</th>
+                            <th className="p-2.5 border-r border-gray-300 w-1/5">Business Challenge</th>
+                            <th className="p-2.5 border-r border-gray-300 w-1/5">KRA</th>
+                            <th className="p-2.5 border-r border-gray-300 w-1/5">Functional Area</th>
+                            <th className="p-2.5 w-1/5">KPI Name</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 text-gray-700">
+                          {spec.items.map((item) => (
+                            <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                              <td className="p-2.5 border-r border-gray-300 text-xs">{item.strategic_objective_supported || "Optimize Strategy"}</td>
+                              <td className="p-2.5 border-r border-gray-300 text-xs">{item.business_challenge_addressed || "Inefficient Processes"}</td>
+                              <td className="p-2.5 border-r border-gray-300 text-xs">{item.related_kra || "Operational Excellence"}</td>
+                              <td className="p-2.5 border-r border-gray-300 text-xs">{item.functional_area || "Operations"}</td>
+                              <td className="p-2.5 font-semibold text-gray-900 text-xs">{item.kpi_name}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase mt-8">
+                  <div>Confidential - Advisory Work Product</div>
+                  <div>Page 3 of {totalPages}</div>
                 </div>
               </div>
 
-              {/* 4. Individual KPI Specifications */}
-              <div className="space-y-6 pt-6 border-t border-gray-200">
-                <h3 className="text-lg font-bold text-gray-900 font-sans">4. Individual KPI Specifications</h3>
-                <p className="text-xs text-gray-500 leading-relaxed font-serif">
-                  Detailed functional blueprints for each approved metric, outlining definitions, lineage, calculations, and rules.
-                </p>
+              {/* INDIVIDUAL KPI SPECIFICATIONS (PAGES 4 TO 4 + N - 1) */}
+              {spec.items.map((item, index) => {
+                const pageNum = 4 + index;
+                return (
+                  <div key={item.id} className={`${previewPageNum === pageNum ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
+                    <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
+                      <div></div>
+                      <div>KPI Functional Specification Document</div>
+                    </div>
 
-                <div className="space-y-6">
-                  {spec.items.map((item, index) => (
-                    <div 
-                      key={item.id} 
-                      className="border border-gray-200 bg-white rounded-sm overflow-hidden space-y-4 relative p-6 shadow-sm"
-                    >
-                      {/* Left accent border to indicate status/category */}
-                      <div className="absolute left-0 top-0 h-full w-1 bg-[#FFE600]" />
-                      
-                      {/* Card Header */}
-                      <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-bold text-yellow-800 bg-yellow-50 px-2 py-0.5 border border-yellow-200 rounded-sm font-mono">
-                            Metric {index + 1}
-                          </span>
-                          <h4 className="text-sm font-bold text-gray-900 font-sans">{item.kpi_name}</h4>
+                    <div className="flex-grow space-y-6">
+                      {index === 0 ? (
+                        <div className="space-y-2">
+                          <h3 className="text-lg font-bold text-gray-900 font-sans border-b border-gray-250 pb-1">4. Individual KPI Specifications</h3>
+                          <p className="text-xs text-gray-500 leading-relaxed font-serif">
+                            Detailed functional blueprints for each approved metric, outlining definitions, lineage, calculations, and rules.
+                          </p>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <h3 className="text-lg font-bold text-gray-900 font-sans border-b border-gray-250 pb-1">4. Individual KPI Specifications (Continued)</h3>
+                        </div>
+                      )}
 
-                      {/* Quick Reference Row */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50 p-4 border border-gray-200 rounded-sm text-xs font-sans">
-                        <div>
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">KPI Category</p>
-                          <p className="text-gray-900 mt-0.5 font-medium">{item.kpi_category || "Operational"}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Functional Area</p>
-                          <p className="text-gray-900 mt-0.5 font-medium">{item.functional_area || "Operations"}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Business Owner</p>
-                          <p className="text-gray-900 mt-0.5 font-medium">{item.business_owner || "TBD"}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Data Owner</p>
-                          <p className="text-gray-900 mt-0.5 font-medium">{item.data_owner || "TBD"}</p>
-                        </div>
-                      </div>
-
-                      {/* Details block */}
-                      <div className="space-y-4 pt-2">
-                        {/* Strategic Alignment traceability block */}
-                        {(() => {
-                          let parts = [
-                            item.strategic_objective_supported || "Strategic Objective",
-                            item.business_challenge_addressed || "Business Challenge",
-                            item.related_kra || "KRA",
-                            item.functional_area || "Functional Area",
-                            item.kpi_name
-                          ];
-                          const traceStr = item.strategic_objective_supported || "";
-                          if (traceStr.includes(" &rarr; ") || traceStr.includes(" → ")) {
-                            const separator = traceStr.includes(" &rarr; ") ? " &rarr; " : " → ";
-                            const parsed = traceStr.split(separator).map(s => s.trim());
-                            if (parsed.length > 0) {
-                              parts = parsed;
-                              if (parts[parts.length - 1] !== item.kpi_name) {
-                                parts.push(item.kpi_name);
-                              }
-                            }
-                          }
+                      <div className="space-y-6">
+                        <div 
+                          className="border border-gray-200 bg-white rounded-sm overflow-hidden space-y-4 relative p-6 shadow-sm"
+                        >
+                          {/* Left accent border */}
+                          <div className="absolute left-0 top-0 h-full w-1 bg-[#FFE600]" />
                           
-                          return (
-                            <div className="bg-gray-50 border border-gray-200 p-3 rounded-sm font-sans">
-                              <div className="text-[9px] font-bold uppercase tracking-widest text-gray-400">Strategic Alignment Traceability</div>
-                              <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-800 pt-1 font-semibold">
-                                {parts.map((part, idx) => (
-                                  <div key={idx} className="flex items-center gap-1.5">
-                                    <span className={idx === parts.length - 1 ? "text-yellow-600 font-bold" : "text-gray-500"}>
-                                      {part}
-                                    </span>
-                                    {idx < parts.length - 1 && (
-                                      <span className="text-gray-400">&rarr;</span>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
+                          <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs font-bold text-yellow-800 bg-yellow-50 px-2 py-0.5 border border-yellow-200 rounded-sm font-mono">
+                                Metric {index + 1}
+                              </span>
+                              <h4 className="text-sm font-bold text-gray-900 font-sans">{item.kpi_name}</h4>
                             </div>
-                          );
-                        })()}
-                        {/* Subsections details */}
-                        <div className="space-y-4">
-                          {sectionConfigs.map((sect) => {
-                            const hasVal = sect.fields.some(field => {
-                              const rawVal = item[field.key as keyof FunctionalSpecItem];
-                              const val = typeof rawVal === "string" ? rawVal : Array.isArray(rawVal) ? rawVal.join(", ") : "";
-                              return val.trim() !== "" && val.trim().toLowerCase() !== "not specified";
-                            });
-                            if (!hasVal) return null;
+                          </div>
+
+                          {/* Quick Reference */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50 p-4 border border-gray-200 rounded-sm text-xs font-sans">
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">KPI Category</p>
+                              <p className="text-gray-900 mt-0.5 font-medium">{item.kpi_category || "Operational"}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Functional Area</p>
+                              <p className="text-gray-900 mt-0.5 font-medium">{item.functional_area || "Operations"}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Business Owner</p>
+                              <p className="text-gray-900 mt-0.5 font-medium">{item.business_owner || "TBD"}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Data Owner</p>
+                              <p className="text-gray-900 mt-0.5 font-medium">{item.data_owner || "TBD"}</p>
+                            </div>
+                          </div>
+
+                          {/* Details Block */}
+                          <div className="space-y-4 pt-2">
+                            {(() => {
+                              let parts = [
+                                item.strategic_objective_supported || "Strategic Objective",
+                                item.business_challenge_addressed || "Business Challenge",
+                                item.related_kra || "KRA",
+                                item.functional_area || "Functional Area",
+                                item.kpi_name
+                              ];
+                              const traceStr = item.strategic_objective_supported || "";
+                              if (traceStr.includes(" &rarr; ") || traceStr.includes(" → ")) {
+                                const separator = traceStr.includes(" &rarr; ") ? " &rarr; " : " → ";
+                                const parsed = traceStr.split(separator).map(s => s.trim());
+                                if (parsed.length > 0) {
+                                  parts = parsed;
+                                  if (parts[parts.length - 1] !== item.kpi_name) {
+                                    parts.push(item.kpi_name);
+                                  }
+                                }
+                              }
+                              
+                              return (
+                                <div className="bg-gray-50 border border-gray-200 p-3 rounded-sm font-sans">
+                                  <div className="text-[9px] font-bold uppercase tracking-widest text-gray-400">Strategic Alignment Traceability</div>
+                                  <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-800 pt-1 font-semibold">
+                                    {parts.map((part, idx) => (
+                                      <div key={idx} className="flex items-center gap-1.5">
+                                        <span className={idx === parts.length - 1 ? "text-yellow-600 font-bold" : "text-gray-500"}>
+                                          {part}
+                                        </span>
+                                        {idx < parts.length - 1 && (
+                                          <span className="text-gray-400">&rarr;</span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+
+                            <div className="space-y-4">
+                              {sectionConfigs.map((sect) => {
+                                const hasVal = sect.fields.some(field => {
+                                  const rawVal = item[field.key as keyof FunctionalSpecItem];
+                                  const val = typeof rawVal === "string" ? rawVal : Array.isArray(rawVal) ? rawVal.join(", ") : "";
+                                  return val.trim() !== "" && val.trim().toLowerCase() !== "not specified";
+                                });
+                                if (!hasVal) return null;
+
+                                return (
+                                  <div key={sect.id} className="space-y-2">
+                                    <h5 className="text-[10px] font-bold uppercase tracking-wider text-gray-800 border-b border-gray-100 pb-0.5 font-sans">
+                                      {sect.title}
+                                    </h5>
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                      {sect.fields.map((field) => {
+                                        const rawVal = item[field.key as keyof FunctionalSpecItem];
+                                        const val = typeof rawVal === "string" ? rawVal : Array.isArray(rawVal) ? rawVal.join(", ") : "";
+                                        if (!val || val.trim().toLowerCase() === "not specified") return null;
+                                        
+                                        const isSpan = sect.fields.length === 1 || field.key === "strategic_objective_supported" || field.key === "business_challenge_addressed" || field.key === "calculation_methodology" || field.key === "inclusion_rules" || field.key === "exclusion_rules";
+                                        return (
+                                          <div key={field.key} className={`space-y-1 ${isSpan ? "md:col-span-2" : ""}`}>
+                                            <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 font-sans">{field.label}</p>
+                                            <p className="text-xs leading-relaxed text-gray-800 whitespace-pre-wrap bg-gray-50 p-2.5 border border-gray-150 rounded-sm font-serif">
+                                              {val}
+                                            </p>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase mt-8">
+                      <div>Confidential - Advisory Work Product</div>
+                      <div>Page {pageNum} of {totalPages}</div>
+                    </div>
+                  </div>
+                );
+              })}
+
+
+              {/* PAGE 5: GOVERNANCE (PAGE INDEX: 4 + N) */}
+              <div className={`${previewPageNum === 4 + spec.items.length ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
+                <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
+                  <div></div>
+                  <div>KPI Functional Specification Document</div>
+                </div>
+
+                <div className="flex-grow space-y-8">
+                  {/* 5. Governance Framework */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-gray-900 font-sans border-b border-gray-250 pb-1">5. Governance Framework</h3>
+                    <p className="text-xs text-gray-755 leading-relaxed font-serif">
+                      To ensure metric consistency, accountability, and ongoing relevance, a formal governance framework is established for all approved KPIs. This structure assigns clear responsibilities and defines escalation paths.
+                    </p>
+
+                    <div className="space-y-2 font-sans">
+                      <h4 className="text-xs font-bold uppercase text-gray-800 tracking-wider">Roles and Responsibilities</h4>
+                      <ul className="list-disc pl-5 text-xs text-gray-600 space-y-2 font-serif">
+                        <li>
+                          <strong className="text-gray-900 font-sans">Business Owner: </strong>
+                          Responsible for defining logic, validating calculation results, approving targets, and driving performance.
+                        </li>
+                        <li>
+                          <strong className="text-gray-900 font-sans">Data Owner: </strong>
+                          Accountable for technical lineage, data completeness, ETL quality checks, and resolving availability issues.
+                        </li>
+                        <li>
+                          <strong className="text-gray-900 font-sans">Escalation Path: </strong>
+                          Discrepancies are escalated to the Data Governance Committee and KPI Advisory Board for review and reconciliation.
+                        </li>
+                      </ul>
+                    </div>
+
+                    {/* Matrix Table */}
+                    <div className="space-y-2 pt-2 font-sans">
+                      <h4 className="text-xs font-bold uppercase text-gray-800 tracking-wider">Ownership & Governance Matrix</h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs border-collapse border border-gray-300">
+                          <thead>
+                            <tr className="bg-gray-150 text-gray-800 font-bold border-b border-gray-300">
+                              <th className="p-2.5 border-r border-gray-300 w-1/4">Metric Name</th>
+                              <th className="p-2.5 border-r border-gray-300 w-1/5">Business Owner</th>
+                              <th className="p-2.5 border-r border-gray-300 w-1/5">Data Owner</th>
+                              <th className="p-2.5">Governance Policy Notes</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200 text-gray-700">
+                            {spec.items.map((item) => (
+                              <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                                <td className="p-2.5 border-r border-gray-300 font-semibold text-gray-900">{item.kpi_name}</td>
+                                <td className="p-2.5 border-r border-gray-300 text-xs">{item.business_owner || "Business Sponsor"}</td>
+                                <td className="p-2.5 border-r border-gray-300 text-xs">{item.data_owner || "Data Custodian"}</td>
+                                <td className="p-2.5 text-xs leading-relaxed font-serif">{item.ownership_governance || "Subject to standard quarterly audits."}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase mt-8">
+                  <div>Confidential - Advisory Work Product</div>
+                  <div>Page {4 + spec.items.length} of {totalPages}</div>
+                </div>
+              </div>
+
+
+              {/* PAGE 6: REPORTING & DASHBOARD (PAGE INDEX: 5 + N) */}
+              <div className={`${previewPageNum === 5 + spec.items.length ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
+                <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
+                  <div></div>
+                  <div>KPI Functional Specification Document</div>
+                </div>
+
+                <div className="flex-grow space-y-8">
+                  {/* 6. Reporting & Dashboard Requirements */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-gray-900 font-sans border-b border-gray-250 pb-1">6. Reporting & Dashboard Requirements</h3>
+                    <p className="text-xs text-gray-755 leading-relaxed font-serif">
+                      Visualization layout and threshold criteria dictate how data is displayed. The matrix below outlines reporting recommendations and performance thresholds.
+                    </p>
+
+                    <div className="overflow-x-auto font-sans">
+                      <table className="w-full text-left text-xs border-collapse border border-gray-300">
+                        <thead>
+                          <tr className="bg-gray-150 text-gray-800 font-bold border-b border-gray-300">
+                            <th className="p-2.5 border-r border-gray-300 w-1/4">Metric Name</th>
+                            <th className="p-2.5 border-r border-gray-300 w-1/4">Reporting Guidelines</th>
+                            <th className="p-2.5 border-r border-gray-300 w-1/4">Dashboard Placement</th>
+                            <th className="p-2.5">Threshold Guidance</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 text-gray-700">
+                          {spec.items.map((item) => {
+                            const get_default_reporting = (category: string) => {
+                              const cat = (category || "").toLowerCase();
+                              if (cat.includes("financial")) return "Monthly trended charts, quarterly variance reporting, and margin analysis.";
+                              if (cat.includes("operational")) return "Weekly performance run-charts, daily process monitor scorecards.";
+                              if (cat.includes("strategic")) return "C-Suite quarterly scorecards, progress bars against annual target milestones.";
+                              return "Standard monthly performance dashboard, with trailing 12-month trend charts.";
+                            };
+
+                            const get_default_threshold = (category: string) => {
+                              const cat = (category || "").toLowerCase();
+                              if (cat.includes("financial")) return "Green: Within +/- 2% of budget. Amber: 2% to 5% variance. Red: > 5% variance.";
+                              if (cat.includes("operational")) return "Green: Meets or exceeds 95% operating efficiency. Amber: 90% to 94%. Red: < 90%.";
+                              if (cat.includes("strategic")) return "Green: Milestone achieved on time. Amber: 1-2 weeks delay. Red: > 2 weeks delay.";
+                              return "Green: Target achieved or exceeded. Amber: 5% to 10% variance. Red: > 10% variance.";
+                            };
+
+                            const defRep = get_default_reporting(item.kpi_category || "");
+                            const defThresh = get_default_threshold(item.kpi_category || "");
+                            const repVal = item.reporting_requirements || defRep;
+                            const dashVal = item.dashboard_recommendations || "Standard Performance Dashboard.";
+                            const threshVal = item.threshold_guidance || defThresh;
 
                             return (
-                              <div key={sect.id} className="space-y-2">
-                                <h5 className="text-[10px] font-bold uppercase tracking-wider text-gray-850 border-b border-gray-100 pb-0.5 font-sans">
-                                  {sect.title}
-                                </h5>
-                                <div className="grid gap-3 md:grid-cols-2">
-                                  {sect.fields.map((field) => {
-                                    const rawVal = item[field.key as keyof FunctionalSpecItem];
-                                    const val = typeof rawVal === "string" ? rawVal : Array.isArray(rawVal) ? rawVal.join(", ") : "";
-                                    if (!val || val.trim().toLowerCase() === "not specified") return null;
-                                    
-                                    const isSpan = sect.fields.length === 1 || field.key === "strategic_objective_supported" || field.key === "business_challenge_addressed" || field.key === "calculation_methodology" || field.key === "inclusion_rules" || field.key === "exclusion_rules";
-                                    return (
-                                      <div key={field.key} className={`space-y-1 ${isSpan ? "md:col-span-2" : ""}`}>
-                                        <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 font-sans">{field.label}</p>
-                                        <p className="text-xs leading-relaxed text-gray-800 whitespace-pre-wrap bg-gray-50 p-2.5 border border-gray-150 rounded-sm font-serif">
-                                          {val}
-                                        </p>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
+                              <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                                <td className="p-2.5 border-r border-gray-300 font-semibold text-gray-900">{item.kpi_name}</td>
+                                <td className="p-2.5 border-r border-gray-300 text-xs leading-relaxed font-serif">{repVal}</td>
+                                <td className="p-2.5 border-r border-gray-300 text-xs leading-relaxed font-serif">{dashVal}</td>
+                                <td className="p-2.5 text-xs leading-relaxed font-serif">{threshVal}</td>
+                              </tr>
                             );
                           })}
-                        </div>
-                      </div>
+                        </tbody>
+                      </table>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* 5. Governance Framework */}
-              <div className="space-y-4 pt-6 border-t border-gray-200">
-                <h3 className="text-lg font-bold text-gray-900 font-sans">5. Governance Framework</h3>
-                <p className="text-xs text-gray-700 leading-relaxed font-serif">
-                  To ensure metric consistency, accountability, and ongoing relevance, a formal governance framework is established for all approved KPIs. This structure assigns clear responsibilities and defines escalation paths.
-                </p>
-
-                {/* Roles & Responsibilities */}
-                <div className="space-y-2 font-sans">
-                  <h4 className="text-xs font-bold uppercase text-gray-800 tracking-wider">Roles and Responsibilities</h4>
-                  <ul className="list-disc pl-5 text-xs text-gray-600 space-y-2 font-serif">
-                    <li>
-                      <strong className="text-gray-900 font-sans">Business Owner: </strong>
-                      Responsible for defining the business logic, validating calculation results, approving target thresholds, and driving operational performance based on metric insights.
-                    </li>
-                    <li>
-                      <strong className="text-gray-900 font-sans">Data Owner: </strong>
-                      Accountable for technical lineage, data completeness, source-to-target mapping, ETL data quality checks, and resolving data ingestion or availability issues.
-                    </li>
-                    <li>
-                      <strong className="text-gray-900 font-sans">Escalation Path: </strong>
-                      In case of data quality discrepancies or alignment disputes, issues are escalated to the Data Governance Committee and KPI Advisory Board for review and reconciliation.
-                    </li>
-                  </ul>
-                </div>
-
-                {/* Ownership and Governance Matrix Table */}
-                <div className="space-y-2 pt-2 font-sans">
-                  <h4 className="text-xs font-bold uppercase text-gray-800 tracking-wider">Ownership & Governance Matrix</h4>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse border border-gray-300">
-                      <thead>
-                        <tr className="bg-gray-50 text-gray-800 font-bold border-b border-gray-300">
-                          <th className="p-3 border-r border-gray-300 w-1/4">Metric Name</th>
-                          <th className="p-3 border-r border-gray-300 w-1/5">Business Owner</th>
-                          <th className="p-3 border-r border-gray-300 w-1/5">Data Owner</th>
-                          <th className="p-3">Governance Policy Notes</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200 text-gray-700">
-                        {spec.items.map((item) => (
-                          <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="p-3 border-r border-gray-300 font-semibold text-gray-900">
-                              {item.kpi_name}
-                            </td>
-                            <td className="p-3 border-r border-gray-300 text-xs">{item.business_owner || "Business Sponsor"}</td>
-                            <td className="p-3 border-r border-gray-300 text-xs">{item.data_owner || "Data Custodian"}</td>
-                            <td className="p-3 text-xs leading-relaxed font-serif">{item.ownership_governance || "Subject to standard quarterly advisory audits and performance reviews."}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
                   </div>
                 </div>
-              </div>
 
-              {/* 6. Reporting & Dashboard Requirements */}
-              <div className="space-y-4 pt-6 border-t border-gray-200">
-                <h3 className="text-lg font-bold text-gray-900 font-sans">6. Reporting & Dashboard Requirements</h3>
-                <p className="text-xs text-gray-755 leading-relaxed font-serif">
-                  Visualization layout and threshold criteria dictate how data is displayed to support decision-making. The matrix below outlines reporting recommendations and performance thresholds for each metric.
-                </p>
-
-                <div className="overflow-x-auto font-sans">
-                  <table className="w-full text-left text-xs border-collapse border border-gray-300">
-                    <thead>
-                      <tr className="bg-gray-50 text-gray-800 font-bold border-b border-gray-300">
-                        <th className="p-3 border-r border-gray-300 w-1/4">Metric Name</th>
-                        <th className="p-3 border-r border-gray-300 w-1/4">Reporting Guidelines</th>
-                        <th className="p-3 border-r border-gray-300 w-1/4">Dashboard Placement</th>
-                        <th className="p-3">Threshold Guidance</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200 text-gray-700">
-                      {spec.items.map((item) => {
-                        const get_default_reporting = (category: string) => {
-                          const cat = (category || "").toLowerCase();
-                          if (cat.includes("financial")) return "Monthly trended charts, quarterly variance reporting, and margin analysis. Drill down capability by cost center and profit center.";
-                          if (cat.includes("operational")) return "Weekly performance run-charts, daily process monitor scorecards. Comparative tracking against prior 30-day rolling averages.";
-                          if (cat.includes("strategic")) return "C-Suite quarterly scorecards, progress bars against annual target milestones, and executive summaries.";
-                          return "Standard monthly performance dashboard, with trailing 12-month trend charts and period-over-period variance metrics.";
-                        };
-
-                        const get_default_threshold = (category: string) => {
-                          const cat = (category || "").toLowerCase();
-                          if (cat.includes("financial")) return "Green: Within +/- 2% of budget target. Amber: 2% to 5% variance. Red: > 5% variance or actual spend exceeding budget.";
-                          if (cat.includes("operational")) return "Green: Meets or exceeds 95% operating efficiency. Amber: 90% to 94% efficiency. Red: < 90% operating efficiency.";
-                          if (cat.includes("strategic")) return "Green: Project milestone achieved on time. Amber: 1-2 weeks delay in milestone. Red: > 2 weeks delay in critical path.";
-                          return "Green: Target achieved or exceeded. Amber: 5% to 10% negative variance from target. Red: > 10% negative variance.";
-                        };
-
-                        const defRep = get_default_reporting(item.kpi_category || "");
-                        const defThresh = get_default_threshold(item.kpi_category || "");
-                        const repVal = item.reporting_requirements || defRep;
-                        const dashVal = item.dashboard_recommendations || "Standard Performance Dashboard.";
-                        const threshVal = item.threshold_guidance || defThresh;
-
-                        return (
-                          <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="p-3 border-r border-gray-300 font-semibold text-gray-900">
-                              {item.kpi_name}
-                            </td>
-                            <td className="p-3 border-r border-gray-300 text-xs leading-relaxed font-serif">{repVal}</td>
-                            <td className="p-3 border-r border-gray-300 text-xs leading-relaxed font-serif">{dashVal}</td>
-                            <td className="p-3 text-xs leading-relaxed font-serif">{threshVal}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                {/* Footer */}
+                <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase mt-8">
+                  <div>Confidential - Advisory Work Product</div>
+                  <div>Page {5 + spec.items.length} of {totalPages}</div>
                 </div>
               </div>
 
-              {/* 7. Assumptions & Constraints */}
-              <div className="space-y-4 pt-6 border-t border-gray-200">
-                <h3 className="text-lg font-bold text-gray-900 font-sans">7. Assumptions & Constraints</h3>
-                <p className="text-xs text-gray-700 leading-relaxed font-serif">
-                  A clear understanding of business and technical assumptions is critical for successful implementation. The following list represents consolidated baseline assumptions and constraints.
-                </p>
 
-                {/* General Architectural Assumptions */}
-                <div className="space-y-2 font-sans">
-                  <h4 className="text-xs font-bold uppercase text-gray-800 tracking-wider">General Architectural Assumptions</h4>
-                  <ul className="list-disc pl-5 text-xs text-gray-600 space-y-2 font-serif">
-                    <li>
-                      <strong className="text-gray-900 font-sans">Data Availability: </strong>
-                      Source transactional tables are assumed to be loaded into the central reporting repository on a standard nightly batch cadence.
-                    </li>
-                    <li>
-                      <strong className="text-gray-900 font-sans">Fiscal Calendar: </strong>
-                      Standard calendar year rules are assumed unless otherwise explicitly documented in specific financial indicators.
-                    </li>
-                    <li>
-                      <strong className="text-gray-900 font-sans">System Uptime: </strong>
-                      Target source ERP ledgers are assumed to maintain 99.5% uptime during standard reporting extraction windows.
-                    </li>
-                  </ul>
+              {/* PAGE 7: ASSUMPTIONS & CONSTRAINTS (PAGE INDEX: 6 + N) */}
+              <div className={`${previewPageNum === 6 + spec.items.length ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
+                <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
+                  <div></div>
+                  <div>KPI Functional Specification Document</div>
                 </div>
 
-                {/* Metric-Specific Assumptions */}
-                <div className="space-y-2 pt-2 font-sans">
-                  <h4 className="text-xs font-bold uppercase text-gray-800 tracking-wider">Metric-Specific Assumptions and Limitations</h4>
-                  <ul className="list-disc pl-5 text-xs text-gray-600 space-y-2 font-serif">
-                    {spec.items.map((item) => {
-                      const cleanedAsm = (item.assumptions_constraints || "").trim();
-                      if (!cleanedAsm || cleanedAsm.toLowerCase() === "not specified") return null;
-                      return (
-                        <li key={item.id}>
-                          <strong className="text-gray-900 font-sans">{item.kpi_name}: </strong>
-                          {cleanedAsm}
-                        </li>
-                      );
-                    })}
-                    {spec.items.every(item => !(item.assumptions_constraints || "").trim() || (item.assumptions_constraints || "").trim().toLowerCase() === "not specified") && (
-                      <li className="italic text-gray-400 font-serif">No custom metric-specific assumptions defined.</li>
-                    )}
-                  </ul>
-                </div>
-              </div>
-
-              {/* 8. Implementation Considerations */}
-              <div className="space-y-4 pt-6 border-t border-gray-200">
-                <h3 className="text-lg font-bold text-gray-900 font-sans">8. Implementation Considerations</h3>
-                <p className="text-xs text-gray-700 leading-relaxed font-serif">
-                  Transitioning these specifications into functional BI tools requires rigorous testing, change management, and data reconciliation. Standard implementation considerations are outlined below.
-                </p>
-
-                {/* Standard Implementation Guidelines */}
-                <div className="space-y-2 font-sans">
-                  <h4 className="text-xs font-bold uppercase text-gray-800 tracking-wider">Standard Implementation Guidelines</h4>
-                  <ul className="list-disc pl-5 text-xs text-gray-600 space-y-2 font-serif">
-                    <li>
-                      <strong className="text-gray-900 font-sans">Data Reconciliation: </strong>
-                      All KPI calculation outcomes must be audited and reconciled against official books of record or audited financial statements.
-                    </li>
-                    <li>
-                      <strong className="text-gray-900 font-sans">User Acceptance Testing (UAT): </strong>
-                      Business owners must perform visual and numeric validation of dashboard mockups prior to production sign-off.
-                    </li>
-                    <li>
-                      <strong className="text-gray-900 font-sans">Change Management: </strong>
-                      Training sessions and clear system documentation are required to support user onboarding and ensure high organizational adoption.
-                    </li>
-                  </ul>
+                <div className="flex-grow space-y-6">
+                  {/* 7. Assumptions & Constraints */}
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-bold text-gray-900 font-sans border-b border-gray-250 pb-1">7. Assumptions & Constraints</h3>
+                    <p className="text-xs text-gray-550 leading-relaxed font-serif">
+                      A clear understanding of business and technical assumptions is critical for successful implementation.
+                      The following list represents consolidated baseline assumptions and constraints.
+                    </p>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-1.5 font-sans">
+                        <h4 className="text-[10px] font-bold uppercase text-gray-500 tracking-wider">General Architectural Assumptions</h4>
+                        <ul className="list-disc pl-5 text-[11px] text-gray-600 space-y-1 font-serif">
+                          <li>Source transactional tables are loaded nightly into the central reporting repository.</li>
+                          <li>Standard calendar year rules are assumed unless otherwise explicitly documented.</li>
+                          <li>Target source ledgers maintain 99.5% uptime during extraction windows.</li>
+                        </ul>
+                      </div>
+                      <div className="space-y-1.5 font-sans">
+                        <h4 className="text-[10px] font-bold uppercase text-gray-500 tracking-wider">Metric-Specific Assumptions</h4>
+                        <ul className="list-disc pl-5 text-[11px] text-gray-600 space-y-1 font-serif">
+                          {spec.items.map((item) => {
+                            const cleanedAsm = (item.assumptions_constraints || "").trim();
+                            if (!cleanedAsm || cleanedAsm.toLowerCase() === "not specified") return null;
+                            return (
+                              <li key={item.id}>
+                                <strong className="text-gray-900 font-sans">{item.kpi_name}: </strong>
+                                {cleanedAsm}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Metric-Specific Technical Considerations */}
-                <div className="space-y-2 pt-2 font-sans">
-                  <h4 className="text-xs font-bold uppercase text-gray-800 tracking-wider">Metric-Specific Technical Considerations</h4>
-                  <ul className="list-disc pl-5 text-xs text-gray-600 space-y-2 font-serif">
-                    {spec.items.map((item) => {
-                      const cleanedImp = (item.implementation_guidance || "").trim();
-                      if (!cleanedImp || cleanedImp.toLowerCase() === "not specified") return null;
-                      return (
-                        <li key={item.id}>
-                          <strong className="text-gray-900 font-sans">{item.kpi_name}: </strong>
-                          {cleanedImp}
-                        </li>
-                      );
-                    })}
-                    {spec.items.every(item => !(item.implementation_guidance || "").trim() || (item.implementation_guidance || "").trim().toLowerCase() === "not specified") && (
-                      <li className="italic text-gray-400 font-serif">No custom metric-specific considerations defined.</li>
-                    )}
-                  </ul>
+                {/* Footer */}
+                <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase mt-8">
+                  <div>Confidential - Advisory Work Product</div>
+                  <div>Page {6 + spec.items.length} of {totalPages}</div>
                 </div>
               </div>
 
-              {/* 9. Appendix */}
-              <div className="space-y-4 pt-6 border-t border-gray-200">
-                <h3 className="text-lg font-bold text-gray-900 font-sans">9. Appendix</h3>
-                
-                {/* KPI Glossary */}
-                <div className="space-y-2 font-sans">
-                  <h4 className="text-xs font-bold uppercase text-gray-800 tracking-wider">KPI Glossary</h4>
-                  <ul className="list-disc pl-5 text-xs text-gray-600 space-y-2 font-serif">
-                    <li><strong className="text-gray-900 font-sans">KPI (Key Performance Indicator): </strong>A quantifiable measure used to evaluate the success of an organization or activity in meeting performance objectives.</li>
-                    <li><strong className="text-gray-900 font-sans">KRA (Key Result Area): </strong>Primary focus areas of outcomes or outputs for which an organizational unit or role is responsible.</li>
-                    <li><strong className="text-gray-900 font-sans">Numerator: </strong>The upper portion of a division representing the measured subset of occurrences.</li>
-                    <li><strong className="text-gray-900 font-sans">Denominator: </strong>The lower portion of a division representing the total base population.</li>
-                  </ul>
+
+              {/* PAGE 8: IMPLEMENTATION CONSIDERATIONS (PAGE INDEX: 7 + N) */}
+              <div className={`${previewPageNum === 7 + spec.items.length ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
+                <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
+                  <div></div>
+                  <div>KPI Functional Specification Document</div>
                 </div>
 
-                {/* Data Quality Principles */}
-                <div className="space-y-2 pt-2 font-sans">
-                  <h4 className="text-xs font-bold uppercase text-gray-800 tracking-wider">Data Quality Principles</h4>
-                  <ul className="list-disc pl-5 text-xs text-gray-600 space-y-2 font-serif">
-                    <li><strong className="text-gray-900 font-sans">Accuracy: </strong>Data correctly represents the real-world operational event it records.</li>
-                    <li><strong className="text-gray-900 font-sans">Completeness: </strong>All necessary dataset components are present without omission.</li>
-                    <li><strong className="text-gray-900 font-sans">Consistency: </strong>Metrics align across various systems, business units, and report interfaces.</li>
-                    <li><strong className="text-gray-900 font-sans">Timeliness: </strong>Updates occur within the required reporting cadence and operational windows.</li>
-                  </ul>
+                <div className="flex-grow space-y-6">
+                  {/* 8. Implementation Considerations */}
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-bold text-gray-900 font-sans border-b border-gray-250 pb-1">8. Implementation Considerations</h3>
+                    <p className="text-xs text-gray-550 leading-relaxed font-serif">
+                      Transitioning these specifications into functional BI tools requires rigorous testing, change management,
+                      and data reconciliation. Standard implementation considerations are outlined below.
+                    </p>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-1.5 font-sans">
+                        <h4 className="text-[10px] font-bold uppercase text-gray-500 tracking-wider">Standard Guidelines</h4>
+                        <ul className="list-disc pl-5 text-[11px] text-gray-600 space-y-1 font-serif">
+                          <li>Audit all calculation outcomes and reconcile against official books or audited financial statements.</li>
+                          <li>UAT validation by business owners prior to production deployment.</li>
+                          <li>Training sessions and clear documentation to support onboarding and drive adoption.</li>
+                        </ul>
+                      </div>
+                      <div className="space-y-1.5 font-sans">
+                        <h4 className="text-[10px] font-bold uppercase text-gray-500 tracking-wider">Metric-Specific Considerations</h4>
+                        <ul className="list-disc pl-5 text-[11px] text-gray-600 space-y-1 font-serif">
+                          {spec.items.map((item) => {
+                            const cleanedImp = (item.implementation_guidance || "").trim();
+                            if (!cleanedImp || cleanedImp.toLowerCase() === "not specified") return null;
+                            return (
+                              <li key={item.id}>
+                                <strong className="text-gray-900 font-sans">{item.kpi_name}: </strong>
+                                {cleanedImp}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Acronym Reference */}
-                <div className="space-y-2 pt-2 font-sans">
-                  <h4 className="text-xs font-bold uppercase text-gray-800 tracking-wider">Acronym Reference</h4>
-                  <ul className="list-disc pl-5 text-xs text-gray-600 space-y-2 font-serif">
-                    <li><strong className="text-gray-900 font-sans">ERP: </strong>Enterprise Resource Planning</li>
-                    <li><strong className="text-gray-900 font-sans">SAP FI-CO: </strong>Financial Accounting & Controlling</li>
-                    <li><strong className="text-gray-900 font-sans">SAP SD: </strong>Sales & Distribution</li>
-                    <li><strong className="text-gray-900 font-sans">SAP MM: </strong>Materials Management</li>
-                    <li><strong className="text-gray-900 font-sans">BI / DWH: </strong>Business Intelligence / Data Warehouse</li>
-                    <li><strong className="text-gray-900 font-sans">UAT: </strong>User Acceptance Testing</li>
-                  </ul>
+                {/* Footer */}
+                <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase mt-8">
+                  <div>Confidential - Advisory Work Product</div>
+                  <div>Page {7 + spec.items.length} of {totalPages}</div>
                 </div>
               </div>
 
+
+              {/* PAGE 9: APPENDIX (PAGE INDEX: 8 + N) */}
+              <div className={`${previewPageNum === 8 + spec.items.length ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
+                <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
+                  <div></div>
+                  <div>KPI Functional Specification Document</div>
+                </div>
+
+                <div className="flex-grow space-y-6">
+                  {/* 9. Appendix */}
+                  <div className="space-y-3 pt-3">
+                    <h3 className="text-lg font-bold text-gray-900 font-sans border-b border-gray-250 pb-1">9. Appendix</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[10px] font-sans text-gray-655 leading-relaxed">
+                      <div>
+                        <h4 className="font-bold uppercase text-gray-800 mb-1">Glossary</h4>
+                        <p><strong className="text-gray-900">KPI: </strong>Quantifiable measure to evaluate success.</p>
+                        <p><strong className="text-gray-900">KRA: </strong>Primary focus areas of business outcomes.</p>
+                        <p><strong className="text-gray-900">Numerator/Denominator: </strong>Formula components.</p>
+                      </div>
+                      <div>
+                        <h4 className="font-bold uppercase text-gray-800 mb-1">Data Quality</h4>
+                        <p><strong className="text-gray-900">Accuracy: </strong>Correct operational representation.</p>
+                        <p><strong className="text-gray-900">Completeness: </strong>No data omission.</p>
+                        <p><strong className="text-gray-900">Consistency: </strong>Metrics align across tools.</p>
+                      </div>
+                      <div>
+                        <h4 className="font-bold uppercase text-gray-800 mb-1">Acronyms</h4>
+                        <p><strong className="text-gray-900">ERP: </strong>Enterprise Resource Planning</p>
+                        <p><strong className="text-gray-900">SAP SD/MM: </strong>Sales/Materials modules</p>
+                        <p><strong className="text-gray-900">UAT/BI: </strong>Acceptance testing / BI systems</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase mt-8">
+                  <div>Confidential - Advisory Work Product</div>
+                  <div>Page {8 + spec.items.length} of {totalPages}</div>
+                </div>
+              </div>
             </div>
-          )}
+          </div>
+        )}
         </div>
       )}
     </div>

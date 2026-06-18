@@ -76,7 +76,7 @@ from app.database import active_engagement_id_ctx
 
 @app.middleware("http")
 async def add_engagement_context(request: Request, call_next):
-    eng_id_str = request.headers.get("X-Engagement-ID")
+    eng_id_str = request.headers.get("X-Engagement-ID") or request.query_params.get("engagement_id")
     eng_id = None
     if eng_id_str:
         try:
@@ -493,6 +493,13 @@ def delete_client(client_id: int):
 @app.get("/client-profile", response_model=dict[str, Any])
 def get_client_profile():
     with SessionLocal() as session:
+        eng_id = active_engagement_id_ctx.get()
+        if eng_id:
+            eng = session.query(Engagement).filter(Engagement.id == eng_id).first()
+            if eng:
+                profile = session.query(ClientProfile).filter(ClientProfile.id == eng.client_profile_id).first()
+                if profile:
+                    return _profile_to_dict(profile, session)
         profile = session.query(ClientProfile).order_by(ClientProfile.id.desc()).first()
         if not profile:
             return {}
@@ -946,6 +953,46 @@ def get_approved_transcripts_context() -> str:
         return "=== APPROVED TRANSCRIPT ANALYSIS INSIGHTS ===\n" + "\n".join(parts)
 
 
+def get_approved_client_insights_context() -> str:
+    eng_id = active_engagement_id_ctx.get()
+    with SessionLocal() as session:
+        profile_id = None
+        if eng_id:
+            eng = session.query(Engagement).filter(Engagement.id == eng_id).first()
+            if eng:
+                profile_id = eng.client_profile_id
+        
+        if not profile_id:
+            profile = session.query(ClientProfile).order_by(ClientProfile.id.desc()).first()
+            if not profile:
+                return ""
+            profile_id = profile.id
+            
+        insights = session.query(ClientInsight).filter(ClientInsight.client_profile_id == profile_id).all()
+        if not insights:
+            return ""
+            
+        parts = []
+        for ins in insights:
+            try:
+                insights_list = json.loads(ins.content_json or "[]")
+            except Exception:
+                continue
+            if not insights_list:
+                continue
+            
+            p_str = (
+                f"--- Business Assets Insights Category: {ins.category} ---\n"
+                + "\n".join(f"  - {item}" for item in insights_list) + "\n"
+            )
+            parts.append(p_str)
+            
+        if not parts:
+            return ""
+            
+        return "=== DYNAMIC BUSINESS ASSET INSIGHTS ===\n" + "\n".join(parts)
+
+
 class GeneratePromptRequest(BaseModel):
     user_instructions: str = ""
 
@@ -972,6 +1019,9 @@ async def generate_prompt(request: GeneratePromptRequest) -> PromptRecord:
         transcript_ctx = get_approved_transcripts_context()
         if transcript_ctx:
             prompt_text += f"\n\n{transcript_ctx}"
+        asset_insights_ctx = get_approved_client_insights_context()
+        if asset_insights_ctx:
+            prompt_text += f"\n\n{asset_insights_ctx}"
         prompt_text += build_fallback_guidance(request.user_instructions)
     else:
         # Build prompt using Gemini
@@ -993,6 +1043,10 @@ async def generate_prompt(request: GeneratePromptRequest) -> PromptRecord:
         transcript_ctx = get_approved_transcripts_context()
         if transcript_ctx:
             user_prompt += f"\n{transcript_ctx}\n"
+
+        asset_insights_ctx = get_approved_client_insights_context()
+        if asset_insights_ctx:
+            user_prompt += f"\n{asset_insights_ctx}\n"
 
         if request.user_instructions:
             user_prompt += (
@@ -1083,6 +1137,10 @@ async def refine_prompt(request: RefinePromptRequest) -> PromptRecord:
         transcript_ctx = get_approved_transcripts_context()
         if transcript_ctx:
             user_prompt += f"{transcript_ctx}\n\n"
+            
+        asset_insights_ctx = get_approved_client_insights_context()
+        if asset_insights_ctx:
+            user_prompt += f"{asset_insights_ctx}\n\n"
 
         user_prompt += (
             f"=== CURRENT PROMPT TO REFINE ===\n"
@@ -1140,6 +1198,9 @@ async def generate_kpis() -> KPILibrary:
                 transcript_ctx = get_approved_transcripts_context()
                 if transcript_ctx and transcript_ctx not in user_prompt:
                     user_prompt += f"\n\n{transcript_ctx}"
+                asset_insights_ctx = get_approved_client_insights_context()
+                if asset_insights_ctx and asset_insights_ctx not in user_prompt:
+                    user_prompt += f"\n\n{asset_insights_ctx}"
                 payload = await provider.generate_json(
                     system_prompt,
                     user_prompt,
@@ -1448,7 +1509,7 @@ def approve_spec() -> dict[str, Any]:
         )
         write_json(FILES["functional_spec"], pydantic_spec.model_dump(mode="json"))
         
-    log_activity("Functional Spec Approved", "The functional specification package was signed off.")
+    log_activity("Functional Spec Approved", "The functional specification document was signed off.")
     return {
         "status": "success",
         "message": "Functional specification approved",
@@ -1659,7 +1720,7 @@ def exports() -> list[ExportItem]:
 
 
 @app.get("/exports/{export_id}/{fmt}")
-def download_export(export_id: str, fmt: str) -> FileResponse:
+def download_export(export_id: str, fmt: str, doc_name: str | None = None) -> FileResponse:
     fmt = fmt.lower()
     EXPORT_DIR.mkdir(exist_ok=True)
     if export_id == "prompt":
@@ -1700,7 +1761,7 @@ def download_export(export_id: str, fmt: str) -> FileResponse:
             generate_docx_spec(path, spec, context)
         elif fmt == "pdf":
             from app.services.doc_generators import generate_pdf_spec
-            generate_pdf_spec(path, spec, context)
+            generate_pdf_spec(path, spec, context, doc_name=doc_name)
         elif fmt == "json":
             import json
             path.write_text(json.dumps(spec.model_dump(mode="json"), indent=2, default=str), encoding="utf-8")
@@ -1710,4 +1771,51 @@ def download_export(export_id: str, fmt: str) -> FileResponse:
         path = export_json_bundle()
     else:
         raise HTTPException(status_code=404, detail="Unknown export.")
-    return FileResponse(path, filename=path.name)
+
+    if doc_name and doc_name.strip():
+        import re
+        safe_name = re.sub(r'[\\/*?:"<>|]', "", doc_name.strip())
+        safe_name = safe_name.replace(" ", "_")
+        if not safe_name.lower().endswith(f".{fmt}"):
+            download_name = f"{safe_name}.{fmt}"
+        else:
+            download_name = safe_name
+    else:
+        # Generate default: {ClientName}_{Industry}_KPI_Functional_Specification
+        client_name_part = ""
+        industry_part = ""
+        with SessionLocal() as session:
+            eng_id = active_engagement_id_ctx.get()
+            profile = None
+            if eng_id:
+                eng = session.query(Engagement).filter(Engagement.id == eng_id).first()
+                if eng:
+                    profile = session.query(ClientProfile).filter(ClientProfile.id == eng.client_profile_id).first()
+            if not profile:
+                profile = session.query(ClientProfile).order_by(ClientProfile.id.desc()).first()
+            
+            if profile:
+                client_name_part = profile.client_name.strip()
+                industry_part = profile.industry.strip()
+        
+        import re
+        parts = []
+        if client_name_part:
+            parts.append(re.sub(r'\s+', "_", client_name_part))
+        if industry_part:
+            parts.append(re.sub(r'\s+', "_", industry_part))
+        
+        if export_id == "functional_document":
+            parts.append("KPI_Functional_Specification")
+        elif export_id == "prompt":
+            parts.append("KPI_Prompt")
+        elif export_id == "kpi_library":
+            parts.append("KPI_Library")
+        else:
+            parts.append(export_id)
+            
+        base_default_name = "_".join(parts)
+        base_default_name = re.sub(r'[\\/*?:"<>|]', "", base_default_name)
+        download_name = f"{base_default_name}.{fmt}"
+
+    return FileResponse(path, filename=download_name)

@@ -139,36 +139,7 @@ function ClientProfileDrawer({
             </div>
           </section>
 
-          {/* Approved AI Insights */}
-          {client.insights && client.insights.length > 0 && (
-            <section className="space-y-3">
-              <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#FFE600]">
-                Approved AI Insights
-              </h4>
-              <div className="space-y-3">
-                {client.insights.map((cat: ClientInsightItem, idx: number) => (
-                  <div
-                    key={idx}
-                    className="border border-[#252525] bg-[#111] rounded-sm p-3 space-y-2"
-                  >
-                    <span className="text-[10px] text-[#FFE600] uppercase tracking-wider font-bold">
-                      {cat.category}
-                    </span>
-                    <ul className="space-y-1">
-                      {cat.insights.map((item, j) => (
-                        <li
-                          key={j}
-                          className="text-[11px] text-[#B0B0B0] leading-relaxed pl-3 border-l-2 border-[#303030]"
-                        >
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
+
         </div>
       </aside>
     </>

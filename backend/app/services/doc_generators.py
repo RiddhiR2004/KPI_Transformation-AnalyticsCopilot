@@ -203,7 +203,43 @@ def generate_docx_spec(path: Path, spec: Any, context: BusinessContext) -> None:
 
     land_intro = doc.add_paragraph()
     land_intro.paragraph_format.space_after = Pt(12)
-    land_intro.add_run("The following table provides a high-level catalog of all approved performance indicators within the scope of this transformation initiative.")
+    land_intro.add_run("The following visual mind-map displays the KPI Landscape as a branching tree structure, routing from the core KPI Library through strategic categories down to individual approved metrics.")
+
+    # Branching Tree Structure
+    p_root = doc.add_paragraph()
+    p_root.paragraph_format.left_indent = Inches(0.2)
+    p_root.paragraph_format.space_after = Pt(2)
+    r_root = p_root.add_run("▼ KPI LIBRARY")
+    r_root.font.bold = True
+    r_root.font.color.rgb = RGBColor(180, 150, 0) # EY Gold
+
+    categories = {}
+    for item in items:
+        cat = item.kpi_category or "Operational"
+        if cat not in categories:
+            categories[cat] = []
+        categories[cat].append(item)
+
+    for cat_name, cat_items in categories.items():
+        p_cat = doc.add_paragraph()
+        p_cat.paragraph_format.left_indent = Inches(0.5)
+        p_cat.paragraph_format.space_after = Pt(2)
+        r_cat = p_cat.add_run(f" └── 📁 {cat_name.upper()}")
+        r_cat.font.bold = True
+        r_cat.font.color.rgb = RGBColor(27, 27, 27)
+
+        for item in cat_items:
+            p_kpi = doc.add_paragraph()
+            p_kpi.paragraph_format.left_indent = Inches(0.9)
+            p_kpi.paragraph_format.space_after = Pt(2)
+            p_kpi.add_run(f"      ├── 📊 {item.kpi_name}")
+
+    spacer_p = doc.add_paragraph()
+    spacer_p.paragraph_format.space_after = Pt(12)
+
+    land_table_intro = doc.add_paragraph()
+    land_table_intro.paragraph_format.space_after = Pt(12)
+    land_table_intro.add_run("The following table provides a high-level catalog of all approved performance indicators within the scope of this transformation initiative.")
 
     land_table = doc.add_table(rows=1 + len(items), cols=4)
     land_table.style = 'Table Grid'
@@ -854,12 +890,9 @@ class NumberedCanvas(canvas.Canvas):
         self.rect(0, 782, 612, 10, fill=True, stroke=False)
 
         # Header Text
-        self.setFont("Helvetica-Bold", 8)
-        self.setFillColor(colors.HexColor("#1B1B1B"))
-        self.drawString(54, 760, "KPI ADVISORY & ANALYTICS COPILOT")
         self.setFont("Helvetica", 8)
         self.setFillColor(colors.HexColor("#666666"))
-        self.drawRightString(558, 760, "KPI FUNCTIONAL SPECIFICATION PACKAGE")
+        self.drawRightString(558, 760, "KPI FUNCTIONAL SPECIFICATION DOCUMENT")
 
         # Top separator line
         self.setStrokeColor(colors.HexColor("#DCDCD9"))
@@ -874,7 +907,118 @@ class NumberedCanvas(canvas.Canvas):
         self.restoreState()
 
 
-def generate_pdf_spec(path: Path, spec: Any, context: BusinessContext) -> None:
+def draw_kpi_tree_pdf(items: list) -> Any:
+    from reportlab.graphics.shapes import Drawing, Rect, String, Line, Circle, Group
+    from reportlab.lib.colors import HexColor
+    
+    # Group KPIs by category
+    categories = {}
+    for item in items:
+        cat = item.kpi_category or "Operational"
+        if cat not in categories:
+            categories[cat] = []
+        categories[cat].append(item)
+        
+    n_kpis = len(items)
+    kpi_gap = 30
+    height = max(180, n_kpis * kpi_gap + 20)
+    width = 504
+    
+    d = Drawing(width, height)
+    
+    # Background border for drawing container
+    d.add(Rect(0, 0, width, height, fillColor=HexColor("#F9F9F9"), strokeColor=HexColor("#DCDCD9"), strokeWidth=0.5, rx=4, ry=4))
+    
+    # Coordinates mapping
+    root_x = 15
+    root_w = 90
+    root_h = 30
+    
+    cat_x = 160
+    cat_w = 100
+    cat_h = 24
+    
+    kpi_x = 310
+    kpi_w = 180
+    kpi_h = 20
+    
+    # Calculate layouts
+    kpis_layout = {}
+    cats_layout = {}
+    
+    current_kpi_idx = 0
+    for category, cat_items in categories.items():
+        # KPI y positions
+        y_positions = []
+        for idx, item in enumerate(cat_items):
+            y = height - 20 - ((current_kpi_idx + idx) * kpi_gap) - kpi_h/2
+            kpis_layout[item.id] = (kpi_x, y)
+            y_positions.append(y)
+            
+        # Category y is the average of its KPIs' y positions
+        cat_y = sum(y_positions) / len(y_positions) if y_positions else height / 2
+        cats_layout[category] = (cat_x, cat_y)
+        current_kpi_idx += len(cat_items)
+        
+    # Root y is the average of category y positions
+    cat_ys = [pos[1] for pos in cats_layout.values()]
+    root_y = sum(cat_ys) / len(cat_ys) if cat_ys else height / 2
+    
+    # Draw connections first so nodes sit on top
+    # 1. Root to Categories
+    for cat_name, (cx, cy) in cats_layout.items():
+        rx1 = root_x + root_w
+        ry1 = root_y
+        cx1 = cx
+        cy1 = cy
+        mid_x = (rx1 + cx1) / 2
+        d.add(Line(rx1, ry1, mid_x, ry1, strokeColor=HexColor("#FFE600"), strokeWidth=1.5))
+        d.add(Line(mid_x, ry1, mid_x, cy1, strokeColor=HexColor("#FFE600"), strokeWidth=1.5))
+        d.add(Line(mid_x, cy1, cx1, cy1, strokeColor=HexColor("#FFE600"), strokeWidth=1.5))
+        
+    # 2. Categories to KPIs
+    for item in items:
+        cat_name = item.kpi_category or "Operational"
+        if cat_name in cats_layout and item.id in kpis_layout:
+            cx, cy = cats_layout[cat_name]
+            kx, ky = kpis_layout[item.id]
+            cx1 = cx + cat_w
+            cy1 = cy
+            kx1 = kx
+            ky1 = ky + kpi_h/2
+            mid_x = (cx1 + kx1) / 2
+            d.add(Line(cx1, cy1, mid_x, cy1, strokeColor=HexColor("#DCDCD9"), strokeWidth=1.0))
+            d.add(Line(mid_x, cy1, mid_x, ky1, strokeColor=HexColor("#DCDCD9"), strokeWidth=1.0))
+            d.add(Line(mid_x, ky1, kx1, ky1, strokeColor=HexColor("#DCDCD9"), strokeWidth=1.0))
+            
+    # Draw Root Node
+    d.add(Rect(root_x, root_y - root_h/2, root_w, root_h, fillColor=HexColor("#1B1B1B"), strokeColor=HexColor("#1B1B1B"), rx=4, ry=4))
+    d.add(String(root_x + root_w/2, root_y - 3, "KPI LIBRARY", textAnchor="middle", fontName="Helvetica-Bold", fontSize=8, fillColor=HexColor("#FFE600")))
+    
+    # Draw Category Nodes
+    for cat_name, (cx, cy) in cats_layout.items():
+        d.add(Rect(cx, cy - cat_h/2, cat_w, cat_h, fillColor=HexColor("#FFE600"), strokeColor=HexColor("#B49600"), strokeWidth=0.5, rx=3, ry=3))
+        disp_cat = cat_name
+        if len(disp_cat) > 18:
+            disp_cat = disp_cat[:15] + "..."
+        d.add(String(cx + cat_w/2, cy - 3, disp_cat.upper(), textAnchor="middle", fontName="Helvetica-Bold", fontSize=7, fillColor=HexColor("#1B1B1B")))
+        
+    # Draw KPI Nodes
+    for idx, item in enumerate(items):
+        if item.id in kpis_layout:
+            kx, ky = kpis_layout[item.id]
+            d.add(Rect(kx, ky, kpi_w, kpi_h, fillColor=HexColor("#FFFFFF"), strokeColor=HexColor("#DCDCD9"), strokeWidth=0.5, rx=2, ry=2))
+            
+            kpi_name = item.kpi_name or ""
+            if len(kpi_name) > 30:
+                kpi_name = kpi_name[:27] + "..."
+            
+            d.add(String(kx + 8, ky + 6, f"{idx+1:02d}. {kpi_name}", fontName="Helvetica", fontSize=7.5, fillColor=HexColor("#1B1B1B")))
+            
+    return d
+
+
+def generate_pdf_spec(path: Path, spec: Any, context: BusinessContext, doc_name: str | None = None) -> None:
     """Generates a premium consolidated client-ready PDF document utilizing ReportLab's flowable architecture."""
     import datetime
     
@@ -890,13 +1034,22 @@ def generate_pdf_spec(path: Path, spec: Any, context: BusinessContext) -> None:
         exec_summary = spec.executive_summary or ""
         updated_at_str = spec.updated_at.strftime("%B %d, %Y") if hasattr(spec, "updated_at") and spec.updated_at else datetime.date.today().strftime("%B %d, %Y")
 
+    pdf_title = doc_name if doc_name else "KPI Functional Specification Document"
+    pdf_author = "KPI Advisory & Analytics"
+    pdf_subject = "KPI Functional Specification Document"
+    pdf_creator = "KPI Advisory & Analytics Copilot"
+
     doc = SimpleDocTemplate(
         str(path),
         pagesize=letter,
         leftMargin=54,
         rightMargin=54,
         topMargin=72,
-        bottomMargin=72
+        bottomMargin=72,
+        title=pdf_title,
+        author=pdf_author,
+        subject=pdf_subject,
+        creator=pdf_creator
     )
 
     styles = getSampleStyleSheet()
@@ -1066,6 +1219,16 @@ def generate_pdf_spec(path: Path, spec: Any, context: BusinessContext) -> None:
     # --- Section 2: KPI Landscape Overview ---
     story.append(Paragraph("2. KPI Landscape Overview", section_heading))
     story.append(Spacer(1, 10))
+    story.append(Paragraph("The following visual mind-map displays the KPI Landscape as a branching tree structure, routing from the core KPI Library through strategic categories down to individual approved metrics.", body_style))
+    story.append(Spacer(1, 10))
+    
+    # Draw KPI Tree
+    try:
+        story.append(draw_kpi_tree_pdf(items))
+        story.append(Spacer(1, 15))
+    except Exception as e:
+        pass
+
     story.append(Paragraph("The following table provides a high-level catalog of all approved performance indicators within the scope of this transformation initiative.", body_style))
     story.append(Spacer(1, 10))
     

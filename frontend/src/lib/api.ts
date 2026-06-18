@@ -147,5 +147,7 @@ export const api = {
 };
 
 export function exportUrl(id: string, format: string) {
-  return `/api/exports/${id}/${format.toLowerCase()}`;
+  const activeEngId = localStorage.getItem("active_engagement_id");
+  const base = `/api/exports/${id}/${format.toLowerCase()}`;
+  return activeEngId ? `${base}?engagement_id=${activeEngId}` : base;
 }

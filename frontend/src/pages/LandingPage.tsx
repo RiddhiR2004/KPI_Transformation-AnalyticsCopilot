@@ -3,18 +3,10 @@ import { useParams, useNavigate } from "react-router-dom";
 import { 
   Building2, 
   Database, 
-  Upload, 
-  Trash2, 
-  Sparkles, 
   Save, 
   CheckCircle, 
   AlertCircle,
-  FileText,
-  Loader2,
-  Plus,
   X,
-  RefreshCw,
-  FolderOpen,
   ArrowLeft
 } from "lucide-react";
 import { api } from "../lib/api";
@@ -38,9 +30,6 @@ export function LandingPage() {
   const handleCancel = () => {
     navigate(-1); // Go back to the previous page (Dashboard or Selection Page)
   };
-
-  // Session ID for staging files
-  const [sessionId] = useState(() => Math.random().toString(36).substring(2, 15));
 
   // Client Info State
   const [clientName, setClientName] = useState("");
@@ -66,19 +55,12 @@ export function LandingPage() {
   const [cloudVal, setCloudVal] = useState("");
   const [customCloud, setCustomCloud] = useState("");
 
-  // Assets Staging State
-  const [stagedFiles, setStagedFiles] = useState<{ name: string; size: number; status: string }[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
-
-  // Extracted Insights State
-  const [extractedInsights, setExtractedInsights] = useState<ClientInsightItem[] | null>(null);
+  // Existing Insights State (loaded to prevent data loss on edit)
+  const [existingInsights, setExistingInsights] = useState<ClientInsightItem[]>([]);
   
   // Status and Messages
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [analysisWarning, setAnalysisWarning] = useState("");
-  const [isDragOver, setIsDragOver] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
   // Load Saved Profile on Mount (only when editing an existing client)
@@ -160,7 +142,7 @@ export function LandingPage() {
           }
           
           if (data.insights) {
-            setExtractedInsights(data.insights);
+            setExistingInsights(data.insights);
           }
           setIsSaved(true);
         }
@@ -192,128 +174,7 @@ export function LandingPage() {
       stepsComplete += 1;
     }
     
-    // Step 3: Business Assets (At least 1 staged file or insights extracted)
-    if (stagedFiles.length > 0 || (extractedInsights && extractedInsights.length > 0)) {
-      stepsComplete += 1;
-    }
-    
-    return Math.round((stepsComplete / 3) * 100);
-  };
-
-  // Drag and Drop handlers
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      void processAndUploadFiles(Array.from(files));
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      void processAndUploadFiles(Array.from(files));
-    }
-  };
-
-  // Validate and Stage Upload Files
-  const processAndUploadFiles = async (files: File[]) => {
-    setError("");
-    setSuccess("");
-    
-    // Limit to 5 files per session
-    if (stagedFiles.length + files.length > 5) {
-      setError("Maximum 5 files can be staged per session.");
-      return;
-    }
-
-    // Check sizes
-    let totalSize = stagedFiles.reduce((acc, f) => acc + f.size, 0);
-    const validatedFiles: File[] = [];
-
-    for (const file of files) {
-      const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
-      let limit = 0;
-      
-      if ([".xlsx", ".xls", ".csv"].includes(ext)) limit = 20 * 1024 * 1024; // 20MB
-      else if (ext === ".pdf") limit = 25 * 1024 * 1024; // 25MB
-      else if (ext === ".docx") limit = 20 * 1024 * 1024; // 20MB
-      else if (ext === ".pptx") limit = 50 * 1024 * 1024; // 50MB
-      else if ([".png", ".jpg", ".jpeg"].includes(ext)) limit = 10 * 1024 * 1024; // 10MB
-      else {
-        setError(`Unsupported file format '${ext}'. Please check list of supported files.`);
-        return;
-      }
-
-      if (file.size > limit) {
-        setError(`File '${file.name}' exceeds the individual size limit for its type.`);
-        return;
-      }
-
-      totalSize += file.size;
-      if (totalSize > 100 * 1024 * 1024) { // 100MB
-        setError("Total staged assets size exceeds the session limit of 100MB.");
-        return;
-      }
-      validatedFiles.push(file);
-    }
-
-    // Upload
-    setUploading(true);
-    try {
-      for (const file of validatedFiles) {
-        const resp = await api.uploadClientAsset(file, sessionId);
-        setStagedFiles(prev => [...prev, { name: resp.filename, size: resp.size, status: "Staged" }]);
-      }
-      setSuccess("Assets staged successfully! Click 'Analyze Assets' to extract business intelligence.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to stage files.");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const deleteStagedFile = (filename: string) => {
-    setStagedFiles(prev => prev.filter(f => f.name !== filename));
-    setError("");
-  };
-
-  // Run LLM Asset Analysis
-  const handleAnalyzeAssets = async () => {
-    setAnalyzing(true);
-    setError("");
-    setSuccess("");
-    setAnalysisWarning("");
-    try {
-      const insights = await api.analyzeClientAssets(sessionId);
-      
-      // Convert backend dictionary to list of Category items
-      const items: ClientInsightItem[] = Object.entries(insights).map(([category, list]) => ({
-        category,
-        insights: Array.isArray(list) ? list : []
-      }));
-      
-      setExtractedInsights(items);
-      setStagedFiles([]); // Clear upload staging list since they are preprocessed
-      setSuccess("Dynamic asset analysis complete! Extracted insights are loaded below for review.");
-      
-      // Check if skipped images alert is needed conceptually
-      // Backend returns insights. If it retried text-only we can notify.
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Dynamic asset extraction failed.");
-    } finally {
-      setAnalyzing(false);
-    }
+    return Math.round((stepsComplete / 2) * 100);
   };
 
   // Save Client Profile & Insights
@@ -352,12 +213,10 @@ export function LandingPage() {
       cloud_platform: cloudVal === "Other" ? customCloud.trim() : cloudVal
     };
 
-    const payloadInsights = extractedInsights || [];
-
     try {
       await api.saveClientProfile({
         profile: payloadProfile,
-        insights: payloadInsights
+        insights: existingInsights
       });
       setSuccess("Client profile saved successfully!");
       setIsSaved(true);
@@ -366,36 +225,6 @@ export function LandingPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save profile.");
     }
-  };
-
-  // Categories Editor helpers
-  const handleCategoryNameChange = (index: number, newName: string) => {
-    if (!extractedInsights) return;
-    const updated = [...extractedInsights];
-    updated[index].category = newName;
-    setExtractedInsights(updated);
-  };
-
-  const handleDeleteCategory = (index: number) => {
-    if (!extractedInsights) return;
-    setExtractedInsights(extractedInsights.filter((_, i) => i !== index));
-  };
-
-  const handleAddCategory = (name: string) => {
-    if (!name.trim() || !extractedInsights) return;
-    // Prevent duplicates
-    if (extractedInsights.some(c => c.category.toLowerCase() === name.trim().toLowerCase())) {
-      setError("Category already exists.");
-      return;
-    }
-    setExtractedInsights([...extractedInsights, { category: name.trim(), insights: [] }]);
-  };
-
-  const handleUpdateInsights = (index: number, items: string[]) => {
-    if (!extractedInsights) return;
-    const updated = [...extractedInsights];
-    updated[index].insights = items;
-    setExtractedInsights(updated);
   };
 
   const progressVal = getProgress();
@@ -419,11 +248,10 @@ export function LandingPage() {
               {editingClientId ? "Edit Client Profile" : "New Client Setup"}
             </p>
             <h2 className="text-3xl font-semibold leading-tight tracking-tight text-[#F5F5F5]">
-              {editingClientId ? "Update Enterprise Profile" : "Establish Enterprise Profile & Strategy Context"}
+              {editingClientId ? "Update Enterprise Profile" : "Establish Enterprise Profile"}
             </h2>
             <p className="max-w-2xl text-xs text-[#B0B0B0] leading-relaxed">
-              Capture organization profile, technology platform landscape, and stage raw business documents. 
-              Trigger dynamic LLM extraction to compile initial operational and strategy context.
+              Capture organization profile and technology platform landscape context to initialize the client setup.
             </p>
           </div>
           
@@ -440,8 +268,6 @@ export function LandingPage() {
               <span className={clientName && country && (industry || customIndustry) ? "text-[#FFE600]" : ""}>Profile</span>
               <span>•</span>
               <span className={erpVal || crmVal || mesVal || biVal || dwVal || cloudVal ? "text-[#FFE600]" : ""}>Landscape</span>
-              <span>•</span>
-              <span className={stagedFiles.length > 0 || extractedInsights ? "text-[#FFE600]" : ""}>Assets</span>
             </div>
           </div>
         </div>
@@ -478,13 +304,6 @@ export function LandingPage() {
         <div className="border border-emerald-950 bg-emerald-950/20 p-4 text-xs text-emerald-400 border-l-2 border-emerald-500 rounded-sm flex items-center gap-3 animate-pulse">
           <CheckCircle size={16} />
           <span>{success}</span>
-        </div>
-      )}
-
-      {analysisWarning && (
-        <div className="border border-amber-950 bg-amber-950/20 p-4 text-xs text-amber-400 border-l-2 border-amber-500 rounded-sm flex items-center gap-3">
-          <AlertCircle size={16} />
-          <span>{analysisWarning}</span>
         </div>
       )}
 
@@ -761,93 +580,10 @@ export function LandingPage() {
 
         </div>
 
-        {/* Right Column: Business Assets & Actions */}
+        {/* Right Column: Actions */}
         <div className="space-y-6">
 
-          {/* Card 3: Business Assets drag and drop */}
-          <div className="border border-[#303030] bg-[#1B1B1B] p-6 rounded-sm space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-[#F5F5F5] flex items-center gap-2 border-b border-[#303030] pb-3">
-              <FolderOpen size={16} className="text-[#FFE600]" />
-              Business Assets & Knowledge Sources
-            </h3>
-
-            <p className="text-[11px] leading-relaxed text-[#B0B0B0]">
-              Upload PDFs, Spreadsheets, PowerPoint slides, or Dashboard Screenshots (Power BI/Tableau). 
-              Staged files are preprocessed and analyzed on request, but are never persisted permanently in SQLite.
-            </p>
-
-            {/* Drag & Drop Upload Zone */}
-            <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              className={`border-2 border-dashed rounded-sm p-7 flex flex-col items-center justify-center gap-3 transition-colors cursor-pointer relative ${
-                isDragOver
-                  ? "border-[#FFE600] bg-[#FFE600]/5"
-                  : "border-[#303030] hover:border-[#555] bg-[#111111]"
-              }`}
-            >
-              <input
-                type="file"
-                id="assets-file-input"
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                onChange={handleFileChange}
-                accept=".txt,.docx,.pdf,.xlsx,.xls,.csv,.pptx,.png,.jpg,.jpeg"
-                multiple
-                disabled={uploading || analyzing}
-              />
-              {uploading ? (
-                <>
-                  <Loader2 className="animate-spin text-[#FFE600]" size={28} />
-                  <p className="text-xs font-semibold text-[#F5F5F5]">Uploading & Staging File...</p>
-                </>
-              ) : (
-                <>
-                  <Upload className="text-[#FFE600]" size={28} />
-                  <div className="text-center space-y-1">
-                    <p className="text-xs font-semibold text-[#F5F5F5]">
-                      Drag and drop files here, or click to upload
-                    </p>
-                    <p className="text-[10px] text-[#888] leading-normal">
-                      Max 5 files per session. Max 100MB total.<br/>
-                      PDF (25MB), Excel/CSV/Word (20MB), PPTX (50MB), Images (10MB).
-                    </p>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* List of Staged Files */}
-            {stagedFiles.length > 0 && (
-              <div className="space-y-2.5 pt-2">
-                <h4 className="text-[10px] uppercase font-bold tracking-wider text-[#B0B0B0]">
-                  Staged Assets ({stagedFiles.length} / 5)
-                </h4>
-                <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                  {stagedFiles.map((file, idx) => (
-                    <div key={idx} className="flex items-center justify-between border border-[#303030] bg-[#111111] p-3 rounded-sm text-xs">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <FileText size={15} className="text-[#FFE600] shrink-0" />
-                        <span className="truncate text-[#E0E0E0]">{file.name}</span>
-                        <span className="text-[10px] text-[#777] shrink-0">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => deleteStagedFile(file.name)}
-                        className="text-[#888] hover:text-red-400 p-0.5 transition-colors shrink-0"
-                        title="Delete from session"
-                        disabled={analyzing}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Card 4: Actions */}
+          {/* Card 3: Actions */}
           <div className="border border-[#303030] bg-[#1B1B1B] p-6 rounded-sm space-y-4">
             <h3 className="text-sm font-bold uppercase tracking-wider text-[#F5F5F5] border-b border-[#303030] pb-3">
               Onboarding Controls
@@ -858,7 +594,6 @@ export function LandingPage() {
                 type="button"
                 className="button-yellow flex items-center gap-2"
                 onClick={handleSaveProfile}
-                disabled={uploading || analyzing}
               >
                 <Save size={16} />
                 Save Client Profile
@@ -871,25 +606,6 @@ export function LandingPage() {
               >
                 <X size={16} />
                 Cancel
-              </button>
-
-              <button
-                type="button"
-                className="button-secondary flex items-center gap-2"
-                onClick={handleAnalyzeAssets}
-                disabled={stagedFiles.length === 0 || uploading || analyzing}
-              >
-                {analyzing ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin text-[#FFE600]" />
-                    Analyzing Assets...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={16} />
-                    Analyze Assets
-                  </>
-                )}
               </button>
             </div>
             {isSaved ? (
@@ -912,221 +628,6 @@ export function LandingPage() {
         </div>
       </div>
 
-      {/* Dynamic Insights Review and Approval Section */}
-      {extractedInsights && (
-        <section className="border border-[#303030] bg-[#1B1B1B] p-6 rounded-sm space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#303030] pb-4">
-            <div>
-              <h3 className="text-lg font-semibold text-[#F5F5F5] flex items-center gap-2">
-                <Sparkles className="text-[#FFE600]" size={20} />
-                AI-Extracted Onboarding Insights
-              </h3>
-              <p className="text-xs text-[#B0B0B0] mt-1 leading-relaxed">
-                Review, edit, add, delete, or rename categories. Click <strong>Save Client Profile</strong> at the top right of the section or in the controls card to commit these approved insights.
-              </p>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                className="button-yellow flex items-center gap-1.5"
-                onClick={handleSaveProfile}
-                disabled={uploading || analyzing}
-              >
-                <Save size={14} />
-                Save Approved Insights
-              </button>
-              <button
-                type="button"
-                className="button-secondary flex items-center gap-1.5"
-                onClick={handleCancel}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-
-          {/* Categories Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {extractedInsights.map((cat, catIdx) => (
-              <CategoryEditor
-                key={catIdx}
-                index={catIdx}
-                categoryName={cat.category}
-                insights={cat.insights}
-                onNameChange={handleCategoryNameChange}
-                onDeleteCategory={handleDeleteCategory}
-                onInsightsChange={handleUpdateInsights}
-              />
-            ))}
-          </div>
-
-          {/* Add Custom Category Form */}
-          <AddCategoryForm onAddCategory={handleAddCategory} />
-        </section>
-      )}
-
-
-    </div>
-  );
-}
-
-// Subcomponent: Category Card Editor
-interface CategoryEditorProps {
-  index: number;
-  categoryName: string;
-  insights: string[];
-  onNameChange: (index: number, newName: string) => void;
-  onDeleteCategory: (index: number) => void;
-  onInsightsChange: (index: number, newInsights: string[]) => void;
-}
-
-function CategoryEditor({
-  index,
-  categoryName,
-  insights,
-  onNameChange,
-  onDeleteCategory,
-  onInsightsChange
-}: CategoryEditorProps) {
-  const [newItemText, setNewItemText] = useState("");
-
-  const handleAddItem = () => {
-    if (newItemText.trim()) {
-      onInsightsChange(index, [...insights, newItemText.trim()]);
-      setNewItemText("");
-    }
-  };
-
-  const handleEditInsight = (itemIdx: number, newText: string) => {
-    const updated = [...insights];
-    updated[itemIdx] = newText;
-    onInsightsChange(index, updated);
-  };
-
-  const handleDeleteInsight = (itemIdx: number) => {
-    onInsightsChange(index, insights.filter((_, i) => i !== itemIdx));
-  };
-
-  return (
-    <div className="border border-[#303030] bg-[#111] p-5 rounded-sm space-y-4 relative flex flex-col justify-between">
-      <div className="space-y-4">
-        {/* Category Header with Editable Title and Delete Button */}
-        <div className="flex items-center justify-between gap-4 border-b border-[#222] pb-3">
-          <input
-            type="text"
-            className="bg-transparent border-b border-transparent hover:border-[#444] focus:border-[#FFE600] focus:ring-0 text-sm font-semibold text-[#FFE600] py-0.5 px-1 outline-none w-full"
-            value={categoryName}
-            onChange={(e) => onNameChange(index, e.target.value)}
-          />
-          <button
-            type="button"
-            onClick={() => onDeleteCategory(index)}
-            className="text-[#666] hover:text-red-400 p-1 transition-colors shrink-0"
-            title="Delete entire category"
-          >
-            <X size={15} />
-          </button>
-        </div>
-
-        {/* List of Insights */}
-        <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-          {insights.length === 0 ? (
-            <p className="text-xs text-[#555] italic p-1">No insights in this category.</p>
-          ) : (
-            insights.map((item, idx) => (
-              <div key={idx} className="flex items-start justify-between gap-3 bg-[#1B1B1B] border border-[#252525] p-2.5 rounded-sm">
-                <textarea
-                  className="bg-transparent border-none text-xs text-[#E0E0E0] p-0 outline-none w-full resize-none leading-relaxed focus:ring-0"
-                  rows={Math.max(1, Math.ceil(item.length / 45))}
-                  value={item}
-                  onChange={(e) => handleEditInsight(idx, e.target.value)}
-                />
-                <button
-                  type="button"
-                  onClick={() => handleDeleteInsight(idx)}
-                  className="text-[#666] hover:text-red-400 p-0.5 transition-colors shrink-0 mt-0.5"
-                >
-                  <Trash2 size={13} />
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Add Insight Row */}
-      <div className="flex gap-2.5 pt-3 border-t border-[#222] mt-4">
-        <input
-          type="text"
-          className="field py-1 px-2.5 text-xs bg-[#1B1B1B] min-h-0 focus:border-[#FFE600] focus:ring-0"
-          placeholder="Add custom insight..."
-          value={newItemText}
-          onChange={(e) => setNewItemText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              handleAddItem();
-            }
-          }}
-        />
-        <button
-          type="button"
-          onClick={handleAddItem}
-          className="px-3 py-1 text-xs border border-[#FFE600] text-[#FFE600] hover:bg-[#FFE600]/10 rounded-sm font-semibold transition-colors shrink-0"
-        >
-          Add
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// Subcomponent: Add Category Form
-function AddCategoryForm({ onAddCategory }: { onAddCategory: (name: string) => void }) {
-  const [name, setName] = useState("");
-
-  const handleAdd = () => {
-    if (name.trim()) {
-      onAddCategory(name.trim());
-      setName("");
-    }
-  };
-
-  return (
-    <div className="border border-[#303030] bg-[#111] p-5 rounded-sm flex items-center justify-between gap-6">
-      <div className="space-y-1 max-w-xl">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-[#FFE600]">
-          Add Custom Insights Category
-        </h4>
-        <p className="text-[11px] text-[#888]">
-          Create a new custom theme/category card to manually compile organization objectives or platform landscapes.
-        </p>
-      </div>
-
-      <div className="flex items-center gap-3 w-80">
-        <input
-          type="text"
-          className="field text-xs py-2 bg-[#1B1B1B]"
-          placeholder="e.g. Critical Risks, Operating Procedures"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              handleAdd();
-            }
-          }}
-        />
-        <button
-          type="button"
-          onClick={handleAdd}
-          className="button-secondary py-2 px-4 flex items-center gap-1 shrink-0"
-        >
-          <Plus size={14} />
-          Create
-        </button>
-      </div>
     </div>
   );
 }

@@ -141,7 +141,7 @@ export function ClientSelectionPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={(e) => handleDelete(e, client.id, client.client_name)}
+                      onClick={(e) => client.id !== undefined && handleDelete(e, client.id, client.client_name)}
                       disabled={deletingId === client.id}
                       className="text-[#666] hover:text-red-400 p-1.5 rounded-full hover:bg-red-400/10 transition-colors"
                       title="Delete Client"

@@ -1,5 +1,5 @@
 import { BusinessContextStep } from "../components/BusinessContextStep";
-import { TranscriptUploadSection } from "../components/TranscriptUploadSection";
+import { BusinessAssetsSection } from "../components/BusinessAssetsSection";
 
 export function BusinessContextPage({ onChange }: { onChange: () => void }) {
   return (
@@ -7,10 +7,10 @@ export function BusinessContextPage({ onChange }: { onChange: () => void }) {
       <PageHeader
         eyebrow="Step 01"
         title="Business Context"
-        text="Capture the business scope and upload meeting transcripts to generate a deterministic KPI prompt for Gemini-backed KPI creation."
+        text="Capture the business scope and upload strategic business assets to generate a deterministic KPI prompt for Gemini-backed KPI creation."
       />
       <BusinessContextStep onChange={onChange} />
-      <TranscriptUploadSection onApprovedChange={onChange} />
+      <BusinessAssetsSection onApprovedChange={onChange} />
     </div>
   );
 }
