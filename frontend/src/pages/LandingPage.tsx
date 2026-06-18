@@ -307,325 +307,306 @@ export function LandingPage() {
         </div>
       )}
 
-      {/* Main Form Cards */}
+      {/* Main Form Cards — Side by Side */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         
-        {/* Left Column: Client Info & Tech Landscape */}
-        <div className="space-y-6">
+        {/* Left Column: Client Info */}
+        <div className="border border-[#303030] bg-[#1B1B1B] p-6 rounded-sm space-y-4">
+          <h3 className="text-sm font-bold uppercase tracking-wider text-[#F5F5F5] flex items-center gap-2 border-b border-[#303030] pb-3">
+            <Building2 size={16} className="text-[#FFE600]" />
+            Client Profile Information
+          </h3>
           
-          {/* Card 1: Client Information */}
-          <div className="border border-[#303030] bg-[#1B1B1B] p-6 rounded-sm space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-[#F5F5F5] flex items-center gap-2 border-b border-[#303030] pb-3">
-              <Building2 size={16} className="text-[#FFE600]" />
-              Client Profile Information
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="label">Client Name *</label>
-                <input
-                  type="text"
-                  className="field"
-                  placeholder="Acme Corporation"
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                  autoComplete="off"
-                />
-              </div>
-
-              <div>
-                <label className="label">Industry *</label>
-                <select
-                  className={`field ${!industry ? "text-[#666666]" : "text-[#F5F5F5]"}`}
-                  value={industry}
-                  onChange={(e) => {
-                    setIndustry(e.target.value);
-                    if (e.target.value !== "Other") setCustomIndustry("");
-                  }}
-                >
-                  <option value="">Select Industry...</option>
-                  {industryOptions.map(i => <option key={i} value={i}>{i}</option>)}
-                </select>
-                {industry === "Other" && (
-                  <input
-                    type="text"
-                    className="field mt-2"
-                    placeholder="Specify custom industry..."
-                    value={customIndustry}
-                    onChange={(e) => setCustomIndustry(e.target.value)}
-                    autoComplete="off"
-                  />
-                )}
-              </div>
-
-              <div>
-                <label className="label">Sub-Industry</label>
-                <input
-                  type="text"
-                  className="field"
-                  placeholder="Automotive Assembly"
-                  value={subIndustry}
-                  onChange={(e) => setSubIndustry(e.target.value)}
-                  autoComplete="off"
-                />
-              </div>
-
-              <div>
-                <label className="label">Country *</label>
-                <input
-                  type="text"
-                  className="field"
-                  placeholder="United States"
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  autoComplete="off"
-                />
-              </div>
-
-              <div>
-                <label className="label">Region</label>
-                <input
-                  type="text"
-                  className="field"
-                  placeholder="North America"
-                  value={region}
-                  onChange={(e) => setRegion(e.target.value)}
-                  autoComplete="off"
-                />
-              </div>
-
-              <div>
-                <label className="label">Company Size</label>
-                <select
-                  className={`field ${!companySize ? "text-[#666666]" : "text-[#F5F5F5]"}`}
-                  value={companySize}
-                  onChange={(e) => setCompanySize(e.target.value)}
-                >
-                  <option value="">Select Size...</option>
-                  {companySizeOptions.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Client Name *</label>
+              <input
+                type="text"
+                className="field"
+                placeholder="Acme Corporation"
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                autoComplete="off"
+              />
             </div>
 
             <div>
-              <label className="label">Organization Description</label>
-              <textarea
-                className="field min-h-[90px]"
-                placeholder="Briefly describe the client's core operations, business units, or value propositions..."
-                value={orgDescription}
-                onChange={(e) => setOrgDescription(e.target.value)}
+              <label className="label">Industry *</label>
+              <select
+                className={`field ${!industry ? "text-[#666666]" : "text-[#F5F5F5]"}`}
+                value={industry}
+                onChange={(e) => {
+                  setIndustry(e.target.value);
+                  if (e.target.value !== "Other") setCustomIndustry("");
+                }}
+              >
+                <option value="">Select Industry...</option>
+                {industryOptions.map(i => <option key={i} value={i}>{i}</option>)}
+              </select>
+              {industry === "Other" && (
+                <input
+                  type="text"
+                  className="field mt-2"
+                  placeholder="Specify custom industry..."
+                  value={customIndustry}
+                  onChange={(e) => setCustomIndustry(e.target.value)}
+                  autoComplete="off"
+                />
+              )}
+            </div>
+
+            <div>
+              <label className="label">Sub-Industry</label>
+              <input
+                type="text"
+                className="field"
+                placeholder="Automotive Assembly"
+                value={subIndustry}
+                onChange={(e) => setSubIndustry(e.target.value)}
+                autoComplete="off"
               />
             </div>
-          </div>
 
-          {/* Card 2: Technology Landscape */}
-          <div className="border border-[#303030] bg-[#1B1B1B] p-6 rounded-sm space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-[#F5F5F5] flex items-center gap-2 border-b border-[#303030] pb-3">
-              <Database size={16} className="text-[#FFE600]" />
-              Technology Landscape
-            </h3>
+            <div>
+              <label className="label">Country *</label>
+              <input
+                type="text"
+                className="field"
+                placeholder="United States"
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                autoComplete="off"
+              />
+            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="label">ERP Platform</label>
-                <select
-                  className={`field ${!erpVal ? "text-[#666666]" : "text-[#F5F5F5]"}`}
-                  value={erpVal}
-                  onChange={(e) => {
-                    setErpVal(e.target.value);
-                    if (e.target.value !== "Other") setCustomErp("");
-                  }}
-                >
-                  <option value="">Select ERP...</option>
-                  {erpOptions.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
-                {erpVal === "Other" && (
-                  <input
-                    type="text"
-                    className="field mt-2"
-                    placeholder="Specify ERP..."
-                    value={customErp}
-                    onChange={(e) => setCustomErp(e.target.value)}
-                    autoComplete="off"
-                  />
-                )}
-              </div>
+            <div>
+              <label className="label">Region</label>
+              <input
+                type="text"
+                className="field"
+                placeholder="North America"
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+                autoComplete="off"
+              />
+            </div>
 
-              <div>
-                <label className="label">CRM Platform</label>
-                <select
-                  className={`field ${!crmVal ? "text-[#666666]" : "text-[#F5F5F5]"}`}
-                  value={crmVal}
-                  onChange={(e) => {
-                    setCrmVal(e.target.value);
-                    if (e.target.value !== "Other") setCustomCrm("");
-                  }}
-                >
-                  <option value="">Select CRM...</option>
-                  {crmOptions.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
-                {crmVal === "Other" && (
-                  <input
-                    type="text"
-                    className="field mt-2"
-                    placeholder="Specify CRM..."
-                    value={customCrm}
-                    onChange={(e) => setCustomCrm(e.target.value)}
-                    autoComplete="off"
-                  />
-                )}
-              </div>
-
-              <div>
-                <label className="label">MES Platform</label>
-                <select
-                  className={`field ${!mesVal ? "text-[#666666]" : "text-[#F5F5F5]"}`}
-                  value={mesVal}
-                  onChange={(e) => {
-                    setMesVal(e.target.value);
-                    if (e.target.value !== "Other") setCustomMes("");
-                  }}
-                >
-                  <option value="">Select MES...</option>
-                  {mesOptions.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
-                {mesVal === "Other" && (
-                  <input
-                    type="text"
-                    className="field mt-2"
-                    placeholder="Specify MES..."
-                    value={customMes}
-                    onChange={(e) => setCustomMes(e.target.value)}
-                    autoComplete="off"
-                  />
-                )}
-              </div>
-
-              <div>
-                <label className="label">BI / Analytics Tool</label>
-                <select
-                  className={`field ${!biVal ? "text-[#666666]" : "text-[#F5F5F5]"}`}
-                  value={biVal}
-                  onChange={(e) => {
-                    setBiVal(e.target.value);
-                    if (e.target.value !== "Other") setCustomBi("");
-                  }}
-                >
-                  <option value="">Select BI...</option>
-                  {biOptions.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
-                {biVal === "Other" && (
-                  <input
-                    type="text"
-                    className="field mt-2"
-                    placeholder="Specify BI..."
-                    value={customBi}
-                    onChange={(e) => setCustomBi(e.target.value)}
-                    autoComplete="off"
-                  />
-                )}
-              </div>
-
-              <div>
-                <label className="label">Data Warehouse</label>
-                <select
-                  className={`field ${!dwVal ? "text-[#666666]" : "text-[#F5F5F5]"}`}
-                  value={dwVal}
-                  onChange={(e) => {
-                    setDwVal(e.target.value);
-                    if (e.target.value !== "Other") setCustomDw("");
-                  }}
-                >
-                  <option value="">Select Warehouse...</option>
-                  {dwOptions.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
-                {dwVal === "Other" && (
-                  <input
-                    type="text"
-                    className="field mt-2"
-                    placeholder="Specify Warehouse..."
-                    value={customDw}
-                    onChange={(e) => setCustomDw(e.target.value)}
-                    autoComplete="off"
-                  />
-                )}
-              </div>
-
-              <div>
-                <label className="label">Cloud Platform</label>
-                <select
-                  className={`field ${!cloudVal ? "text-[#666666]" : "text-[#F5F5F5]"}`}
-                  value={cloudVal}
-                  onChange={(e) => {
-                    setCloudVal(e.target.value);
-                    if (e.target.value !== "Other") setCustomCloud("");
-                  }}
-                >
-                  <option value="">Select Cloud...</option>
-                  {cloudOptions.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
-                {cloudVal === "Other" && (
-                  <input
-                    type="text"
-                    className="field mt-2"
-                    placeholder="Specify Cloud..."
-                    value={customCloud}
-                    onChange={(e) => setCustomCloud(e.target.value)}
-                    autoComplete="off"
-                  />
-                )}
-              </div>
+            <div>
+              <label className="label">Company Size</label>
+              <select
+                className={`field ${!companySize ? "text-[#666666]" : "text-[#F5F5F5]"}`}
+                value={companySize}
+                onChange={(e) => setCompanySize(e.target.value)}
+              >
+                <option value="">Select Size...</option>
+                {companySizeOptions.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
             </div>
           </div>
 
-        </div>
-
-        {/* Right Column: Actions */}
-        <div className="space-y-6">
-
-          {/* Card 3: Actions */}
-          <div className="border border-[#303030] bg-[#1B1B1B] p-6 rounded-sm space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-[#F5F5F5] border-b border-[#303030] pb-3">
-              Onboarding Controls
-            </h3>
-
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                className="button-yellow flex items-center gap-2"
-                onClick={handleSaveProfile}
-              >
-                <Save size={16} />
-                Save Client Profile
-              </button>
-
-              <button
-                type="button"
-                className="button-secondary flex items-center gap-2"
-                onClick={handleCancel}
-              >
-                <X size={16} />
-                Cancel
-              </button>
-            </div>
-            {isSaved ? (
-              <div className="mt-4 p-4 border border-[#FFE600]/30 bg-[#FFE600]/5 rounded-sm space-y-2">
-                <div className="flex items-center gap-2 text-xs font-bold text-[#FFE600] uppercase tracking-wider">
-                  <CheckCircle size={16} />
-                  Onboarding Complete
-                </div>
-                <p className="text-[11px] text-[#B0B0B0] leading-relaxed">
-                  Profile saved. Redirecting to the dashboard...
-                </p>
-              </div>
-            ) : (
-              <p className="text-[11px] text-[#666] italic mt-2">
-                * Please save your client profile before proceeding to Step 1.
-              </p>
-            )}
+          <div>
+            <label className="label">Organization Description</label>
+            <textarea
+              className="field min-h-[90px]"
+              placeholder="Briefly describe the client's core operations, business units, or value propositions..."
+              value={orgDescription}
+              onChange={(e) => setOrgDescription(e.target.value)}
+            />
           </div>
-
         </div>
+
+        {/* Right Column: Technology Landscape */}
+        <div className="border border-[#303030] bg-[#1B1B1B] p-6 rounded-sm space-y-4">
+          <h3 className="text-sm font-bold uppercase tracking-wider text-[#F5F5F5] flex items-center gap-2 border-b border-[#303030] pb-3">
+            <Database size={16} className="text-[#FFE600]" />
+            Technology Landscape
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="label">ERP Platform</label>
+              <select
+                className={`field ${!erpVal ? "text-[#666666]" : "text-[#F5F5F5]"}`}
+                value={erpVal}
+                onChange={(e) => {
+                  setErpVal(e.target.value);
+                  if (e.target.value !== "Other") setCustomErp("");
+                }}
+              >
+                <option value="">Select ERP...</option>
+                {erpOptions.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+              {erpVal === "Other" && (
+                <input
+                  type="text"
+                  className="field mt-2"
+                  placeholder="Specify ERP..."
+                  value={customErp}
+                  onChange={(e) => setCustomErp(e.target.value)}
+                  autoComplete="off"
+                />
+              )}
+            </div>
+
+            <div>
+              <label className="label">CRM Platform</label>
+              <select
+                className={`field ${!crmVal ? "text-[#666666]" : "text-[#F5F5F5]"}`}
+                value={crmVal}
+                onChange={(e) => {
+                  setCrmVal(e.target.value);
+                  if (e.target.value !== "Other") setCustomCrm("");
+                }}
+              >
+                <option value="">Select CRM...</option>
+                {crmOptions.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+              {crmVal === "Other" && (
+                <input
+                  type="text"
+                  className="field mt-2"
+                  placeholder="Specify CRM..."
+                  value={customCrm}
+                  onChange={(e) => setCustomCrm(e.target.value)}
+                  autoComplete="off"
+                />
+              )}
+            </div>
+
+            <div>
+              <label className="label">MES Platform</label>
+              <select
+                className={`field ${!mesVal ? "text-[#666666]" : "text-[#F5F5F5]"}`}
+                value={mesVal}
+                onChange={(e) => {
+                  setMesVal(e.target.value);
+                  if (e.target.value !== "Other") setCustomMes("");
+                }}
+              >
+                <option value="">Select MES...</option>
+                {mesOptions.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+              {mesVal === "Other" && (
+                <input
+                  type="text"
+                  className="field mt-2"
+                  placeholder="Specify MES..."
+                  value={customMes}
+                  onChange={(e) => setCustomMes(e.target.value)}
+                  autoComplete="off"
+                />
+              )}
+            </div>
+
+            <div>
+              <label className="label">BI / Analytics Tool</label>
+              <select
+                className={`field ${!biVal ? "text-[#666666]" : "text-[#F5F5F5]"}`}
+                value={biVal}
+                onChange={(e) => {
+                  setBiVal(e.target.value);
+                  if (e.target.value !== "Other") setCustomBi("");
+                }}
+              >
+                <option value="">Select BI...</option>
+                {biOptions.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+              {biVal === "Other" && (
+                <input
+                  type="text"
+                  className="field mt-2"
+                  placeholder="Specify BI..."
+                  value={customBi}
+                  onChange={(e) => setCustomBi(e.target.value)}
+                  autoComplete="off"
+                />
+              )}
+            </div>
+
+            <div>
+              <label className="label">Data Warehouse</label>
+              <select
+                className={`field ${!dwVal ? "text-[#666666]" : "text-[#F5F5F5]"}`}
+                value={dwVal}
+                onChange={(e) => {
+                  setDwVal(e.target.value);
+                  if (e.target.value !== "Other") setCustomDw("");
+                }}
+              >
+                <option value="">Select Warehouse...</option>
+                {dwOptions.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+              {dwVal === "Other" && (
+                <input
+                  type="text"
+                  className="field mt-2"
+                  placeholder="Specify Warehouse..."
+                  value={customDw}
+                  onChange={(e) => setCustomDw(e.target.value)}
+                  autoComplete="off"
+                />
+              )}
+            </div>
+
+            <div>
+              <label className="label">Cloud Platform</label>
+              <select
+                className={`field ${!cloudVal ? "text-[#666666]" : "text-[#F5F5F5]"}`}
+                value={cloudVal}
+                onChange={(e) => {
+                  setCloudVal(e.target.value);
+                  if (e.target.value !== "Other") setCustomCloud("");
+                }}
+              >
+                <option value="">Select Cloud...</option>
+                {cloudOptions.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+              {cloudVal === "Other" && (
+                <input
+                  type="text"
+                  className="field mt-2"
+                  placeholder="Specify Cloud..."
+                  value={customCloud}
+                  onChange={(e) => setCustomCloud(e.target.value)}
+                  autoComplete="off"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Save / Cancel — Centered Below Both Cards */}
+      <div className="flex flex-col items-center gap-3 pt-2 pb-4">
+        <div className="flex flex-wrap gap-3 justify-center">
+          <button
+            type="button"
+            className="button-yellow flex items-center gap-2 px-8 py-3 text-sm"
+            onClick={handleSaveProfile}
+          >
+            <Save size={16} />
+            Save Client Profile
+          </button>
+
+          <button
+            type="button"
+            className="button-secondary flex items-center gap-2 px-6 py-3 text-sm"
+            onClick={handleCancel}
+          >
+            <X size={16} />
+            Cancel
+          </button>
+        </div>
+        {isSaved ? (
+          <div className="flex items-center gap-2 text-xs font-bold text-[#FFE600] uppercase tracking-wider mt-1">
+            <CheckCircle size={14} />
+            Profile saved. Redirecting to the dashboard...
+          </div>
+        ) : (
+          <p className="text-[11px] text-[#666] italic mt-1">
+            * Please save your client profile before proceeding to Step 1.
+          </p>
+        )}
       </div>
 
     </div>

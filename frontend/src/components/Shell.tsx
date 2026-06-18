@@ -1,4 +1,4 @@
-import { BarChart3, ChevronRight, FileText, Network, Table2, Target, Workflow, CheckCircle, Building2, Briefcase, Home } from "lucide-react";
+import { BarChart3, ChevronRight, FileText, Network, Table2, Target, Workflow, CheckCircle, Building2, Briefcase, Home, Bell, LogOut, User } from "lucide-react";
 import type { ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import type { ActivityEvent, ExportItem, WorkflowStatus } from "../types/api";
@@ -49,43 +49,65 @@ export function Shell({
             <h1 className="text-lg font-semibold tracking-tight text-[#F5F5F5]">KPI Transformation & Analytics Copilot</h1>
           </NavLink>
 
-          {/* Breadcrumb: Client → Engagement */}
-          {(activeClientName || activeEngName) && location.pathname !== "/select-client" && (
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-xs text-[#B0B0B0] bg-[#111] border border-[#303030] px-3 py-1.5 rounded-sm font-semibold">
-                {activeClientName && (
-                  <>
-                    <Building2 size={12} className="text-[#FFE600]" />
-                    <span className="text-[#F5F5F5]">{activeClientName}</span>
-                  </>
+          <div className="flex items-center gap-4">
+            {/* Breadcrumb: Client → Engagement */}
+            {(activeClientName || activeEngName) && location.pathname !== "/" && (
+              <>
+                <div className="flex items-center gap-2 text-xs text-[#B0B0B0] bg-[#111] border border-[#303030] px-3 py-1.5 rounded-sm font-semibold">
+                  {activeClientName && (
+                    <>
+                      <Building2 size={12} className="text-[#FFE600]" />
+                      <span className="text-[#F5F5F5]">{activeClientName}</span>
+                    </>
+                  )}
+                  {activeClientName && activeEngName && (
+                    <ChevronRight size={10} className="text-[#555]" />
+                  )}
+                  {activeEngName && (
+                    <>
+                      <Briefcase size={12} className="text-[#FFE600]" />
+                      <span className="text-[#FFE600]">{activeEngName}</span>
+                    </>
+                  )}
+                </div>
+                {location.pathname !== "/dashboard" && (
+                  <NavLink
+                    to="/dashboard"
+                    className="flex items-center gap-1.5 text-xs font-bold text-[#B0B0B0] hover:text-[#FFE600] border border-[#303030] hover:border-[#FFE600]/40 px-3 py-1.5 rounded-sm transition-colors bg-[#111]"
+                  >
+                    <Home size={12} className="text-[#FFE600]" />
+                    <span>Home</span>
+                  </NavLink>
                 )}
-                {activeClientName && activeEngName && (
-                  <ChevronRight size={10} className="text-[#555]" />
-                )}
-                {activeEngName && (
-                  <>
-                    <Briefcase size={12} className="text-[#FFE600]" />
-                    <span className="text-[#FFE600]">{activeEngName}</span>
-                  </>
-                )}
-              </div>
-              {location.pathname !== "/dashboard" && (
                 <NavLink
-                  to="/dashboard"
-                  className="flex items-center gap-1.5 text-xs font-bold text-[#B0B0B0] hover:text-[#FFE600] border border-[#303030] hover:border-[#FFE600]/40 px-3 py-1.5 rounded-sm transition-colors bg-[#111]"
+                  to="/"
+                  className="text-xs font-bold text-[#111] bg-[#FFE600] hover:bg-[#FFE600]/90 px-3 py-1.5 rounded-sm transition-colors"
                 >
-                  <Home size={12} className="text-[#FFE600]" />
-                  <span>Home</span>
+                  Switch Client
                 </NavLink>
-              )}
-              <NavLink
-                to="/"
-                className="text-xs font-bold text-[#111] bg-[#FFE600] hover:bg-[#FFE600]/90 px-3 py-1.5 rounded-sm transition-colors"
-              >
-                Switch Client
-              </NavLink>
+              </>
+            )}
+
+            {/* Notifications */}
+            <button className="relative p-2 text-[#888] hover:text-[#FFE600] transition-colors" title="Notifications">
+              <Bell size={18} />
+              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#FFE600] border border-[#1B1B1B]" />
+            </button>
+
+            {/* Divider */}
+            <div className="h-6 w-px bg-[#303030]" />
+
+            {/* User Profile */}
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#FFE600]/20 to-[#FFE600]/5 border border-[#FFE600]/30 text-[#FFE600] text-xs font-bold">
+                KR
+              </div>
+              <div className="hidden md:block">
+                <p className="text-xs font-semibold text-[#F5F5F5] leading-tight">Krish R.</p>
+                <p className="text-[10px] text-[#888] leading-tight">Consultant</p>
+              </div>
             </div>
-          )}
+          </div>
         </div>
       </header>
 
