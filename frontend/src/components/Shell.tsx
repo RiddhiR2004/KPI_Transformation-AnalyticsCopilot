@@ -33,6 +33,7 @@ export function Shell({
   
   const userName = localStorage.getItem("user_name") || "riddhi.r";
   const userEmail = localStorage.getItem("user_email") || "riddhi.r@example.com";
+  const userRole = localStorage.getItem("user_role") || "Consultant";
   
   const initials = userName
     .split(/[\s._]+/)
@@ -155,7 +156,7 @@ export function Shell({
                 </div>
                 <div className="hidden md:block pr-2">
                   <p className="text-xs font-semibold text-[#F5F5F5] leading-tight">{userName}</p>
-                  <p className="text-[10px] text-[#888] leading-tight">Consultant</p>
+                  <p className="text-[10px] text-[#888] leading-tight">{userRole}</p>
                 </div>
               </button>
 

@@ -9,6 +9,7 @@ export function SettingsPage() {
   const [displayName, setDisplayName] = useState("");
   const [emailAddress, setEmailAddress] = useState("");
   const [theme, setTheme] = useState("dark");
+  const [role, setRole] = useState("Consultant");
   const [exportFormat, setExportFormat] = useState("pdf");
   const [namingConvention, setNamingConvention] = useState("[CLIENTCODE]_[ENGID]_[DATE]");
   const [success, setSuccess] = useState("");
@@ -19,6 +20,7 @@ export function SettingsPage() {
     setDisplayName(localStorage.getItem("user_name") || "riddhi.r");
     setEmailAddress(localStorage.getItem("user_email") || "riddhi.r@example.com");
     setTheme(localStorage.getItem("settings_theme") || "dark");
+    setRole(localStorage.getItem("user_role") || "Consultant");
     setExportFormat(localStorage.getItem("settings_export_format") || "pdf");
     setNamingConvention(localStorage.getItem("settings_naming_convention") || "[CLIENTCODE]_[ENGID]_[DATE]");
   }, []);
@@ -29,10 +31,12 @@ export function SettingsPage() {
     try {
       const oldName = localStorage.getItem("user_name") || "riddhi.r";
       const oldEmail = localStorage.getItem("user_email") || "riddhi.r@example.com";
+      const oldRole = localStorage.getItem("user_role") || "Consultant";
 
       // Save to local storage
       localStorage.setItem("user_name", displayName.trim());
       localStorage.setItem("user_email", emailAddress.trim());
+      localStorage.setItem("user_role", role.trim());
       localStorage.setItem("settings_theme", theme);
       localStorage.setItem("settings_export_format", exportFormat);
       localStorage.setItem("settings_naming_convention", namingConvention);
@@ -44,8 +48,8 @@ export function SettingsPage() {
         status: "Success",
         entity_type: "User",
         entity_name: displayName.trim(),
-        previous_value: JSON.stringify({ name: oldName, email: oldEmail }),
-        new_value: JSON.stringify({ name: displayName.trim(), email: emailAddress.trim() })
+        previous_value: JSON.stringify({ name: oldName, email: oldEmail, role: oldRole }),
+        new_value: JSON.stringify({ name: displayName.trim(), email: emailAddress.trim(), role: role.trim() })
       });
 
       // Audit log settings updates
@@ -170,15 +174,12 @@ export function SettingsPage() {
               </div>
               <div>
                 <label className="label">Role</label>
-                <input type="text" className="field w-1/2" defaultValue="Consultant" disabled />
-                <p className="text-[11px] text-[#666] mt-1">Roles are managed by the platform administrator.</p>
-              </div>
-              <div>
-                <label className="label">Display Density</label>
-                <select className="field w-1/2" defaultValue="comfortable">
-                  <option value="comfortable">Comfortable</option>
-                  <option value="compact">Compact</option>
-                </select>
+                <input 
+                  type="text" 
+                  className="field w-1/2" 
+                  value={role} 
+                  onChange={(e) => setRole(e.target.value)} 
+                />
               </div>
             </div>
           </div>
