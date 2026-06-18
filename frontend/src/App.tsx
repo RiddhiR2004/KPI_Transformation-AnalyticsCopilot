@@ -11,6 +11,8 @@ import { ClientSelectionPage } from "./pages/ClientSelectionPage";
 import { api } from "./lib/api";
 import type { ActivityEvent, ExportItem, WorkflowStatus } from "./types/api";
 
+import { SettingsPage } from "./pages/SettingsPage";
+
 export default function App() {
   const [status, setStatus] = useState<WorkflowStatus>();
   const [timeline, setTimeline] = useState<ActivityEvent[]>([]);
@@ -42,6 +44,7 @@ export default function App() {
         <Route path="/" element={<ClientSelectionPage />} />
         <Route path="/select-client" element={<Navigate to="/" replace />} />
         <Route path="/dashboard" element={<ClientsDashboard />} />
+        <Route path="/settings" element={<SettingsPage />} />
 
         {/* Onboarding / Client Setup — for new or editing existing client profiles */}
         <Route path="/onboarding" element={<LandingPage />} />

@@ -16,6 +16,7 @@ import {
   Users,
   Eye,
   Server,
+  Edit3,
 } from "lucide-react";
 import { api } from "../lib/api";
 import type {
@@ -162,13 +163,14 @@ function EngagementGrid({
   onOpenEngagement: (eng: EngagementRecord) => void;
 }) {
   const [showModal, setShowModal] = useState(false);
+  const [editEngagementId, setEditEngagementId] = useState<number | null>(null);
   const [engName, setEngName] = useState("");
   const [engIdField, setEngIdField] = useState("");
   const [engDesc, setEngDesc] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const handleCreate = async () => {
+  const handleSave = async () => {
     if (!engName.trim()) {
       setError("Engagement name is required.");
       return;
@@ -176,22 +178,40 @@ function EngagementGrid({
     setSaving(true);
     setError("");
     try {
-      await api.createEngagement({
-        client_profile_id: clientId,
-        name: engName.trim(),
-        engagement_id: engIdField.trim(),
-        description: engDesc.trim(),
-      });
+      if (editEngagementId) {
+        await api.updateEngagement(editEngagementId, {
+          client_profile_id: clientId,
+          name: engName.trim(),
+          engagement_id: engIdField.trim(),
+          description: engDesc.trim(),
+        });
+      } else {
+        await api.createEngagement({
+          client_profile_id: clientId,
+          name: engName.trim(),
+          engagement_id: engIdField.trim(),
+          description: engDesc.trim(),
+        });
+      }
       setShowModal(false);
+      setEditEngagementId(null);
       setEngName("");
       setEngIdField("");
       setEngDesc("");
       onRefresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create engagement.");
+      setError(err instanceof Error ? err.message : `Failed to ${editEngagementId ? "update" : "create"} engagement.`);
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleEdit = (eng: EngagementRecord) => {
+    setEditEngagementId(eng.id);
+    setEngName(eng.name);
+    setEngIdField(eng.engagement_id);
+    setEngDesc(eng.description);
+    setShowModal(true);
   };
 
   const handleDelete = async (id: number) => {
@@ -228,7 +248,13 @@ function EngagementGrid({
           </span>
         </div>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={() => {
+            setEditEngagementId(null);
+            setEngName("");
+            setEngIdField("");
+            setEngDesc("");
+            setShowModal(true);
+          }}
           className="button-secondary flex items-center gap-1.5 text-xs py-2 px-4"
         >
           <Plus size={14} />
@@ -300,18 +326,30 @@ function EngagementGrid({
                 <div className="flex items-center justify-between pt-1 border-t border-[#222]">
                   <span className="flex items-center gap-1.5 text-[10px] text-[#555]">
                     <Calendar size={11} />
-                    {new Date(eng.created_at).toLocaleDateString("en-US", {
+                    Last Updated: {new Date(eng.updated_at).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
                       year: "numeric",
-                    })}
+                    })} {new Date(eng.updated_at).toLocaleTimeString("en-US", {
+                      hour: "numeric",
+                      minute: "2-digit",
+                      hour12: true,
+                    }).toLowerCase()}
                   </span>
-                  <button
-                    onClick={() => onOpenEngagement(eng)}
-                    className="inline-flex items-center gap-1.5 text-[11px] font-bold text-black bg-[#FFE600] hover:bg-[#FFE600]/90 px-3 py-1.5 rounded-sm transition-all hover:translate-x-0.5"
-                  >
-                    Open <ChevronRight size={13} />
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleEdit(eng)}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#B0B0B0] hover:text-[#FFE600] px-2 py-1.5 transition-all"
+                    >
+                      <Edit3 size={13} /> Edit
+                    </button>
+                    <button
+                      onClick={() => onOpenEngagement(eng)}
+                      className="inline-flex items-center gap-1.5 text-[11px] font-bold text-black bg-[#FFE600] hover:bg-[#FFE600]/90 px-3 py-1.5 rounded-sm transition-all hover:translate-x-0.5"
+                    >
+                      Open <ChevronRight size={13} />
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -327,7 +365,7 @@ function EngagementGrid({
               <div className="flex items-center gap-2">
                 <Briefcase className="text-[#FFE600]" size={18} />
                 <h3 className="text-sm font-bold uppercase tracking-wider text-[#F5F5F5]">
-                  New Engagement — {clientName}
+                  {editEngagementId ? "Edit Engagement" : "New Engagement"} — {clientName}
                 </h3>
               </div>
               <button onClick={() => setShowModal(false)} className="text-[#666] hover:text-[#F5F5F5] transition-colors">
@@ -354,19 +392,7 @@ function EngagementGrid({
                   autoFocus
                 />
               </div>
-              <div>
-                <label className="label">
-                  Engagement ID{" "}
-                  <span className="text-[#666] font-normal">(auto-generated if blank)</span>
-                </label>
-                <input
-                  type="text"
-                  className="field"
-                  placeholder="e.g. ENG-001"
-                  value={engIdField}
-                  onChange={(e) => setEngIdField(e.target.value)}
-                />
-              </div>
+
               <div>
                 <label className="label">
                   Description <span className="text-[#666] font-normal">(optional)</span>
@@ -382,7 +408,7 @@ function EngagementGrid({
 
             <div className="flex gap-3 pt-2">
               <button
-                onClick={handleCreate}
+                onClick={handleSave}
                 disabled={saving}
                 className="button-yellow flex items-center gap-2 flex-1 justify-center"
               >

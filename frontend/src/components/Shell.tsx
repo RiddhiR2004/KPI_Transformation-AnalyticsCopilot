@@ -1,5 +1,5 @@
-import { BarChart3, ChevronRight, FileText, Network, Table2, Target, Workflow, CheckCircle, Building2, Briefcase, Home, Bell, LogOut, User } from "lucide-react";
-import type { ReactNode } from "react";
+import { BarChart3, ChevronRight, FileText, Network, Table2, Target, Workflow, CheckCircle, Building2, Briefcase, Home, Bell, LogOut, User, Settings } from "lucide-react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import type { ActivityEvent, ExportItem, WorkflowStatus } from "../types/api";
 
@@ -29,6 +29,19 @@ export function Shell({
   const location = useLocation();
   const activeEngName = localStorage.getItem("active_engagement_name");
   const activeClientName = localStorage.getItem("active_client_name");
+  
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setShowProfileMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#111111] text-[#F5F5F5] font-sans antialiased">
@@ -97,15 +110,51 @@ export function Shell({
             {/* Divider */}
             <div className="h-6 w-px bg-[#303030]" />
 
-            {/* User Profile */}
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#FFE600]/20 to-[#FFE600]/5 border border-[#FFE600]/30 text-[#FFE600] text-xs font-bold">
-                KR
-              </div>
-              <div className="hidden md:block">
-                <p className="text-xs font-semibold text-[#F5F5F5] leading-tight">Krish R.</p>
-                <p className="text-[10px] text-[#888] leading-tight">Consultant</p>
-              </div>
+            {/* User Profile Menu */}
+            <div className="relative" ref={profileMenuRef}>
+              <button 
+                onClick={() => setShowProfileMenu(!showProfileMenu)}
+                className="flex items-center gap-3 p-1 rounded-sm hover:bg-[#111] transition-colors text-left"
+              >
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#FFE600]/20 to-[#FFE600]/5 border border-[#FFE600]/30 text-[#FFE600] text-xs font-bold">
+                  KR
+                </div>
+                <div className="hidden md:block pr-2">
+                  <p className="text-xs font-semibold text-[#F5F5F5] leading-tight">Krish R.</p>
+                  <p className="text-[10px] text-[#888] leading-tight">Consultant</p>
+                </div>
+              </button>
+
+              {/* Dropdown */}
+              {showProfileMenu && (
+                <div className="absolute right-0 mt-2 w-48 rounded-sm bg-[#1B1B1B] border border-[#303030] shadow-2xl py-1 z-50">
+                  <div className="px-4 py-2 border-b border-[#303030] mb-1">
+                    <p className="text-xs font-semibold text-[#F5F5F5]">krish.r@example.com</p>
+                  </div>
+                  <NavLink
+                    to="/"
+                    onClick={() => setShowProfileMenu(false)}
+                    className="flex items-center gap-2 px-4 py-2 text-xs text-[#B0B0B0] hover:text-[#FFE600] hover:bg-[#111] transition-colors"
+                  >
+                    <User size={14} /> Profile
+                  </NavLink>
+                  <NavLink
+                    to="/settings"
+                    onClick={() => setShowProfileMenu(false)}
+                    className="flex items-center gap-2 px-4 py-2 text-xs text-[#B0B0B0] hover:text-[#FFE600] hover:bg-[#111] transition-colors"
+                  >
+                    <Settings size={14} /> Settings
+                  </NavLink>
+                  <div className="border-t border-[#303030] mt-1 pt-1">
+                    <button
+                      onClick={() => setShowProfileMenu(false)}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-xs text-[#B0B0B0] hover:text-[#FFE600] hover:bg-[#111] transition-colors text-left"
+                    >
+                      <LogOut size={14} /> Logout
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -157,7 +206,7 @@ export function Shell({
               </section>
             </aside>
 
-            <main>{children}</main>
+            <main className="min-w-0">{children}</main>
           </div>
         )}
       </div>

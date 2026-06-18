@@ -827,8 +827,32 @@ def create_engagement(payload: EngagementCreate):
         # Auto-generate an engagement ID if not provided
         eng_id = payload.engagement_id.strip()
         if not eng_id:
-            import time
-            eng_id = f"ENG-{int(time.time())}"
+            # 1. Extract uppercase letters from client name for CLIENTCODE. Fallback to first two chars.
+            client_code = "".join([c for c in profile.client_name if c.isupper()])
+            if not client_code:
+                client_code = profile.client_name[:2].upper()
+            
+            # 2. Get current year
+            year = datetime.now().year
+            
+            # 3. Find the latest engagement for this client to determine sequence
+            from sqlalchemy import select, desc
+            latest_eng = session.scalar(
+                select(Engagement)
+                .filter(Engagement.client_profile_id == profile.id)
+                .filter(Engagement.engagement_id.like(f"{client_code}-{year}-%"))
+                .order_by(desc(Engagement.id))
+            )
+            
+            eng_num = 1
+            if latest_eng and latest_eng.engagement_id:
+                try:
+                    last_num = int(latest_eng.engagement_id.split("-")[-1])
+                    eng_num = last_num + 1
+                except ValueError:
+                    pass
+            
+            eng_id = f"{client_code}-{year}-{eng_num:03d}"
 
         now = datetime.now()
         eng = Engagement(
@@ -857,6 +881,70 @@ def create_engagement(payload: EngagementCreate):
             updated_at=eng.updated_at,
         )
 
+@app.put("/engagements/{engagement_id_path}", response_model=EngagementRecord)
+def update_engagement(engagement_id_path: int, payload: EngagementCreate):
+    """Update an existing engagement's name and description."""
+    if not payload.name.strip():
+        raise HTTPException(status_code=400, detail="Engagement name is required.")
+        
+    with SessionLocal() as session:
+        eng = session.query(Engagement).filter(Engagement.id == engagement_id_path).first()
+        if not eng:
+            raise HTTPException(status_code=404, detail="Engagement not found.")
+            
+        eng.name = payload.name.strip()
+        eng.description = payload.description.strip()
+        eng.updated_at = datetime.now()
+        
+        session.commit()
+        session.refresh(eng)
+        
+        log_activity("Engagement Updated", f"Engagement '{eng.name}' updated.")
+        
+        from app.database import (
+            BusinessContext as DBBusinessContext,
+            Prompt as DBPrompt,
+            KPILibrary as DBKPILibrary,
+            FunctionalSpecification as DBFunctionalSpecification,
+        )
+        
+        context = bool(session.scalar(select(DBBusinessContext).filter_by(engagement_id=eng.id).limit(1)))
+        prompt = bool(session.scalar(select(DBPrompt).filter_by(engagement_id=eng.id).limit(1)))
+        
+        lib_row = session.scalar(select(DBKPILibrary).filter_by(engagement_id=eng.id).limit(1))
+        library = False
+        if lib_row:
+            try:
+                library = bool(json.loads(lib_row.items or "[]"))
+            except Exception:
+                pass
+                
+        spec_row = session.scalar(select(DBFunctionalSpecification).filter_by(engagement_id=eng.id).limit(1))
+        spec = False
+        if spec_row:
+            try:
+                spec = bool(json.loads(spec_row.items or "[]"))
+            except Exception:
+                pass
+        
+        wf_status = WorkflowStatus(
+            business_context=context,
+            prompt_generation=prompt,
+            kpi_library=library,
+            functional_specification=spec,
+        )
+        
+        return EngagementRecord(
+            id=eng.id,
+            client_profile_id=eng.client_profile_id,
+            name=eng.name,
+            engagement_id=eng.engagement_id,
+            description=eng.description,
+            status=eng.status,
+            created_at=eng.created_at,
+            updated_at=eng.updated_at,
+            workflow_status=wf_status,
+        )
 
 @app.delete("/engagements/{engagement_id_path}")
 def delete_engagement(engagement_id_path: int):

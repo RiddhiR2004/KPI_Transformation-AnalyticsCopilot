@@ -140,6 +140,12 @@ export const api = {
       headers: jsonHeaders,
       body: JSON.stringify(body),
     }),
+  updateEngagement: (id: number, body: EngagementCreate) =>
+    request<EngagementRecord>(`/engagements/${id}`, {
+      method: "PUT",
+      headers: jsonHeaders,
+      body: JSON.stringify(body),
+    }),
   deleteEngagement: (id: number) =>
     request<{ status: string; message: string }>(`/engagements/${id}`, {
       method: "DELETE",
