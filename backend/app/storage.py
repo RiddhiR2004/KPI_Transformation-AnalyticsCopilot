@@ -116,6 +116,8 @@ def read_json(path: Path, default: Any) -> Any:
                 return default
             return {
                 "items": json.loads(row.items),
+                "executive_summary": row.executive_summary or "",
+                "status": row.status or "draft",
                 "updated_at": row.updated_at.isoformat() if row.updated_at else now_iso(),
             }
             
@@ -243,6 +245,8 @@ def write_json(path: Path, data: Any) -> None:
                     row = FunctionalSpecification(id=1)
                     session.add(row)
             row.items = json.dumps(data.get("items", []))
+            row.executive_summary = data.get("executive_summary", "")
+            row.status = data.get("status", "draft")
             row.updated_at = datetime.now()
             session.commit()
             
@@ -376,6 +380,8 @@ def seed_from_dict(data: dict[str, Any]) -> None:
             session.add(FunctionalSpecification(
                 id=1,
                 items=json.dumps(fs_data.get("items", [])),
+                executive_summary=fs_data.get("executive_summary", ""),
+                status=fs_data.get("status", "draft"),
                 updated_at=updated_at
             ))
 

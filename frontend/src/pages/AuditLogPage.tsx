@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   Shield, Search, Calendar, User, Filter, RefreshCw, X, ChevronDown, ChevronUp, 
   ExternalLink, CheckCircle2, AlertCircle, Clock, Database, UserCheck
@@ -44,6 +44,10 @@ export function AuditLogPage() {
   const [engagements, setEngagements] = useState<EngagementRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandedLogId, setExpandedLogId] = useState<number | null>(null);
+
+  // Sorting State
+  const [sortField, setSortField] = useState<string>("timestamp");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   // Filters State
   const [q, setQ] = useState("");
@@ -111,6 +115,66 @@ export function AuditLogPage() {
     }, 50);
   };
 
+  // Sorting Handler
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("desc"); // Default to descending
+    }
+  };
+
+  const renderSortIndicator = (field: string) => {
+    if (sortField !== field) {
+      return <span className="text-gray-600 ml-1 text-[9px] opacity-40">⇅</span>;
+    }
+    return sortDirection === "asc" ? (
+      <span className="text-[#FFE600] ml-1 text-[9px]">▲</span>
+    ) : (
+      <span className="text-[#FFE600] ml-1 text-[9px]">▼</span>
+    );
+  };
+
+  // Memoized sorted logs
+  const sortedLogs = useMemo(() => {
+    const sorted = [...logs];
+    sorted.sort((a, b) => {
+      let aVal: any = "";
+      let bVal: any = "";
+
+      if (sortField === "timestamp") {
+        aVal = a.timestamp ? Date.parse(a.timestamp) || 0 : 0;
+        bVal = b.timestamp ? Date.parse(b.timestamp) || 0 : 0;
+      } else if (sortField === "user") {
+        aVal = (a.user_name || "").toLowerCase();
+        bVal = (b.user_name || "").toLowerCase();
+      } else if (sortField === "client") {
+        aVal = (a.client_name || "").toLowerCase();
+        bVal = (b.client_name || "").toLowerCase();
+      } else if (sortField === "engagement") {
+        aVal = (a.engagement_name || "").toLowerCase();
+        bVal = (b.engagement_name || "").toLowerCase();
+      } else if (sortField === "module") {
+        aVal = (a.module || "").toLowerCase();
+        bVal = (b.module || "").toLowerCase();
+      } else if (sortField === "action") {
+        aVal = (a.action || "").toLowerCase();
+        bVal = (b.action || "").toLowerCase();
+      } else if (sortField === "status") {
+        aVal = (a.status || "").toLowerCase();
+        bVal = (b.status || "").toLowerCase();
+      }
+
+      if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  }, [logs, sortField, sortDirection]);
+
+
+
   const getStatusBadge = (status: string) => {
     const s = status.toLowerCase();
     if (s === "success") {
@@ -134,9 +198,17 @@ export function AuditLogPage() {
     }
   };
 
-  // Helper to safely parse JSON for printing
+  // Helper to check if a log has actual payload values worth expanding
+  const hasPayload = (log: AuditLog) => {
+    const prev = log.previous_value;
+    const next = log.new_value;
+    const hasPrev = prev && prev !== "N/A" && prev.trim() !== "" && prev.trim() !== "null";
+    const hasNext = next && next !== "N/A" && next.trim() !== "" && next.trim() !== "null";
+    return !!(hasPrev || hasNext);
+  };
+
   const formatJSONValue = (val: string | null) => {
-    if (!val) return "N/A";
+    if (!val || val === "N/A" || val === "null" || val.trim() === "") return <span className="text-[#666] italic text-xs font-mono">N/A</span>;
     try {
       const parsed = JSON.parse(val);
       return <pre className="text-xs bg-[#111] border border-[#303030] p-4 rounded-sm overflow-x-auto text-[#B0B0B0] font-mono leading-relaxed max-w-full">{JSON.stringify(parsed, null, 2)}</pre>;
@@ -148,12 +220,12 @@ export function AuditLogPage() {
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <section className="border border-[#303030] bg-[#1B1B1B] p-8 rounded-sm">
+      <section className="border border-[#303030] bg-[#1B1B1B] p-8 rounded-sm shadow-xl">
         <div className="flex flex-wrap items-center justify-between gap-6">
           <div className="space-y-1">
             <div className="flex items-center gap-3 mb-2">
               <Shield size={24} className="text-[#FFE600]" />
-              <h2 className="text-3xl font-semibold leading-tight tracking-tight text-[#F5F5F5]">
+              <h2 className="text-3xl font-semibold leading-tight tracking-tight text-[#F5F5F5] font-sans">
                 Audit Log & Governance
               </h2>
             </div>
@@ -163,7 +235,7 @@ export function AuditLogPage() {
           </div>
           <button 
             onClick={fetchLogs} 
-            className="button-yellow inline-flex items-center gap-2 px-5 py-2.5 self-center"
+            className="button-yellow inline-flex items-center gap-2 px-5 py-2.5 self-center shadow-md font-semibold text-xs transition-all"
             disabled={loading}
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
@@ -172,16 +244,19 @@ export function AuditLogPage() {
         </div>
       </section>
 
+
+
       {/* Advanced Filter Toolbar */}
       <div className="border border-[#303030] bg-[#1B1B1B] p-6 rounded-sm space-y-4 shadow-xl">
         <div className="flex items-center justify-between border-b border-[#303030] pb-3 mb-4">
           <div className="flex items-center gap-2">
             <Filter size={14} className="text-[#FFE600]" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[#F5F5F5]">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[#F5F5F5] font-sans">
               Governance Filter Console
             </h3>
           </div>
           <button 
+            type="button"
             onClick={handleResetFilters}
             className="text-[11px] font-semibold text-[#B0B0B0] hover:text-[#FFE600] flex items-center gap-1.5 transition-colors"
           >
@@ -189,27 +264,27 @@ export function AuditLogPage() {
           </button>
         </div>
 
-        <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           {/* Global Search */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-[#888]">Keyword Search</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-[#888]">Keyword Search</label>
             <div className="relative">
               <input 
                 type="text" 
-                className="field pl-9 w-full" 
-                placeholder="Search values, actions, users..."
+                className="field pl-9 w-full text-xs py-2" 
+                placeholder="Search audit content..."
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
               />
-              <Search className="absolute left-3 top-2.5 text-[#555]" size={14} />
+              <Search className="absolute left-3 top-2.5 text-[#555]" size={13} />
             </div>
           </div>
 
           {/* Client Select */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-[#888]">Filter by Client</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-[#888]">Filter by Client</label>
             <select 
-              className="field w-full"
+              className="field w-full text-xs py-2 cursor-pointer"
               value={selectedClient}
               onChange={(e) => setSelectedClient(e.target.value)}
             >
@@ -222,9 +297,9 @@ export function AuditLogPage() {
 
           {/* Engagement Select */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-[#888]">Filter by Engagement</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-[#888]">Filter by Engagement</label>
             <select 
-              className="field w-full"
+              className="field w-full text-xs py-2 cursor-pointer"
               value={selectedEngagement}
               onChange={(e) => setSelectedEngagement(e.target.value)}
             >
@@ -239,9 +314,9 @@ export function AuditLogPage() {
 
           {/* Module Select */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-[#888]">Filter by Module</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-[#888]">Filter by Module</label>
             <select 
-              className="field w-full"
+              className="field w-full text-xs py-2 cursor-pointer"
               value={selectedModule}
               onChange={(e) => setSelectedModule(e.target.value)}
             >
@@ -254,16 +329,16 @@ export function AuditLogPage() {
 
           {/* User Filter */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-[#888]">Filter by User</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-[#888]">Filter by User</label>
             <div className="relative">
               <input 
                 type="text" 
-                className="field pl-9 w-full" 
+                className="field pl-9 w-full text-xs py-2" 
                 placeholder="User name or email..."
                 value={userQuery}
                 onChange={(e) => setUserQuery(e.target.value)}
               />
-              <User className="absolute left-3 top-2.5 text-[#555]" size={14} />
+              <User className="absolute left-3 top-2.5 text-[#555]" size={13} />
             </div>
           </div>
 
@@ -271,9 +346,9 @@ export function AuditLogPage() {
           <div className="flex items-end">
             <button 
               type="submit" 
-              className="button-yellow w-full py-2.5 flex items-center justify-center gap-2"
+              className="button-yellow w-full py-2 flex items-center justify-center gap-2 shadow-sm"
             >
-              <Search size={14} />
+              <Search size={13} />
               <span>Apply Filters</span>
             </button>
           </div>
@@ -285,50 +360,114 @@ export function AuditLogPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-[#111111] border-b border-[#303030] text-[10px] font-bold uppercase tracking-wider text-[#888]">
-                <th className="py-4 px-6 w-[20px]"></th>
-                <th className="py-4 px-4">Timestamp</th>
-                <th className="py-4 px-4">User</th>
-                <th className="py-4 px-4">Client</th>
-                <th className="py-4 px-4">Engagement</th>
-                <th className="py-4 px-4">Module</th>
-                <th className="py-4 px-4">Action</th>
-                <th className="py-4 px-4">Status</th>
+              <tr className="bg-[#111111] border-b border-[#303030] text-[10px] font-bold uppercase tracking-wider text-[#888] select-none">
+                <th className="py-4 px-6 w-[30px] text-center"></th>
+                
+                <th 
+                  className="py-4 px-4 cursor-pointer hover:text-[#FFE600] transition-colors"
+                  onClick={() => handleSort("timestamp")}
+                >
+                  Timestamp {renderSortIndicator("timestamp")}
+                </th>
+                
+                <th 
+                  className="py-4 px-4 cursor-pointer hover:text-[#FFE600] transition-colors"
+                  onClick={() => handleSort("user")}
+                >
+                  User {renderSortIndicator("user")}
+                </th>
+                
+                <th 
+                  className="py-4 px-4 cursor-pointer hover:text-[#FFE600] transition-colors"
+                  onClick={() => handleSort("client")}
+                >
+                  Client {renderSortIndicator("client")}
+                </th>
+                
+                <th 
+                  className="py-4 px-4 cursor-pointer hover:text-[#FFE600] transition-colors"
+                  onClick={() => handleSort("engagement")}
+                >
+                  Engagement {renderSortIndicator("engagement")}
+                </th>
+                
+                <th 
+                  className="py-4 px-4 cursor-pointer hover:text-[#FFE600] transition-colors"
+                  onClick={() => handleSort("module")}
+                >
+                  Module {renderSortIndicator("module")}
+                </th>
+                
+                <th 
+                  className="py-4 px-4 cursor-pointer hover:text-[#FFE600] transition-colors"
+                  onClick={() => handleSort("action")}
+                >
+                  Action {renderSortIndicator("action")}
+                </th>
+                
+                <th 
+                  className="py-4 px-4 cursor-pointer hover:text-[#FFE600] transition-colors"
+                  onClick={() => handleSort("status")}
+                >
+                  Status {renderSortIndicator("status")}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#303030]/40 text-xs text-[#E0E0E0]">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-[#888]">
+                  <td colSpan={8} className="py-16 text-center text-[#888]">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <RefreshCw size={24} className="animate-spin text-[#FFE600]" />
                       <span>Loading governance logs...</span>
                     </div>
                   </td>
                 </tr>
-              ) : logs.length === 0 ? (
+              ) : sortedLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-[#888]">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <Shield size={28} className="text-[#303030] mb-1" />
-                      <span className="font-semibold text-sm">No audit records found</span>
-                      <span className="text-[11px]">Modify your governance filter criteria and try again.</span>
+                  <td colSpan={8} className="py-16 text-center text-[#888]">
+                    <div className="flex flex-col items-center justify-center gap-3 max-w-md mx-auto">
+                      <Shield size={32} className="text-[#303030]" />
+                      <span className="font-semibold text-sm text-[#F5F5F5]">No audit records match the selected filter criteria.</span>
+                      <span className="text-[11px] text-gray-500">Try adjusting your filter parameters or search terms to locate specific compliance logs.</span>
+                      <button
+                        type="button"
+                        onClick={handleResetFilters}
+                        className="mt-2 button-yellow !py-1.5 !px-4 text-xs font-bold flex items-center gap-1.5"
+                      >
+                        <RefreshCw size={11} />
+                        Clear All Filters
+                      </button>
                     </div>
                   </td>
                 </tr>
               ) : (
-                logs.map(log => {
+                sortedLogs.map(log => {
                   const isExpanded = expandedLogId === log.id;
+                  const logHasPayload = hasPayload(log);
+                  
                   return (
                     <React.Fragment key={log.id}>
                       <tr 
-                        onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
-                        className={`hover:bg-[#111]/40 cursor-pointer border-l-4 transition-all duration-150 ${
+                        onClick={logHasPayload ? () => setExpandedLogId(isExpanded ? null : log.id) : undefined}
+                        className={`border-l-4 transition-all duration-150 ${
+                          logHasPayload 
+                            ? "hover:bg-[#111]/45 cursor-pointer" 
+                            : "hover:bg-transparent cursor-default"
+                        } ${
                           isExpanded ? "bg-[#111]/30 border-l-[#FFE600]" : "border-l-transparent"
                         }`}
                       >
                         <td className="py-4 px-6 text-center text-[#555]">
-                          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          {logHasPayload ? (
+                            isExpanded ? (
+                              <ChevronUp size={14} className="text-[#FFE600]" />
+                            ) : (
+                              <ChevronDown size={14} className="hover:text-gray-400" />
+                            )
+                          ) : (
+                            <span className="inline-block w-1 h-1 bg-[#303030] rounded-full" />
+                          )}
                         </td>
                         <td className="py-4 px-4 font-mono font-medium text-[#B0B0B0] whitespace-nowrap">
                           {log.timestamp}
@@ -348,20 +487,20 @@ export function AuditLogPage() {
                             {log.module}
                           </span>
                         </td>
-                        <td className="py-4 px-4 font-semibold text-[#FFE600] whitespace-nowrap">
+                        <td className="py-4 px-4 font-semibold text-[#FFE600] whitespace-nowrap font-sans">
                           {log.action}
                         </td>
                         <td className="py-4 px-4">
                           {getStatusBadge(log.status)}
                         </td>
                       </tr>
-                      {isExpanded && (
+                      {isExpanded && logHasPayload && (
                         <tr className="bg-[#111111]/50 border-t border-[#303030]">
                           <td colSpan={8} className="p-6">
                             <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-6 text-xs text-[#B0B0B0]">
                               {/* Left details pane */}
                               <div className="space-y-4 border-r border-[#303030] pr-6">
-                                <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#F5F5F5] flex items-center gap-1.5">
+                                <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#F5F5F5] flex items-center gap-1.5 font-sans">
                                   <Database size={12} className="text-[#FFE600]" /> Entity Metadata
                                 </h4>
                                 <div className="grid grid-cols-[100px_1fr] gap-y-3 leading-relaxed">
@@ -391,7 +530,7 @@ export function AuditLogPage() {
 
                               {/* Right diff pane */}
                               <div className="space-y-4">
-                                <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#F5F5F5] flex items-center gap-1.5">
+                                <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#F5F5F5] flex items-center gap-1.5 font-sans">
                                   <ExternalLink size={12} className="text-[#FFE600]" /> Change Diff & Payload Values
                                 </h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -416,7 +555,7 @@ export function AuditLogPage() {
             </tbody>
           </table>
         </div>
-        <div className="bg-[#111111] px-6 py-4 border-t border-[#303030] flex items-center justify-between text-[11px] text-[#666] font-semibold">
+        <div className="bg-[#111111] px-6 py-4 border-t border-[#303030] flex items-center justify-between text-[11px] text-[#666] font-semibold select-none">
           <span>Displaying {logs.length} governance events</span>
           <span>Compliance tracking active</span>
         </div>

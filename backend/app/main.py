@@ -1844,8 +1844,10 @@ def build_mock_executive_summary(context: BusinessContext, approved_kpis: list[K
     )
 
 
-def load_db_spec() -> Any:
+@app.get("/functional-spec")
+def get_functional_spec() -> dict[str, Any]:
     from app.database import FunctionalSpecification as DBFunctionalSpecification
+    import json
     with SessionLocal() as session:
         db_spec = session.query(DBFunctionalSpecification).order_by(DBFunctionalSpecification.id.desc()).first()
         if not db_spec:
@@ -1858,22 +1860,18 @@ def load_db_spec() -> Any:
             session.add(db_spec)
             session.commit()
             session.refresh(db_spec)
-        return db_spec
-
-
-@app.get("/functional-spec")
-def get_functional_spec() -> dict[str, Any]:
-    db_spec = load_db_spec()
-    import json
-    draft_items_list = json.loads(db_spec.draft_items or "[]")
-    approved_items_list = json.loads(db_spec.approved_items or "[]")
-    return {
-        "items": draft_items_list,
-        "approved_items": approved_items_list,
-        "executive_summary": db_spec.executive_summary,
-        "status": db_spec.status,
-        "updated_at": db_spec.updated_at.isoformat() if db_spec.updated_at else None
-    }
+        
+        draft_items_list = json.loads(db_spec.draft_items or "[]")
+        approved_items_list = json.loads(db_spec.approved_items or "[]")
+        updated_at_str = db_spec.updated_at.isoformat() if db_spec.updated_at else None
+        
+        return {
+            "items": draft_items_list,
+            "approved_items": approved_items_list,
+            "executive_summary": db_spec.executive_summary,
+            "status": db_spec.status,
+            "updated_at": updated_at_str
+        }
 
 
 @app.post("/functional-spec")
@@ -1943,12 +1941,13 @@ def approve_spec(request: Request) -> dict[str, Any]:
             new_value="Approved Functional Specification Document",
             db_session=session
         )
+        updated_at_str = db_spec.updated_at.isoformat()
         
     log_activity("Functional Spec Approved", "The functional specification document was signed off.")
     return {
         "status": "success",
         "message": "Functional specification approved",
-        "updated_at": db_spec.updated_at.isoformat()
+        "updated_at": updated_at_str
     }
 
 
@@ -2140,13 +2139,14 @@ async def generate_spec(request: Request) -> dict[str, Any]:
             new_value=f"Generated specs for {len(spec_items)} KPIs",
             db_session=session
         )
+        updated_at_str = db_spec.updated_at.isoformat()
         
     log_activity("Functional Spec Generated", f"Specifications enriched for {len(spec_items)} approved KPIs")
     return {
         "items": [item.model_dump(mode="json") for item in spec_items],
         "executive_summary": executive_summary,
         "status": "draft",
-        "updated_at": db_spec.updated_at.isoformat()
+        "updated_at": updated_at_str
     }
 
 

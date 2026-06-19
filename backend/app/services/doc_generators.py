@@ -6,7 +6,7 @@ from typing import Any
 
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT, WD_TAB_LEADER
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls
 
@@ -103,19 +103,19 @@ def generate_docx_spec(path: Path, spec: Any, context: BusinessContext) -> None:
 
     # --- Title Page / Cover Section ---
     title_p = doc.add_paragraph()
-    title_p.paragraph_format.space_before = Pt(120)
-    title_p.paragraph_format.space_after = Pt(6)
+    title_p.paragraph_format.space_before = Pt(24)
+    title_p.paragraph_format.space_after = Pt(4)
     title_run = title_p.add_run("KPI Advisory & Analytics")
     title_run.font.name = 'Calibri'
-    title_run.font.size = Pt(14)
+    title_run.font.size = Pt(12)
     title_run.font.bold = True
     title_run.font.color.rgb = RGBColor(180, 150, 0) # EY Gold
 
     main_title_p = doc.add_paragraph()
-    main_title_p.paragraph_format.space_after = Pt(24)
+    main_title_p.paragraph_format.space_after = Pt(12)
     main_title_run = main_title_p.add_run("Functional Specification Document")
     main_title_run.font.name = 'Calibri'
-    main_title_run.font.size = Pt(28)
+    main_title_run.font.size = Pt(22)
     main_title_run.font.bold = True
     main_title_run.font.color.rgb = RGBColor(27, 27, 27)
 
@@ -125,26 +125,24 @@ def generate_docx_spec(path: Path, spec: Any, context: BusinessContext) -> None:
     accent_table.columns[0].width = Inches(7.0)
     accent_cell = accent_table.cell(0, 0)
     set_cell_shading(accent_cell, "FFE600") # EY Yellow
-    set_cell_margins(accent_cell, top=30, bottom=30, left=0, right=0)
+    set_cell_margins(accent_cell, top=15, bottom=15, left=0, right=0)
     
     # Subtitle / description
     desc_p = doc.add_paragraph()
-    desc_p.paragraph_format.space_before = Pt(36)
-    desc_p.paragraph_format.space_after = Pt(120)
+    desc_p.paragraph_format.space_before = Pt(12)
+    desc_p.paragraph_format.space_after = Pt(24)
     desc_run = desc_p.add_run("A unified blueprint translating business strategy into governed, measurable performance metrics.")
     desc_run.font.name = 'Calibri'
-    desc_run.font.size = Pt(12)
+    desc_run.font.size = Pt(10.5)
     desc_run.font.italic = True
     desc_run.font.color.rgb = RGBColor(100, 100, 100)
-
-    doc.add_page_break()
 
     # --- Document Metadata Section ---
     meta_title = doc.add_paragraph()
     meta_title.paragraph_format.space_before = Pt(12)
-    meta_title.paragraph_format.space_after = Pt(12)
+    meta_title.paragraph_format.space_after = Pt(8)
     meta_title_run = meta_title.add_run("Document Control & Metadata")
-    meta_title_run.font.size = Pt(16)
+    meta_title_run.font.size = Pt(13)
     meta_title_run.font.bold = True
     meta_title_run.font.color.rgb = RGBColor(27, 27, 27)
 
@@ -164,16 +162,69 @@ def generate_docx_spec(path: Path, spec: Any, context: BusinessContext) -> None:
         cell_lbl = row.cells[0]
         cell_lbl.text = label
         set_cell_shading(cell_lbl, "F0F0F0")
-        set_cell_margins(cell_lbl, top=80, bottom=80, left=100, right=100)
+        set_cell_margins(cell_lbl, top=40, bottom=40, left=80, right=80)
         cell_lbl.paragraphs[0].runs[0].font.bold = True
-        cell_lbl.paragraphs[0].runs[0].font.size = Pt(9.5)
+        cell_lbl.paragraphs[0].runs[0].font.size = Pt(8.5)
         cell_lbl.width = Inches(2.2)
 
         cell_val = row.cells[1]
         cell_val.text = str(val)
-        set_cell_margins(cell_val, top=80, bottom=80, left=100, right=100)
-        cell_val.paragraphs[0].runs[0].font.size = Pt(9.5)
+        set_cell_margins(cell_val, top=40, bottom=40, left=80, right=80)
+        cell_val.paragraphs[0].runs[0].font.size = Pt(8.5)
         cell_val.width = Inches(4.8)
+
+    # --- Table of Contents Section (DOCX) ---
+    toc_title_p = doc.add_paragraph()
+    toc_title_p.paragraph_format.space_before = Pt(20)
+    toc_title_p.paragraph_format.space_after = Pt(8)
+    toc_title_run = toc_title_p.add_run("Table of Contents")
+    toc_title_run.font.size = Pt(13)
+    toc_title_run.font.bold = True
+    toc_title_run.font.color.rgb = RGBColor(27, 27, 27)
+
+    toc_items = [
+        ("Document Control & Metadata", "1"),
+        ("1. Executive Summary", "2"),
+        ("2. KPI Landscape Overview", "2"),
+        ("3. Strategic Traceability Matrix", "3"),
+        ("4. Individual KPI Specifications", "4"),
+    ]
+    
+    for idx, item in enumerate(items):
+        toc_items.append((f"   4.{idx+1} {item.kpi_name}", str(4 + idx)))
+        
+    toc_items.extend([
+        ("5. Governance Framework", str(4 + len(items))),
+        ("6. Reporting & Dashboard Requirements", str(5 + len(items))),
+        ("7. Assumptions & Constraints", str(6 + len(items))),
+        ("8. Implementation Considerations", str(7 + len(items))),
+        ("9. Appendix", str(8 + len(items)))
+    ])
+
+    for title, pagenum in toc_items:
+        p = doc.add_paragraph()
+        p.paragraph_format.tab_stops.add_tab_stop(Inches(7.0), alignment=WD_TAB_ALIGNMENT.RIGHT, leader=WD_TAB_LEADER.DOTS)
+        p.paragraph_format.space_before = Pt(3.5)
+        p.paragraph_format.space_after = Pt(3.5)
+        
+        run_title = p.add_run(title)
+        run_title.font.name = 'Calibri'
+        run_title.font.size = Pt(9.5)
+        
+        run_dots = p.add_run(f"\t{pagenum}")
+        run_dots.font.name = 'Calibri'
+        run_dots.font.size = Pt(9.5)
+        
+        is_sub = title.startswith("   4.")
+        
+        if not is_sub:
+            run_title.font.bold = True
+            run_title.font.color.rgb = RGBColor(27, 27, 27)
+            run_dots.font.bold = True
+            run_dots.font.color.rgb = RGBColor(180, 150, 0)  # EY Gold
+        else:
+            run_title.font.color.rgb = RGBColor(100, 100, 100)
+            run_dots.font.color.rgb = RGBColor(100, 100, 100)
 
     doc.add_page_break()
 
@@ -236,6 +287,8 @@ def generate_docx_spec(path: Path, spec: Any, context: BusinessContext) -> None:
 
     spacer_p = doc.add_paragraph()
     spacer_p.paragraph_format.space_after = Pt(12)
+
+    doc.add_page_break()
 
     land_table_intro = doc.add_paragraph()
     land_table_intro.paragraph_format.space_after = Pt(12)
@@ -340,17 +393,32 @@ def generate_docx_spec(path: Path, spec: Any, context: BusinessContext) -> None:
 
     # --- Section 4: Individual KPI Sections ---
     doc.add_page_break()
-    kpi_sec_title = doc.add_paragraph()
-    kpi_sec_title.paragraph_format.space_before = Pt(12)
-    kpi_sec_title.paragraph_format.space_after = Pt(12)
-    kpi_sec_title_run = kpi_sec_title.add_run("4. Individual KPI Specifications")
-    kpi_sec_title_run.font.size = Pt(16)
-    kpi_sec_title_run.font.bold = True
-    kpi_sec_title_run.font.color.rgb = RGBColor(27, 27, 27)
-
     for index, item in enumerate(items, start=1):
+        if index == 1:
+            kpi_sec_title = doc.add_paragraph()
+            kpi_sec_title.paragraph_format.space_before = Pt(12)
+            kpi_sec_title.paragraph_format.space_after = Pt(8)
+            kpi_sec_title_run = kpi_sec_title.add_run("4. Individual KPI Specifications")
+            kpi_sec_title_run.font.size = Pt(16)
+            kpi_sec_title_run.font.bold = True
+            kpi_sec_title_run.font.color.rgb = RGBColor(27, 27, 27)
+
+            kpi_sec_intro = doc.add_paragraph()
+            kpi_sec_intro.paragraph_format.space_after = Pt(12)
+            kpi_sec_intro_run = kpi_sec_intro.add_run("Detailed functional blueprints for each approved metric, outlining definitions, lineage, calculations, and rules.")
+            kpi_sec_intro_run.font.size = Pt(9.5)
+            kpi_sec_intro_run.font.italic = True
+        else:
+            kpi_sec_title = doc.add_paragraph()
+            kpi_sec_title.paragraph_format.space_before = Pt(12)
+            kpi_sec_title.paragraph_format.space_after = Pt(8)
+            kpi_sec_title_run = kpi_sec_title.add_run("4. Individual KPI Specifications (Continued)")
+            kpi_sec_title_run.font.size = Pt(16)
+            kpi_sec_title_run.font.bold = True
+            kpi_sec_title_run.font.color.rgb = RGBColor(27, 27, 27)
+
         kpi_p = doc.add_paragraph()
-        kpi_p.paragraph_format.space_before = Pt(24)
+        kpi_p.paragraph_format.space_before = Pt(12)
         kpi_p.paragraph_format.space_after = Pt(8)
         kpi_p.paragraph_format.keep_with_next = True
         
@@ -508,9 +576,10 @@ def generate_docx_spec(path: Path, spec: Any, context: BusinessContext) -> None:
         source_run = source_p.add_run(clean_or_fallback(item.source_systems_lineage, "Recommended source ERP database. (Assumption)"))
         source_run.font.size = Pt(9.5)
         source_run.font.italic = True
+        
+        doc.add_page_break()
 
     # --- Section 5: Governance Framework ---
-    doc.add_page_break()
     gov_title = doc.add_paragraph()
     gov_title.paragraph_format.space_before = Pt(12)
     gov_title.paragraph_format.space_after = Pt(12)
@@ -1170,13 +1239,13 @@ def generate_pdf_spec(path: Path, spec: Any, context: BusinessContext, doc_name:
     story = []
 
     # --- Cover Page Layout ---
-    story.append(Spacer(1, 100))
+    story.append(Spacer(1, 10))
     story.append(Paragraph("KPI Advisory & Analytics", subtitle_style))
     story.append(Paragraph("Functional Specification Document", title_style))
     
     # Yellow colored accent bar
     bar_data = [['']]
-    bar_table = Table(bar_data, colWidths=[504], rowHeights=[4])
+    bar_table = Table(bar_data, colWidths=[504], rowHeights=[3])
     bar_table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,-1), ey_yellow),
         ('PADDING', (0,0), (-1,-1), 0),
@@ -1184,14 +1253,11 @@ def generate_pdf_spec(path: Path, spec: Any, context: BusinessContext, doc_name:
         ('TOPPADDING', (0,0), (-1,-1), 0),
     ]))
     story.append(bar_table)
-    story.append(Spacer(1, 24))
+    story.append(Spacer(1, 10))
     story.append(Paragraph("A unified blueprint translating business strategy into governed, measurable performance metrics.", body_style))
-    story.append(PageBreak())
+    story.append(Spacer(1, 15))
 
     # --- Document Control & Metadata ---
-    story.append(Paragraph("Document Control & Metadata", section_heading))
-    story.append(Spacer(1, 10))
-    
     meta_data = [
         [Paragraph("Document Version", tbl_label_style), Paragraph("1.0", tbl_value_style)],
         [Paragraph("Generated Date", tbl_label_style), Paragraph(updated_at_str, tbl_value_style)],
@@ -1204,10 +1270,92 @@ def generate_pdf_spec(path: Path, spec: Any, context: BusinessContext, doc_name:
     meta_tbl.setStyle(TableStyle([
         ('GRID', (0,0), (-1,-1), 0.5, border_color),
         ('BACKGROUND', (0,0), (0,-1), colors.HexColor("#F0F0F0")),
-        ('PADDING', (0,0), (-1,-1), 8),
+        ('PADDING', (0,0), (-1,-1), 5),
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
     ]))
     story.append(meta_tbl)
+    story.append(Spacer(1, 15))
+
+    # --- Table of Contents (PDF) ---
+    story.append(Paragraph("Table of Contents", sub_section_title_style))
+    story.append(Spacer(1, 4))
+    
+    toc_page_style = ParagraphStyle(
+        'TocPage',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8.5,
+        leading=11,
+        textColor=colors.HexColor("#B49600"),
+        alignment=2
+    )
+
+    toc_items = [
+        ("Document Control & Metadata", "1"),
+        ("1. Executive Summary", "2"),
+        ("2. KPI Landscape Overview", "2"),
+        ("3. Strategic Traceability Matrix", "3"),
+        ("4. Individual KPI Specifications", "4"),
+    ]
+    
+    for idx, item in enumerate(items):
+        toc_items.append((f"4.{idx+1} {item.kpi_name}", str(4 + idx)))
+        
+    toc_items.extend([
+        ("5. Governance Framework", str(4 + len(items))),
+        ("6. Reporting & Dashboard Requirements", str(5 + len(items))),
+        ("7. Assumptions & Constraints", str(6 + len(items))),
+        ("8. Implementation Considerations", str(7 + len(items))),
+        ("9. Appendix", str(8 + len(items)))
+    ])
+
+    toc_data = []
+    for title, pagenum in toc_items:
+        is_sub = title.startswith("4.") and not title.startswith("4. Individual")
+        is_main = not is_sub
+        
+        if is_sub:
+            title_style = ParagraphStyle(
+                'TocSubTitle',
+                parent=styles['Normal'],
+                fontName='Helvetica',
+                fontSize=8.5,
+                leading=11,
+                textColor=colors.HexColor("#555555"),
+                leftIndent=15
+            )
+            page_style = ParagraphStyle(
+                'TocSubPage',
+                parent=styles['Normal'],
+                fontName='Helvetica',
+                fontSize=8.5,
+                leading=11,
+                textColor=colors.HexColor("#666666"),
+                alignment=2
+            )
+        else:
+            title_style = ParagraphStyle(
+                'TocMainTitle',
+                parent=styles['Normal'],
+                fontName='Helvetica-Bold',
+                fontSize=9.0,
+                leading=12,
+                textColor=colors.HexColor("#1B1B1B")
+            )
+            page_style = toc_page_style
+
+        title_p = Paragraph(title, title_style)
+        page_p = Paragraph(pagenum, page_style)
+        toc_data.append([title_p, page_p])
+        
+    toc_tbl = Table(toc_data, colWidths=[420, 84])
+    toc_tbl.setStyle(TableStyle([
+        ('LINEBELOW', (0,0), (-1,-1), 0.5, colors.HexColor("#EAEAEA")),
+        ('PADDING', (0,0), (-1,-1), 4),
+        ('ALIGN', (1,0), (1,-1), 'RIGHT'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    story.append(toc_tbl)
     story.append(PageBreak())
 
     # --- Section 1: Executive Summary ---
@@ -1225,9 +1373,10 @@ def generate_pdf_spec(path: Path, spec: Any, context: BusinessContext, doc_name:
     # Draw KPI Tree
     try:
         story.append(draw_kpi_tree_pdf(items))
-        story.append(Spacer(1, 15))
     except Exception as e:
         pass
+
+    story.append(PageBreak())
 
     story.append(Paragraph("The following table provides a high-level catalog of all approved performance indicators within the scope of this transformation initiative.", body_style))
     story.append(Spacer(1, 10))
@@ -1287,11 +1436,16 @@ def generate_pdf_spec(path: Path, spec: Any, context: BusinessContext, doc_name:
     story.append(PageBreak())
 
     # --- Section 4: Individual KPI Sections ---
-    story.append(Paragraph("4. Individual KPI Specifications", section_heading))
-    story.append(Spacer(1, 10))
-    
     for idx, item in enumerate(items, start=1):
         kpi_elements = []
+        if idx == 1:
+            kpi_elements.append(Paragraph("4. Individual KPI Specifications", section_heading))
+            kpi_elements.append(Paragraph("Detailed functional blueprints for each approved metric, outlining definitions, lineage, calculations, and rules.", body_style))
+            kpi_elements.append(Spacer(1, 10))
+        else:
+            kpi_elements.append(Paragraph("4. Individual KPI Specifications (Continued)", section_heading))
+            kpi_elements.append(Spacer(1, 10))
+            
         kpi_header_text = f"<font color='#B49600'>Metric {idx:02d}:</font> {item.kpi_name}"
         kpi_elements.append(Paragraph(kpi_header_text, kpi_title_style))
         kpi_elements.append(Spacer(1, 4))
@@ -1370,8 +1524,7 @@ def generate_pdf_spec(path: Path, spec: Any, context: BusinessContext, doc_name:
         kpi_elements.append(Spacer(1, 20))
         
         story.append(KeepTogether(kpi_elements))
-    
-    story.append(PageBreak())
+        story.append(PageBreak())
 
     # --- Section 5: Governance Framework ---
     story.append(Paragraph("5. Governance Framework", section_heading))
