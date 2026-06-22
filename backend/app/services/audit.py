@@ -27,24 +27,23 @@ def write_audit_log(
     db_session = None
 ) -> None:
     def execute(session):
+        resolved_client_id = client_id
         client_name = None
         engagement_name = None
         
-        # If client_id is provided, resolve name
-        if client_id:
-            client = session.get(ClientProfile, client_id)
-            if client:
-                client_name = client.client_name
-                
-        # If engagement_id is provided, resolve names
+        # If engagement_id is provided, resolve names & client_id
         if engagement_id:
             eng = session.get(Engagement, engagement_id)
             if eng:
                 engagement_name = eng.name
-                if not client_name and eng.client_profile_id:
-                    client = session.get(ClientProfile, eng.client_profile_id)
-                    if client:
-                        client_name = client.client_name
+                if not resolved_client_id and eng.client_profile_id:
+                    resolved_client_id = eng.client_profile_id
+                    
+        # If resolved_client_id is provided, resolve name
+        if resolved_client_id:
+            client = session.get(ClientProfile, resolved_client_id)
+            if client:
+                client_name = client.client_name
                         
         audit_entry = AuditLog(
             user_name=user_name,
@@ -54,7 +53,7 @@ def write_audit_log(
             entity_name=entity_name,
             previous_value=previous_value,
             new_value=new_value,
-            client_id=client_id,
+            client_id=resolved_client_id,
             engagement_id=engagement_id,
             client_name=client_name,
             engagement_name=engagement_name,

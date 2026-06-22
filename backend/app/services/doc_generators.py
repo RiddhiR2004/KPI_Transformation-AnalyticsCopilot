@@ -137,6 +137,8 @@ def generate_docx_spec(path: Path, spec: Any, context: BusinessContext) -> None:
     desc_run.font.italic = True
     desc_run.font.color.rgb = RGBColor(100, 100, 100)
 
+    doc.add_page_break()
+
     # --- Document Metadata Section ---
     meta_title = doc.add_paragraph()
     meta_title.paragraph_format.space_before = Pt(12)
@@ -173,6 +175,8 @@ def generate_docx_spec(path: Path, spec: Any, context: BusinessContext) -> None:
         cell_val.paragraphs[0].runs[0].font.size = Pt(8.5)
         cell_val.width = Inches(4.8)
 
+    doc.add_page_break()
+
     # --- Table of Contents Section (DOCX) ---
     toc_title_p = doc.add_paragraph()
     toc_title_p.paragraph_format.space_before = Pt(20)
@@ -183,22 +187,22 @@ def generate_docx_spec(path: Path, spec: Any, context: BusinessContext) -> None:
     toc_title_run.font.color.rgb = RGBColor(27, 27, 27)
 
     toc_items = [
-        ("Document Control & Metadata", "1"),
-        ("1. Executive Summary", "2"),
-        ("2. KPI Landscape Overview", "2"),
-        ("3. Strategic Traceability Matrix", "3"),
-        ("4. Individual KPI Specifications", "4"),
+        ("Document Control & Metadata", "2"),
+        ("1. Executive Summary", "4"),
+        ("2. KPI Landscape Overview", "4"),
+        ("3. Strategic Traceability Matrix", "5"),
+        ("4. Individual KPI Specifications", "6"),
     ]
     
     for idx, item in enumerate(items):
-        toc_items.append((f"   4.{idx+1} {item.kpi_name}", str(4 + idx)))
+        toc_items.append((f"   4.{idx+1} {item.kpi_name}", str(6 + idx)))
         
     toc_items.extend([
-        ("5. Governance Framework", str(4 + len(items))),
-        ("6. Reporting & Dashboard Requirements", str(5 + len(items))),
-        ("7. Assumptions & Constraints", str(6 + len(items))),
-        ("8. Implementation Considerations", str(7 + len(items))),
-        ("9. Appendix", str(8 + len(items)))
+        ("5. Governance Framework", str(6 + len(items))),
+        ("6. Reporting & Dashboard Requirements", str(7 + len(items))),
+        ("7. Assumptions & Constraints", str(8 + len(items))),
+        ("8. Implementation Considerations", str(9 + len(items))),
+        ("9. Appendix", str(10 + len(items)))
     ])
 
     for title, pagenum in toc_items:
@@ -1256,6 +1260,7 @@ def generate_pdf_spec(path: Path, spec: Any, context: BusinessContext, doc_name:
     story.append(Spacer(1, 10))
     story.append(Paragraph("A unified blueprint translating business strategy into governed, measurable performance metrics.", body_style))
     story.append(Spacer(1, 15))
+    story.append(PageBreak())
 
     # --- Document Control & Metadata ---
     meta_data = [
@@ -1275,6 +1280,7 @@ def generate_pdf_spec(path: Path, spec: Any, context: BusinessContext, doc_name:
     ]))
     story.append(meta_tbl)
     story.append(Spacer(1, 15))
+    story.append(PageBreak())
 
     # --- Table of Contents (PDF) ---
     story.append(Paragraph("Table of Contents", sub_section_title_style))
@@ -1291,22 +1297,22 @@ def generate_pdf_spec(path: Path, spec: Any, context: BusinessContext, doc_name:
     )
 
     toc_items = [
-        ("Document Control & Metadata", "1"),
-        ("1. Executive Summary", "2"),
-        ("2. KPI Landscape Overview", "2"),
-        ("3. Strategic Traceability Matrix", "3"),
-        ("4. Individual KPI Specifications", "4"),
+        ("Document Control & Metadata", "2"),
+        ("1. Executive Summary", "4"),
+        ("2. KPI Landscape Overview", "4"),
+        ("3. Strategic Traceability Matrix", "5"),
+        ("4. Individual KPI Specifications", "6"),
     ]
     
     for idx, item in enumerate(items):
-        toc_items.append((f"4.{idx+1} {item.kpi_name}", str(4 + idx)))
+        toc_items.append((f"4.{idx+1} {item.kpi_name}", str(6 + idx)))
         
     toc_items.extend([
-        ("5. Governance Framework", str(4 + len(items))),
-        ("6. Reporting & Dashboard Requirements", str(5 + len(items))),
-        ("7. Assumptions & Constraints", str(6 + len(items))),
-        ("8. Implementation Considerations", str(7 + len(items))),
-        ("9. Appendix", str(8 + len(items)))
+        ("5. Governance Framework", str(6 + len(items))),
+        ("6. Reporting & Dashboard Requirements", str(7 + len(items))),
+        ("7. Assumptions & Constraints", str(8 + len(items))),
+        ("8. Implementation Considerations", str(9 + len(items))),
+        ("9. Appendix", str(10 + len(items)))
     ])
 
     toc_data = []

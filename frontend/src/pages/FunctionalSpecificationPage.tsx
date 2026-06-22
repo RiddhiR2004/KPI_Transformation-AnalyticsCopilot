@@ -450,7 +450,7 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
   const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null);
   const [docName, setDocName] = useState("");
   const [previewPageNum, setPreviewPageNum] = useState(1);
-  const totalPages = useMemo(() => 8 + spec.items.length, [spec.items.length]);
+  const totalPages = useMemo(() => 10 + spec.items.length, [spec.items.length]);
 
   useEffect(() => {
     if (previewPageNum > totalPages) {
@@ -1659,8 +1659,7 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
 
               {/* The Pages Container */}
               <div className="space-y-8 print:space-y-0 print:bg-white">
-              
-              {/* PAGE 1: COVER PAGE */}
+                         {/* PAGE 1: COVER PAGE */}
               <div className={`${previewPageNum === 1 ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
                 {/* Gold/Yellow Top Header line (consulting accent) */}
                 <div className="absolute top-0 left-0 right-0 h-1.5 bg-[#FFE600] print:hidden" />
@@ -1679,9 +1678,27 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
 
                   {/* Accent yellow bar */}
                   <div className="h-1 bg-[#FFE600] w-full" />
+                </div>
 
+                {/* Footer */}
+                <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase">
+                  <div>Confidential - Advisory Work Product</div>
+                  <div>Page 1 of {totalPages}</div>
+                </div>
+              </div>
+
+              {/* PAGE 2: DOCUMENT CONTROL & METADATA */}
+              <div className={`${previewPageNum === 2 ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
+                <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
+                  <div>Document Control & Metadata</div>
+                  <div>KPI Functional Specification Document</div>
+                </div>
+
+                <div className="flex-grow space-y-6 flex flex-col justify-center">
+                  <h3 className="text-lg font-bold text-gray-900 font-sans border-b border-gray-250 pb-1">Document Control & Metadata</h3>
+                  
                   {/* Metadata Grid */}
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-6 pt-6 text-xs border-t border-gray-100">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-6 pt-6 text-xs bg-gray-50 border border-gray-200 p-6 rounded-sm">
                     <div>
                       <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Document Version</p>
                       <p className="text-xs text-gray-900 font-semibold mt-1">1.0</p>
@@ -1719,9 +1736,25 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
                       </div>
                     </div>
                   </div>
+                </div>
 
+                {/* Footer */}
+                <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase">
+                  <div>Confidential - Advisory Work Product</div>
+                  <div>Page 2 of {totalPages}</div>
+                </div>
+              </div>
+
+              {/* PAGE 3: TABLE OF CONTENTS */}
+              <div className={`${previewPageNum === 3 ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
+                <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
+                  <div>Table of Contents</div>
+                  <div>KPI Functional Specification Document</div>
+                </div>
+
+                <div className="flex-grow space-y-6 flex flex-col justify-center">
                   {/* Table of Contents */}
-                  <div className="bg-gray-50 border border-gray-200 p-6 rounded-sm space-y-4 font-sans mt-8">
+                  <div className="bg-gray-50 border border-gray-200 p-6 rounded-sm space-y-4 font-sans">
                     <p className="text-xs font-bold uppercase tracking-wider text-gray-700">Table of Contents</p>
                     <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-[11px] text-gray-600">
                       <div>Document Control & Metadata</div>
@@ -1741,13 +1774,12 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
                 {/* Footer */}
                 <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase">
                   <div>Confidential - Advisory Work Product</div>
-                  <div>Page 1 of {totalPages}</div>
+                  <div>Page 3 of {totalPages}</div>
                 </div>
               </div>
 
-
-              {/* PAGE 2: EXECUTIVE SUMMARY & LANDSCAPE OVERVIEW */}
-              <div className={`${previewPageNum === 2 ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
+              {/* PAGE 4: EXECUTIVE SUMMARY & LANDSCAPE OVERVIEW */}
+              <div className={`${previewPageNum === 4 ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
                 <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
                   <div></div>
                   <div>KPI Functional Specification Document</div>
@@ -1780,13 +1812,13 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
                 {/* Footer */}
                 <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase mt-8">
                   <div>Confidential - Advisory Work Product</div>
-                  <div>Page 2 of {totalPages}</div>
+                  <div>Page 4 of {totalPages}</div>
                 </div>
               </div>
 
 
-              {/* PAGE 3: LANDSCAPE TABLE & STRATEGIC TRACEABILITY MATRIX */}
-              <div className={`${previewPageNum === 3 ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
+              {/* PAGE 5: LANDSCAPE TABLE & STRATEGIC TRACEABILITY MATRIX */}
+              <div className={`${previewPageNum === 5 ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
                 <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
                   <div></div>
                   <div>KPI Functional Specification Document</div>
@@ -1859,13 +1891,13 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
                 {/* Footer */}
                 <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase mt-8">
                   <div>Confidential - Advisory Work Product</div>
-                  <div>Page 3 of {totalPages}</div>
+                  <div>Page 5 of {totalPages}</div>
                 </div>
               </div>
 
-              {/* INDIVIDUAL KPI SPECIFICATIONS (PAGES 4 TO 4 + N - 1) */}
+              {/* INDIVIDUAL KPI SPECIFICATIONS (PAGES 6 TO 6 + N - 1) */}
               {spec.items.map((item, index) => {
-                const pageNum = 4 + index;
+                const pageNum = 6 + index;
                 return (
                   <div key={item.id} className={`${previewPageNum === pageNum ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
                     <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
@@ -2014,8 +2046,8 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
               })}
 
 
-              {/* PAGE 5: GOVERNANCE (PAGE INDEX: 4 + N) */}
-              <div className={`${previewPageNum === 4 + spec.items.length ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
+              {/* PAGE 5: GOVERNANCE (PAGE INDEX: 6 + N) */}
+              <div className={`${previewPageNum === 6 + spec.items.length ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
                 <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
                   <div></div>
                   <div>KPI Functional Specification Document</div>
@@ -2079,13 +2111,13 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
                 {/* Footer */}
                 <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase mt-8">
                   <div>Confidential - Advisory Work Product</div>
-                  <div>Page {4 + spec.items.length} of {totalPages}</div>
+                  <div>Page {6 + spec.items.length} of {totalPages}</div>
                 </div>
               </div>
 
 
-              {/* PAGE 6: REPORTING & DASHBOARD (PAGE INDEX: 5 + N) */}
-              <div className={`${previewPageNum === 5 + spec.items.length ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
+              {/* PAGE 6: REPORTING & DASHBOARD (PAGE INDEX: 7 + N) */}
+              <div className={`${previewPageNum === 7 + spec.items.length ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
                 <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
                   <div></div>
                   <div>KPI Functional Specification Document</div>
@@ -2151,13 +2183,13 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
                 {/* Footer */}
                 <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase mt-8">
                   <div>Confidential - Advisory Work Product</div>
-                  <div>Page {5 + spec.items.length} of {totalPages}</div>
+                  <div>Page {7 + spec.items.length} of {totalPages}</div>
                 </div>
               </div>
 
 
-              {/* PAGE 7: ASSUMPTIONS & CONSTRAINTS (PAGE INDEX: 6 + N) */}
-              <div className={`${previewPageNum === 6 + spec.items.length ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
+              {/* PAGE 7: ASSUMPTIONS & CONSTRAINTS (PAGE INDEX: 8 + N) */}
+              <div className={`${previewPageNum === 8 + spec.items.length ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
                 <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
                   <div></div>
                   <div>KPI Functional Specification Document</div>
@@ -2202,13 +2234,13 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
                 {/* Footer */}
                 <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase mt-8">
                   <div>Confidential - Advisory Work Product</div>
-                  <div>Page {6 + spec.items.length} of {totalPages}</div>
+                  <div>Page {8 + spec.items.length} of {totalPages}</div>
                 </div>
               </div>
 
 
-              {/* PAGE 8: IMPLEMENTATION CONSIDERATIONS (PAGE INDEX: 7 + N) */}
-              <div className={`${previewPageNum === 7 + spec.items.length ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
+              {/* PAGE 8: IMPLEMENTATION CONSIDERATIONS (PAGE INDEX: 9 + N) */}
+              <div className={`${previewPageNum === 9 + spec.items.length ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
                 <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
                   <div></div>
                   <div>KPI Functional Specification Document</div>
@@ -2253,13 +2285,13 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
                 {/* Footer */}
                 <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase mt-8">
                   <div>Confidential - Advisory Work Product</div>
-                  <div>Page {7 + spec.items.length} of {totalPages}</div>
+                  <div>Page {9 + spec.items.length} of {totalPages}</div>
                 </div>
               </div>
 
 
-              {/* PAGE 9: APPENDIX (PAGE INDEX: 8 + N) */}
-              <div className={`${previewPageNum === 8 + spec.items.length ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
+              {/* PAGE 9: APPENDIX (PAGE INDEX: 10 + N) */}
+              <div className={`${previewPageNum === 10 + spec.items.length ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
                 <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
                   <div></div>
                   <div>KPI Functional Specification Document</div>
@@ -2295,7 +2327,7 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
                 {/* Footer */}
                 <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase mt-8">
                   <div>Confidential - Advisory Work Product</div>
-                  <div>Page {8 + spec.items.length} of {totalPages}</div>
+                  <div>Page {10 + spec.items.length} of {totalPages}</div>
                 </div>
               </div>
             </div>
