@@ -70,6 +70,8 @@ export const api = {
     request<KPILibrary>("/approve-kpis", { method: "POST", headers: jsonHeaders, body: JSON.stringify({ ids, status }) }),
   updateKpi: (id: string, patch: Partial<KPI>) =>
     request<KPILibrary>("/kpi-library/update", { method: "POST", headers: jsonHeaders, body: JSON.stringify({ id, patch }) }),
+  addKpi: (item: Partial<KPI>) =>
+    request<KPILibrary>("/kpi-library/add", { method: "POST", headers: jsonHeaders, body: JSON.stringify({ item }) }),
   getFunctionalSpec: () => request<FunctionalSpecification>("/functional-spec"),
   saveFunctionalSpec: (body: FunctionalSpecification) =>
     request<FunctionalSpecification>("/functional-spec", { method: "POST", headers: jsonHeaders, body: JSON.stringify(body) }),

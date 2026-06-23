@@ -76,6 +76,7 @@ You must return ONLY a JSON object matching this exact schema:
     {{
       "kpi_name": "Exact Name from Catalog",
       "kpi_description": "Customized business purpose / description text tailored to the context",
+      "why_important": "A detailed explanation of why this KPI is important for the specific client context",
       "business_owner": "Business Owner role tailored to context",
       "data_owner": "Data Owner role tailored to context",
       "refresh_cadence": "Weekly/Monthly/Quarterly",
@@ -195,20 +196,21 @@ STRICT GUARDRAILS & FORMATTING RULES:
      * Mandate that each generated KPI record contains exactly the following 16 fields:
        1. KPI Name (must match curated catalog names exactly)
        2. KPI Description
-       3. Business Purpose
-       4. Functional Area
-       5. KRA
-       6. KPI Category
-       7. Formula
-       8. Numerator
-       9. Denominator
-       10. Business Owner
-       11. Data Owner
-       12. Source System
-       13. Refresh Cadence
-       14. Target Range
-       15. Threshold Range
-       16. Notes / Assumptions
+       3. Why Important
+       4. Business Purpose
+       5. Functional Area
+       6. KRA
+       7. KPI Category
+       8. Formula
+       9. Numerator
+       10. Denominator
+       11. Business Owner
+       12. Data Owner
+       13. Source System
+       14. Refresh Cadence
+       15. Target Range
+       16. Threshold Range
+       17. Notes / Assumptions
      * Provide the following JSON schema that the downstream KPI generation must follow:
        ```json
        {{
@@ -312,20 +314,21 @@ STRICT GUARDRAILS & FORMATTING RULES:
      * Mandate that each generated KPI record contains exactly the following 16 fields:
        1. KPI Name (must match curated catalog names exactly)
        2. KPI Description
-       3. Business Purpose
-       4. Functional Area
-       5. KRA
-       6. KPI Category
-       7. Formula
-       8. Numerator
-       9. Denominator
-       10. Business Owner
-       11. Data Owner
-       12. Source System
-       13. Refresh Cadence
-       14. Target Range
-       15. Threshold Range
-       16. Notes / Assumptions
+       3. Why Important
+       4. Business Purpose
+       5. Functional Area
+       6. KRA
+       7. KPI Category
+       8. Formula
+       9. Numerator
+       10. Denominator
+       11. Business Owner
+       12. Data Owner
+       13. Source System
+       14. Refresh Cadence
+       15. Target Range
+       16. Threshold Range
+       17. Notes / Assumptions
      * Provide the following JSON schema that the downstream KPI generation must follow:
        ```json
        {{

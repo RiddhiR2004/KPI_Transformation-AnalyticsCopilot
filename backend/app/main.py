@@ -1726,6 +1726,39 @@ def update_kpi(request: Request, update_req: KPIUpdateRequest) -> KPILibrary:
     return library
 
 
+class KPIAddRequest(BaseModel):
+    item: KPI
+
+@app.post("/kpi-library/add")
+def add_kpi(request: Request, add_req: KPIAddRequest) -> KPILibrary:
+    import time
+    context = current_context()
+    library = current_library()
+    
+    new_id = f"kpi-custom-{len(library.items) + 1}-{int(time.time())}"
+    add_req.item.id = new_id
+    if not add_req.item.status:
+        add_req.item.status = KPIStatus.recommended
+        
+    library.items.insert(0, add_req.item)
+    
+    library.quality = quality_check(library.items, context)
+    library.recommendations = recommendations(library.items, context)
+    write_json(FILES["kpi_library"], library.model_dump(mode="json"))
+    
+    log_activity("KPI Added", f"Custom KPI '{add_req.item.kpi_name}' added to library")
+    
+    log_audit(
+        request=request,
+        action="Create",
+        module="KPI Library",
+        entity_type="KPI",
+        entity_name=add_req.item.kpi_name,
+        new_value=json.dumps(add_req.item.model_dump(mode="json"))
+    )
+    return library
+
+
 @app.get("/workflow-status")
 def workflow_status() -> WorkflowStatus:
     context = bool(read_json(FILES["business_context"], {}))

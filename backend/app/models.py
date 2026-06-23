@@ -107,6 +107,7 @@ class KPI(BaseModel):
     kpi_category: str = "Financial"
     business_definition: str = ""
     kpi_description: str
+    why_important: str = ""
     formula: str
     numerator: str = ""
     denominator: str = ""

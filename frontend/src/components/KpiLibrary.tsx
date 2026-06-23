@@ -59,6 +59,39 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
     setEditForm(prev => prev ? { ...prev, [key]: val } : null);
   }
 
+  function handleAddCustomKpi() {
+    const newKpi: Partial<KPI> = {
+      id: "new-kpi",
+      kpi_name: "",
+      functional_area: "Sales",
+      kra: "",
+      kpi_category: "Financial",
+      business_definition: "",
+      kpi_description: "",
+      formula: "",
+      numerator: "",
+      denominator: "",
+      source_system: "",
+      sap_module: "",
+      business_owner: "",
+      data_owner: "",
+      refresh_cadence: "",
+      recommended_target_range: "",
+      recommended_threshold_range: "",
+      notes: "",
+      why_important: "",
+      strategic_focus_area: "",
+      standard_driver: "",
+      sector_driver: "",
+      value_drivers: [],
+      industry_tags: [],
+      status: "draft" as KPIStatus
+    };
+    setSelectedKpi(newKpi as KPI);
+    setEditForm(newKpi as KPI);
+    setIsEditing(true);
+  }
+
   async function saveEdits() {
     if (!editForm || !selectedKpi) return;
     try {
@@ -76,12 +109,19 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
         notes: editForm.notes,
         functional_area: editForm.functional_area,
         kpi_category: editForm.kpi_category,
+        why_important: editForm.why_important,
       };
       
-      const updated = await api.updateKpi(selectedKpi.id, patch);
+      let updated: KPILibrary;
+      if (selectedKpi.id === "new-kpi") {
+        updated = await api.addKpi(patch);
+      } else {
+        updated = await api.updateKpi(selectedKpi.id, patch);
+      }
       setLibrary(updated);
       
-      const match = updated.items.find(item => item.id === selectedKpi.id);
+      const newOrUpdatedId = selectedKpi.id === "new-kpi" ? updated.items[0].id : selectedKpi.id;
+      const match = updated.items.find(item => item.id === newOrUpdatedId);
       if (match) {
         setSelectedKpi(match);
         setEditForm(match);
@@ -197,6 +237,9 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
           <button className="button-primary" disabled={!library.items.length} onClick={() => setStatus(library.items.map((item) => item.id), "approved")}>
             <CheckCheck size={16} />
             Bulk Approve
+          </button>
+          <button className="button-secondary" onClick={handleAddCustomKpi}>
+            + Add Custom KPI
           </button>
           {hasApproved && (
             <button className="button-yellow border border-black/10" onClick={() => navigate("/step-3")}>
@@ -400,7 +443,7 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
                 </div>
                 
                 <h3 className="mt-2 text-xl font-semibold text-[#F5F5F5] tracking-tight">
-                  {isEditing ? (editForm?.kpi_name || selectedKpi.kpi_name) : selectedKpi.kpi_name}
+                  {isEditing ? (editForm?.kpi_name || "New Custom KPI") : (selectedKpi.kpi_name || "New Custom KPI")}
                 </h3>
               </div>
               
@@ -598,6 +641,17 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
                       onChange={(e) => setFormVal("notes", e.target.value)}
                     />
                   </div>
+
+                  {/* Why Important */}
+                  <div>
+                    <label className="label text-[#FFE600]">Why this KPI is important</label>
+                    <textarea
+                      rows={3}
+                      className="field text-xs font-semibold"
+                      value={editForm?.why_important || ""}
+                      onChange={(e) => setFormVal("why_important", e.target.value)}
+                    />
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -627,6 +681,14 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
                     <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#FFE600] mb-2">Business Purpose / Description</h4>
                     <p className="text-xs text-[#B0B0B0] leading-relaxed whitespace-pre-wrap">
                       {selectedKpi.kpi_description || "—"}
+                    </p>
+                  </div>
+
+                  {/* Why Important */}
+                  <div>
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#FFE600] mb-2">Why this KPI is important</h4>
+                    <p className="text-xs text-[#B0B0B0] leading-relaxed whitespace-pre-wrap">
+                      {selectedKpi.why_important || "—"}
                     </p>
                   </div>
 

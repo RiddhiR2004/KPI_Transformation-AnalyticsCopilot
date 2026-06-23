@@ -31,6 +31,7 @@ export type KPI = {
   kpi_category: string;
   business_definition: string;
   kpi_description: string;
+  why_important?: string;
   formula: string;
   numerator: string;
   denominator: string;
