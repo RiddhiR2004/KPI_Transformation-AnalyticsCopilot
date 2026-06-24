@@ -1,4 +1,4 @@
-import { Save, Sparkles, RefreshCw, Plus, X, Building2 } from "lucide-react";
+import { Save, Sparkles, Loader2, Plus, X, Building2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
@@ -114,7 +114,8 @@ export function BusinessContextStep({ onChange }: { onChange: () => void }) {
     additional_business_priorities: [],
     additional_business_challenges: [],
     additional_kras: [],
-    additional_functional_areas: []
+    additional_functional_areas: [],
+    custom_fields: []
   });
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -164,7 +165,8 @@ export function BusinessContextStep({ onChange }: { onChange: () => void }) {
         additional_business_priorities: [],
         additional_business_challenges: [],
         additional_kras: [],
-        additional_functional_areas: []
+        additional_functional_areas: [],
+        custom_fields: []
       };
 
       api.getContext().then((data) => {
@@ -248,7 +250,7 @@ export function BusinessContextStep({ onChange }: { onChange: () => void }) {
   if (loading) {
     return (
       <section className="panel p-7 flex h-64 items-center justify-center text-[#FFE600]">
-        <RefreshCw size={28} className="animate-spin" />
+        <Loader2 size={28} className="animate-spin" />
         <span className="ml-3 text-sm font-semibold tracking-wide uppercase">Loading Strategic Context Schema...</span>
       </section>
     );
@@ -283,7 +285,7 @@ export function BusinessContextStep({ onChange }: { onChange: () => void }) {
           </p>
         </div>
         <button className="button-yellow" onClick={generatePrompt} disabled={generating}>
-          {generating ? <RefreshCw size={16} className="animate-spin" /> : <Sparkles size={16} />}
+          {generating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
           {generating ? "Generating..." : "Generate KPI Prompt"}
         </button>
       </div>
@@ -344,6 +346,75 @@ export function BusinessContextStep({ onChange }: { onChange: () => void }) {
           <MultiSelect label="Functional Areas" options={areas} value={form.functional_areas} onChange={(value) => setForm({ ...form, functional_areas: value })} />
           <CustomValueInput label="Additional Functional Areas" predefinedSelected={form.functional_areas} value={form.additional_functional_areas || []} onChange={(value) => setForm({ ...form, additional_functional_areas: value })} />
         </div>
+      </div>
+
+      {/* Custom Context Fields Section */}
+      <div className="mt-6 border border-[#303030] bg-[#111111]/30 p-5 rounded-sm">
+        <div className="mb-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#FFE600]">Advisory Tailoring</p>
+          <h4 className="mt-1 text-xl font-semibold text-[#F5F5F5]">Custom Context Parameters</h4>
+          <p className="mt-1 text-xs text-[#B0B0B0]">
+            Define custom parameters, question-answer pairs, or specific business constraints to tailor the KPI prompt generation.
+          </p>
+        </div>
+
+        {(form.custom_fields || []).length > 0 ? (
+          <div className="space-y-3 mb-4">
+            {(form.custom_fields || []).map((field, idx) => (
+              <div key={idx} className="flex gap-3 items-start">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    className="field text-xs font-semibold py-1 px-2.5 h-8 w-full"
+                    placeholder="Field Name / Question (e.g., ERP Modules)"
+                    value={field.label}
+                    onChange={(e) => {
+                      const updated = [...(form.custom_fields || [])];
+                      updated[idx] = { ...updated[idx], label: e.target.value };
+                      setForm({ ...form, custom_fields: updated });
+                    }}
+                  />
+                </div>
+                <div className="flex-[2]">
+                  <textarea
+                    className="field text-xs font-semibold py-1.5 px-2.5 min-h-[32px] h-8 w-full resize-y"
+                    placeholder="Field Value / Answer (e.g., SAP EWM, PP, MM)"
+                    value={field.value}
+                    onChange={(e) => {
+                      const updated = [...(form.custom_fields || [])];
+                      updated[idx] = { ...updated[idx], value: e.target.value };
+                      setForm({ ...form, custom_fields: updated });
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="text-[#808080] hover:text-[#FFE600] transition shrink-0 p-2 border border-[#303030] bg-[#1B1B1B]/40 hover:bg-[#1B1B1B] rounded-sm"
+                  onClick={() => {
+                    const updated = (form.custom_fields || []).filter((_, i) => i !== idx);
+                    setForm({ ...form, custom_fields: updated });
+                  }}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-[#808080] italic mb-4">No custom context fields added yet.</p>
+        )}
+
+        <button
+          type="button"
+          className="button-yellow py-1.5 px-3 text-xs flex items-center justify-center gap-1.5 bg-[#FFE600] text-[#111111]"
+          onClick={() => {
+            const updated = [...(form.custom_fields || []), { label: "", value: "" }];
+            setForm({ ...form, custom_fields: updated });
+          }}
+        >
+          <Plus size={14} />
+          <span>Add Custom Field</span>
+        </button>
       </div>
 
       <div className="mt-6 flex items-center justify-between border-t border-[#303030] pt-4 text-xs text-[#B0B0B0]">

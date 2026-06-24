@@ -53,6 +53,7 @@ class BusinessContext(Base):
     additional_business_challenges: Mapped[str] = mapped_column(Text, default="[]")  # JSON string
     additional_kras: Mapped[str] = mapped_column(Text, default="[]")  # JSON string
     additional_functional_areas: Mapped[str] = mapped_column(Text, default="[]")  # JSON string
+    custom_fields: Mapped[str] = mapped_column(Text, default="[]")  # JSON string representing list of {label, value}
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
@@ -88,9 +89,15 @@ class KPITree(Base):
     __tablename__ = "kpi_tree"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    client_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     engagement_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     name: Mapped[str] = mapped_column(String(100), default="Default Tree")
     data: Mapped[str] = mapped_column(Text, default="{}")  # JSON string
+    tree_json: Mapped[str] = mapped_column(Text, default="{}")  # Complete tree structure JSON string
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    status: Mapped[str] = mapped_column(String(50), default="draft")  # draft / approved
+    created_by: Mapped[str] = mapped_column(String(255), default="")
+    updated_by: Mapped[str] = mapped_column(String(255), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
@@ -377,7 +384,8 @@ def init_db() -> None:
                 ("additional_business_priorities", "TEXT DEFAULT '[]'"),
                 ("additional_business_challenges", "TEXT DEFAULT '[]'"),
                 ("additional_kras", "TEXT DEFAULT '[]'"),
-                ("additional_functional_areas", "TEXT DEFAULT '[]'")
+                ("additional_functional_areas", "TEXT DEFAULT '[]'"),
+                ("custom_fields", "TEXT DEFAULT '[]'")
             ]
             for col_name, col_def in new_cols:
                 if col_name not in existing_cols:
@@ -436,6 +444,21 @@ def init_db() -> None:
                 )
                 """
             )
+
+            # kpi_tree table migration for new columns
+            cursor_tree = conn.exec_driver_sql("PRAGMA table_info(kpi_tree)")
+            existing_cols_tree = [row[1] for row in cursor_tree.fetchall()]
+            new_cols_tree = [
+                ("client_id", "INTEGER"),
+                ("tree_json", "TEXT DEFAULT '{}'"),
+                ("version", "INTEGER DEFAULT 1"),
+                ("status", "VARCHAR(50) DEFAULT 'draft'"),
+                ("created_by", "VARCHAR(255) DEFAULT ''"),
+                ("updated_by", "VARCHAR(255) DEFAULT ''")
+            ]
+            for col_name, col_def in new_cols_tree:
+                if col_name not in existing_cols_tree:
+                    conn.exec_driver_sql(f"ALTER TABLE kpi_tree ADD COLUMN {col_name} {col_def}")
 
             # Dynamic engagement_id column migration for step tables
             tables_to_migrate = [

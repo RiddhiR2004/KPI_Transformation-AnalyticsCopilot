@@ -1384,6 +1384,12 @@ async def generate_prompt(request: Request, gen_request: GeneratePromptRequest) 
             f"\n--- Additional / Custom Functional Areas ---\n" + ("\n".join(f"- {a}" for a in context_raw.additional_functional_areas) if context_raw.additional_functional_areas else "None specified") + "\n"
         )
         
+        if getattr(context_raw, "custom_fields", None):
+            user_prompt += "\n--- Custom Context Fields / Answers ---\n"
+            for f in context_raw.custom_fields:
+                if f.label.strip() or f.value.strip():
+                    user_prompt += f"- {f.label}: {f.value}\n"
+        
         transcript_ctx = get_approved_transcripts_context()
         if transcript_ctx:
             user_prompt += f"\n{transcript_ctx}\n"
@@ -1652,6 +1658,12 @@ async def generate_kpis(request: Request) -> KPILibrary:
     return library
 
 
+@app.get("/kpi-catalog")
+def get_kpi_catalog() -> list[dict[str, Any]]:
+    from app.services.kpi_engine import load_catalog
+    return load_catalog()
+
+
 @app.get("/kpi-library")
 def get_kpi_library() -> dict[str, Any]:
     return read_json(FILES["kpi_library"], {})
@@ -1759,17 +1771,408 @@ def add_kpi(request: Request, add_req: KPIAddRequest) -> KPILibrary:
     return library
 
 
+def generate_demo_driver_tree(context: BusinessContext, approved_kpis: list[KPI], profile: Any) -> dict:
+    sfas = []
+    
+    # Group by functional area to create SFAs
+    by_area = {}
+    for k in approved_kpis:
+        area = k.functional_area or "Operations"
+        if area not in by_area:
+            by_area[area] = []
+        by_area[area].append(k)
+        
+    for area, kpis in by_area.items():
+        sfa_name = f"{area} Process Excellence"
+        sfa_desc = f"Focuses on driving productivity, quality, and cycle time reductions within {area} workflows."
+        sfa_rationale = f"Generated to support the primary functional area: {area} as defined in client priorities."
+        
+        objs = [p for p in context.business_priorities if area.lower() in p.lower()] or context.business_priorities[:2]
+        chals = [c for c in context.business_challenges if area.lower() in c.lower()] or context.business_challenges[:2]
+        
+        sfa_context = {
+            "strategic_objectives": objs,
+            "business_challenges": chals,
+            "kras": list(set(k.kra for k in kpis if k.kra)) or ["Operational Excellence"],
+            "functional_areas": [area],
+            "custom_parameters": [f.label for f in getattr(context, "custom_fields", []) if f.label]
+        }
+        
+        # Group by category to create Standard Drivers
+        by_cat = {}
+        for k in kpis:
+            cat = k.kpi_category or "Operational"
+            if cat not in by_cat:
+                by_cat[cat] = []
+            by_cat[cat].append(k)
+            
+        drivers = []
+        for cat, cat_kpis in by_cat.items():
+            sd_name = f"Optimize {cat} Levers"
+            sd_desc = f"Ensure disciplined execution of {cat.lower()} workflows and resource controls."
+            sd_rationale = f"Aligns with the {cat} KPI category requirements for {area} governance."
+            sd_context = {
+                "strategic_objectives": sfa_context["strategic_objectives"],
+                "business_challenges": sfa_context["business_challenges"],
+                "kras": list(set(k.kra for k in cat_kpis if k.kra)) or ["Process Control"],
+                "functional_areas": [area],
+                "custom_parameters": sfa_context["custom_parameters"]
+            }
+            
+            # Group by KRA to create Sector-Specific Drivers
+            by_kra = {}
+            for k in cat_kpis:
+                kra = k.kra or "Operational Excellence"
+                if kra not in by_kra:
+                    by_kra[kra] = []
+                by_kra[kra].append(k)
+                
+            sector_drivers = []
+            for kra, kra_kpis in by_kra.items():
+                ssd_name = f"{kra} Optimization ({profile.industry if profile else 'Generic'})"
+                ssd_desc = f"Operational levers designed specifically for {kra} within {profile.industry if profile else 'the enterprise'} context."
+                ssd_rationale = f"Generated specifically to address the Key Result Area: {kra} using local source telemetry."
+                ssd_context = {
+                    "strategic_objectives": sd_context["strategic_objectives"],
+                    "business_challenges": sd_context["business_challenges"],
+                    "kras": [kra],
+                    "functional_areas": [area],
+                    "custom_parameters": sd_context["custom_parameters"]
+                }
+                
+                mapped_kpis = []
+                for k in kra_kpis:
+                    mapped_kpis.append({
+                        "name": k.kpi_name,
+                        "description": k.kpi_description,
+                        "importance": k.why_important or f"Critical for measuring {kra} in {area}.",
+                        "placement_rationale": f"Directly traces from strategic objectives to {k.kpi_name} under {kra}.",
+                        "source_context": {
+                            "strategic_objectives": ssd_context["strategic_objectives"],
+                            "business_challenges": ssd_context["business_challenges"],
+                            "kras": [kra],
+                            "functional_areas": [area],
+                            "custom_parameters": ssd_context["custom_parameters"]
+                        }
+                    })
+                    
+                sector_drivers.append({
+                    "name": ssd_name,
+                    "description": ssd_desc,
+                    "business_rationale": ssd_rationale,
+                    "source_context": ssd_context,
+                    "kpis": mapped_kpis
+                })
+                
+            drivers.append({
+                "name": sd_name,
+                "description": sd_desc,
+                "business_rationale": sd_rationale,
+                "source_context": sd_context,
+                "sector_specific_drivers": sector_drivers
+            })
+            
+        sfas.append({
+            "name": sfa_name,
+            "description": sfa_desc,
+            "business_rationale": sfa_rationale,
+            "source_context": sfa_context,
+            "drivers": drivers
+        })
+        
+    return {"strategic_focus_areas": sfas}
+
+
+class KpiTreeSaveRequest(BaseModel):
+    name: str = "Default Tree"
+    data: dict
+    action: str | None = None
+    entity_type: str | None = None
+    entity_name: str | None = None
+    previous_value: str | None = None
+    new_value: str | None = None
+
+
+class KpiTreeApproveRequest(BaseModel):
+    approved: bool
+
+
+@app.get("/kpi-tree")
+def get_kpi_tree():
+    from app.database import KPITree
+    with SessionLocal() as session:
+        eng_id = active_engagement_id_ctx.get()
+        if eng_id is not None:
+            row = session.scalar(select(KPITree).filter_by(engagement_id=eng_id))
+        else:
+            row = session.scalar(select(KPITree).filter_by(id=1))
+            
+        if not row:
+            raise HTTPException(status_code=404, detail="KPI Driver Tree has not been generated yet.")
+            
+        return {
+            "name": row.name,
+            "client_id": row.client_id,
+            "version": row.version,
+            "status": row.status,
+            "created_by": row.created_by,
+            "updated_by": row.updated_by,
+            "data": json.loads(row.tree_json or row.data or "{}"),
+            "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+        }
+
+
+@app.post("/kpi-tree")
+def save_kpi_tree(request: Request, payload: KpiTreeSaveRequest):
+    from app.database import KPITree
+    user_name, _ = get_user_info(request)
+    eng_id = active_engagement_id_ctx.get()
+    
+    with SessionLocal() as session:
+        client_id = None
+        if eng_id:
+            eng = session.query(Engagement).filter(Engagement.id == eng_id).first()
+            if eng:
+                client_id = eng.client_profile_id
+                
+        if eng_id is not None:
+            row = session.scalar(select(KPITree).filter_by(engagement_id=eng_id))
+            if not row:
+                row = KPITree(engagement_id=eng_id, created_by=user_name, version=1, status="draft")
+                session.add(row)
+        else:
+            row = session.scalar(select(KPITree).filter_by(id=1))
+            if not row:
+                row = KPITree(id=1, created_by=user_name, version=1, status="draft")
+                session.add(row)
+                
+        prev_data = row.tree_json
+        
+        row.name = payload.name
+        row.client_id = client_id
+        row.tree_json = json.dumps(payload.data)
+        row.data = json.dumps(payload.data)
+        row.updated_by = user_name
+        row.updated_at = datetime.now()
+        session.commit()
+        
+        log_audit(
+            request=request,
+            action=payload.action or "Tree Edited",
+            module="KPI Driver Tree",
+            entity_type=payload.entity_type or "KPI Driver Tree",
+            entity_name=payload.entity_name or row.name,
+            previous_value=payload.previous_value or prev_data,
+            new_value=payload.new_value or row.tree_json,
+            db_session=session
+        )
+        
+    log_activity(payload.action or "KPI Driver Tree Saved", f"Driver tree updated by {user_name}")
+    return {"status": "success", "message": "KPI Driver Tree saved successfully."}
+
+
+@app.post("/approve-kpi-tree")
+def approve_kpi_tree(request: Request, payload: KpiTreeApproveRequest):
+    from app.database import KPITree
+    user_name, _ = get_user_info(request)
+    eng_id = active_engagement_id_ctx.get()
+    
+    with SessionLocal() as session:
+        if eng_id is not None:
+            row = session.scalar(select(KPITree).filter_by(engagement_id=eng_id))
+        else:
+            row = session.scalar(select(KPITree).filter_by(id=1))
+            
+        if not row:
+            raise HTTPException(status_code=404, detail="KPI Driver Tree not found.")
+            
+        status_val = "approved" if payload.approved else "draft"
+        action_val = "Tree Approved" if payload.approved else "Tree Unapproved"
+        
+        row.status = status_val
+        row.updated_by = user_name
+        row.updated_at = datetime.now()
+        session.commit()
+        
+        log_audit(
+            request=request,
+            action=action_val,
+            module="KPI Driver Tree",
+            entity_type="KPI Driver Tree",
+            entity_name=row.name,
+            new_value=status_val,
+            db_session=session
+        )
+        
+    log_activity(action_val, f"KPI Driver Tree marked as {status_val} by {user_name}")
+    return {"status": "success", "status_value": status_val}
+
+
+@app.post("/generate-kpi-tree")
+async def generate_kpi_tree(request: Request):
+    from app.database import KPITree
+    from app.services.prompting import KPI_DRIVER_TREE_SYSTEM_PROMPT
+    user_name, _ = get_user_info(request)
+    context = current_context()
+    
+    # Load approved KPIs
+    approved_data = read_json(FILES["approved_kpis"], {})
+    approved_items_raw = approved_data.get("items") or []
+    approved_kpis = [KPI(**item) for item in approved_items_raw]
+    if not approved_kpis:
+        raise HTTPException(status_code=400, detail="No approved KPIs in library. Please approve KPIs in Step 2 first.")
+        
+    eng_id = active_engagement_id_ctx.get()
+    profile = None
+    with SessionLocal() as session:
+        if eng_id:
+            eng = session.query(Engagement).filter(Engagement.id == eng_id).first()
+            if eng:
+                profile = session.query(ClientProfile).filter(ClientProfile.id == eng.client_profile_id).first()
+        if not profile:
+            profile = session.query(ClientProfile).order_by(ClientProfile.id.desc()).first()
+            
+    provider = get_provider()
+    
+    # Check if we are running in DemoProvider mode or not
+    if isinstance(provider, DemoProvider):
+        tree_json_dict = generate_demo_driver_tree(context, approved_kpis, profile)
+    else:
+        # Build prompt using Gemini
+        system_prompt = KPI_DRIVER_TREE_SYSTEM_PROMPT
+        user_prompt = (
+            f"=== CLIENT PROFILE ===\n"
+            f"Client Name: {profile.client_name if profile else 'N/A'}\n"
+            f"Industry: {profile.industry if profile else 'N/A'}\n"
+            f"Sub-Industry: {profile.sub_industry if profile else 'N/A'}\n"
+            f"Country: {profile.country if profile else 'N/A'}\n"
+            f"Region: {profile.region if profile else 'N/A'}\n"
+            f"Technology Landscape:\n"
+            f"  - ERP: {profile.erp_platform if profile else 'N/A'}\n"
+            f"  - CRM: {profile.crm_platform if profile else 'N/A'}\n"
+            f"  - MES: {profile.mes_platform if profile else 'N/A'}\n"
+            f"  - BI Tool: {profile.bi_tool if profile else 'N/A'}\n"
+            f"  - Data Warehouse: {profile.data_warehouse if profile else 'N/A'}\n"
+            f"  - Cloud: {profile.cloud_platform if profile else 'N/A'}\n"
+            f"Description: {profile.organization_description if profile else 'N/A'}\n\n"
+            f"=== BUSINESS CONTEXT ===\n"
+            f"Industry: {context.industry}\n"
+            f"Organization Level: {context.organization_level}\n"
+            f"Strategic Objectives / Priorities:\n"
+            + "\n".join(f"- {p}" for p in context.business_priorities) + "\n"
+            f"Business Challenges:\n"
+            + "\n".join(f"- {c}" for c in context.business_challenges) + "\n"
+            f"Key Result Areas (KRAs):\n"
+            + "\n".join(f"- {k}" for k in context.top_kras) + "\n"
+            f"Functional Areas:\n"
+            + "\n".join(f"- {a}" for a in context.functional_areas) + "\n\n"
+        )
+        if getattr(context, "custom_fields", None):
+            user_prompt += "=== CUSTOM PARAMETERS ===\n"
+            for f in context.custom_fields:
+                if f.label.strip() or f.value.strip():
+                    user_prompt += f"- {f.label}: {f.value}\n"
+            user_prompt += "\n"
+            
+        user_prompt += "=== APPROVED KPIS FOR DECOMPOSITION ===\n"
+        for idx, k in enumerate(approved_kpis, start=1):
+            user_prompt += (
+                f"KPI {idx}: {k.kpi_name}\n"
+                f"  - Description: {k.kpi_description}\n"
+                f"  - Why Important: {k.why_important or 'N/A'}\n"
+                f"  - Category: {k.kpi_category}\n"
+                f"  - Functional Area: {k.functional_area}\n"
+                f"  - KRA: {k.kra}\n"
+                f"  - Formula: {k.formula}\n"
+                f"  - Numerator: {k.numerator}\n"
+                f"  - Denominator: {k.denominator}\n\n"
+            )
+            
+        try:
+            logger.info("Generating KPI Driver Tree from LLM...")
+            tree_json_dict = await provider.generate_json(KPI_DRIVER_TREE_SYSTEM_PROMPT, user_prompt, step_name="generate_kpi_tree")
+            if not isinstance(tree_json_dict, dict) or "strategic_focus_areas" not in tree_json_dict:
+                raise ValueError("Invalid JSON format from LLM.")
+        except Exception as exc:
+            logger.error(f"KPI Driver Tree LLM generation failed: {exc}. Falling back to demo generator.", exc_info=True)
+            tree_json_dict = generate_demo_driver_tree(context, approved_kpis, profile)
+
+    # Save to database
+    with SessionLocal() as session:
+        client_id = profile.id if profile else None
+        
+        prev_version = 0
+        if eng_id is not None:
+            row = session.scalar(select(KPITree).filter_by(engagement_id=eng_id))
+            if not row:
+                row = KPITree(engagement_id=eng_id, created_by=user_name, name="KPI Driver Tree")
+                session.add(row)
+            else:
+                prev_version = row.version or 0
+        else:
+            row = session.scalar(select(KPITree).filter_by(id=1))
+            if not row:
+                row = KPITree(id=1, created_by=user_name, name="KPI Driver Tree")
+                session.add(row)
+            else:
+                prev_version = row.version or 0
+                
+        row.version = prev_version + 1
+        row.status = "draft"
+        row.client_id = client_id
+        row.tree_json = json.dumps(tree_json_dict)
+        row.data = json.dumps(tree_json_dict)
+        row.updated_by = user_name
+        row.updated_at = datetime.now()
+        session.commit()
+        
+        action_val = "Version Regenerated" if prev_version > 0 else "Tree Generated"
+        log_audit(
+            request=request,
+            action=action_val,
+            module="KPI Driver Tree",
+            entity_type="KPI Driver Tree",
+            entity_name=row.name,
+            new_value=json.dumps({"version": row.version, "status": row.status}),
+            db_session=session
+        )
+        log_activity("KPI Driver Tree Generated", f"Traceability tree generated (Version {row.version})")
+        
+        return {
+            "name": row.name,
+            "client_id": row.client_id,
+            "version": row.version,
+            "status": row.status,
+            "created_by": row.created_by,
+            "updated_by": row.updated_by,
+            "data": tree_json_dict,
+            "updated_at": row.updated_at.isoformat()
+        }
+
+
 @app.get("/workflow-status")
 def workflow_status() -> WorkflowStatus:
     context = bool(read_json(FILES["business_context"], {}))
     prompt = bool(read_json(FILES["prompts"], {}))
     library = bool(read_json(FILES["kpi_library"], {}).get("items"))
     spec = bool(read_json(FILES["functional_spec"], {}).get("items"))
+    
+    # Check if tree exists
+    with SessionLocal() as session:
+        from app.database import KPITree as DBKPITree
+        eng_id = active_engagement_id_ctx.get()
+        if eng_id is not None:
+            tree_row = session.scalar(select(DBKPITree).filter_by(engagement_id=eng_id))
+        else:
+            tree_row = session.scalar(select(DBKPITree).filter_by(id=1))
+        has_tree = bool(tree_row and tree_row.tree_json and tree_row.tree_json != "{}")
+        
     return WorkflowStatus(
         business_context=context,
         prompt_generation=prompt,
         kpi_library=library,
         functional_specification=spec,
+        kpi_tree=has_tree,
     )
 
 
@@ -2189,16 +2592,28 @@ def exports() -> list[ExportItem]:
     has_prompt = bool(read_json(FILES["prompts"], {}))
     has_kpis = bool(read_json(FILES["kpi_library"], {}).get("items"))
     has_spec = bool(read_json(FILES["functional_spec"], {}).get("items"))
+    
+    with SessionLocal() as session:
+        from app.database import KPITree as DBKPITree
+        eng_id = active_engagement_id_ctx.get()
+        if eng_id is not None:
+            tree_row = session.scalar(select(DBKPITree).filter_by(engagement_id=eng_id))
+        else:
+            tree_row = session.scalar(select(DBKPITree).filter_by(id=1))
+        has_tree = bool(tree_row and tree_row.tree_json and tree_row.tree_json != "{}")
+
     return [
         ExportItem(id="prompt", label="Export Prompt", description="KPI generation prompt from Prompt Studio", formats=["DOCX", "JSON"], available=has_prompt),
         ExportItem(id="kpi_library", label="Export KPI Library", description="Approved and draft KPI library", formats=["XLSX", "CSV", "JSON"], available=has_kpis),
         ExportItem(id="functional_document", label="Functional Specification", description="Governed business functional specification document", formats=["DOCX", "PDF", "JSON"], available=has_spec),
+        ExportItem(id="kpi_driver_tree", label="KPI Driver Tree", description="Approved strategy-to-KPI driver tree specification", formats=["PDF", "JSON"], available=has_tree),
         ExportItem(id="json_bundle", label="Export JSON Bundle", description="Complete session data for audit or migration", formats=["JSON"], available=True),
     ]
 
 
 @app.get("/exports/{export_id}/{fmt}")
 def download_export(request: Request, export_id: str, fmt: str, doc_name: str | None = None) -> FileResponse:
+    import json
     fmt = fmt.lower()
     EXPORT_DIR.mkdir(exist_ok=True)
     if export_id == "prompt":
@@ -2245,6 +2660,39 @@ def download_export(request: Request, export_id: str, fmt: str, doc_name: str | 
             path.write_text(json.dumps(spec.model_dump(mode="json"), indent=2, default=str), encoding="utf-8")
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported format for functional document: {fmt}")
+    elif export_id == "kpi_driver_tree":
+        from app.database import KPITree as DBKPITree
+        with SessionLocal() as session:
+            eng_id = active_engagement_id_ctx.get()
+            if eng_id is not None:
+                row = session.scalar(select(DBKPITree).filter_by(engagement_id=eng_id))
+            else:
+                row = session.scalar(select(DBKPITree).filter_by(id=1))
+                
+            if not row or not row.tree_json or row.tree_json == "{}":
+                raise HTTPException(status_code=400, detail="KPI Driver Tree has not been generated yet.")
+                
+            tree_data = json.loads(row.tree_json)
+            
+            profile = None
+            if eng_id:
+                eng = session.query(Engagement).filter(Engagement.id == eng_id).first()
+                if eng:
+                    profile = session.query(ClientProfile).filter(ClientProfile.id == eng.client_profile_id).first()
+            if not profile:
+                profile = session.query(ClientProfile).order_by(ClientProfile.id.desc()).first()
+                
+            context_data = read_json(FILES["business_context"], {})
+            context = BusinessContext(**context_data) if context_data else BusinessContext()
+            
+            path = EXPORT_DIR / f"kpi-driver-tree.{fmt}"
+            if fmt == "pdf":
+                from app.services.doc_generators import generate_pdf_driver_tree
+                generate_pdf_driver_tree(path, tree_data, context, profile, doc_name=doc_name)
+            elif fmt == "json":
+                path.write_text(json.dumps(tree_data, indent=2, default=str), encoding="utf-8")
+            else:
+                raise HTTPException(status_code=400, detail=f"Unsupported format for KPI Driver Tree: {fmt}")
     elif export_id == "json_bundle":
         path = export_json_bundle()
     else:

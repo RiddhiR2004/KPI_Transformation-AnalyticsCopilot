@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, Download, Play, Save, Send, Sparkles, RefreshCw } from "lucide-react";
+import { AlertTriangle, Check, Download, Play, Save, Send, Sparkles, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import type { PromptRecord } from "../types/api";
@@ -192,7 +192,7 @@ export function PromptStudio({ onChange }: { onChange: () => void }) {
               onClick={refinePrompt}
               title="Refine the current prompt using your instructions above"
             >
-              {refiningPrompt ? <RefreshCw size={15} className="animate-spin" /> : <Sparkles size={15} />}
+              {refiningPrompt ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
               {refiningPrompt ? "Refining..." : "Refine Prompt"}
             </button>
           ) : (
@@ -202,7 +202,7 @@ export function PromptStudio({ onChange }: { onChange: () => void }) {
               onClick={generatePrompt}
               title="Generate initial prompt using instructions"
             >
-              {generatingPrompt ? <RefreshCw size={15} className="animate-spin" /> : <Sparkles size={15} />}
+              {generatingPrompt ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
               {generatingPrompt ? "Generating..." : "Generate AI Prompt"}
             </button>
           )}
@@ -263,7 +263,7 @@ export function PromptStudio({ onChange }: { onChange: () => void }) {
                 onClick={generateKpis}
                 title={!record.is_approved ? "Please approve prompt before generating library" : "Generate KPI Library"}
               >
-                {generatingLibrary ? <RefreshCw size={15} className="animate-spin" /> : <Play size={15} />}
+                {generatingLibrary ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />}
                 {generatingLibrary ? "Generating KPI Library..." : "Generate KPI Library"}
               </button>
             </div>

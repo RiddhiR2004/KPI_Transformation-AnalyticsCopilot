@@ -1,4 +1,4 @@
-import { AlertCircle, ArrowLeft, CheckCircle, Download, Edit3, FileText, Play, Save, RefreshCw, ChevronDown, ChevronRight, Check, Printer, Building2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle, Download, Edit3, FileText, Play, Save, RefreshCw, ChevronDown, ChevronRight, Check, Printer, Building2, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, exportUrl } from "../lib/api";
@@ -712,7 +712,7 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center text-[#FFE600]">
-        <RefreshCw size={28} className="animate-spin" />
+        <Loader2 size={28} className="animate-spin" />
         <span className="ml-3 text-sm font-semibold tracking-wide uppercase">Loading Enterprise Workspace...</span>
       </div>
     );
@@ -770,7 +770,7 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
             disabled={generating} 
             onClick={generateSpec}
           >
-            <RefreshCw size={12} className={generating ? "animate-spin" : ""} />
+            <Loader2 size={12} className={generating ? "animate-spin" : ""} />
             Re-synthesize Spec
           </button>
         </div>
@@ -804,7 +804,7 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
           </div>
           <div>
             <button className="button-yellow" disabled={generating} onClick={generateSpec}>
-              {generating ? <RefreshCw size={16} className="animate-spin" /> : <Play size={16} />}
+              {generating ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
               {generating ? "Synthesizing Specification..." : "Generate Functional Specification"}
             </button>
           </div>
@@ -930,7 +930,7 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
                 disabled={generating}
                 id="re-synthesize-spec-btn"
               >
-                <RefreshCw size={12} className={generating ? "animate-spin" : ""} />
+                <Loader2 size={12} className={generating ? "animate-spin" : ""} />
                 Re-synthesize Spec
               </button>
             </div>

@@ -17,6 +17,7 @@ import type {
   ClientProfileWithCount,
   EngagementCreate,
   EngagementRecord,
+  KpiTreeRecord,
 } from "../types/api";
 
 const jsonHeaders = { "Content-Type": "application/json" };
@@ -77,12 +78,27 @@ export const api = {
     request<FunctionalSpecification>("/functional-spec", { method: "POST", headers: jsonHeaders, body: JSON.stringify(body) }),
   generateSpec: () => request<FunctionalSpecification>("/generate-spec", { method: "POST" }),
   approveSpec: () => request<{ status: string; message: string; updated_at: string }>("/approve-spec", { method: "POST" }),
+  getKpiTree: () => request<KpiTreeRecord>("/kpi-tree"),
+  saveKpiTree: (payload: {
+    name: string;
+    data: any;
+    action?: string;
+    entity_type?: string;
+    entity_name?: string;
+    previous_value?: string;
+    new_value?: string;
+  }) =>
+    request<{ status: string; message: string }>("/kpi-tree", { method: "POST", headers: jsonHeaders, body: JSON.stringify(payload) }),
+  approveKpiTree: (approved: boolean) =>
+    request<{ status: string; status_value: string }>("/approve-kpi-tree", { method: "POST", headers: jsonHeaders, body: JSON.stringify({ approved }) }),
+  generateKpiTree: () => request<KpiTreeRecord>("/generate-kpi-tree", { method: "POST" }),
   getWorkflowStatus: () => request<WorkflowStatus>("/workflow-status"),
   getTimeline: () => request<ActivityEvent[]>("/timeline"),
   getExports: () => request<ExportItem[]>("/exports"),
   getLlmStatus: () =>
     request<{ provider: string; model: string; uses_real_llm: boolean; api_key_configured: boolean; api_key_env: string }>("/llm-status"),
   getMetadata: (category: string) => request<MetadataItem[]>(`/metadata/${category}`),
+  getCatalog: () => request<KPI[]>("/kpi-catalog"),
 
   // Transcripts API
   getTranscripts: () => request<TranscriptAnalysisRecord[]>("/transcript/list"),

@@ -14,6 +14,11 @@ class KPIStatus(str, Enum):
     rejected = "rejected"
 
 
+class CustomContextField(BaseModel):
+    label: str
+    value: str
+
+
 class BusinessContext(BaseModel):
     industry: str = ""
     organization_level: str = ""
@@ -26,6 +31,7 @@ class BusinessContext(BaseModel):
     additional_business_challenges: list[str] = Field(default_factory=list)
     additional_kras: list[str] = Field(default_factory=list)
     additional_functional_areas: list[str] = Field(default_factory=list)
+    custom_fields: list[CustomContextField] = Field(default_factory=list)
     updated_at: datetime = Field(default_factory=datetime.now)
 
     @model_validator(mode="after")
@@ -67,6 +73,8 @@ class BusinessContext(BaseModel):
         self.additional_kras = clean_custom_list(self.additional_kras, self.top_kras)
         self.additional_functional_areas = clean_custom_list(self.additional_functional_areas, self.functional_areas)
 
+        self.custom_fields = [f for f in self.custom_fields if f.label.strip() or f.value.strip()]
+
         return self
 
     def get_merged(self) -> BusinessContext:
@@ -86,6 +94,7 @@ class BusinessContext(BaseModel):
             additional_business_challenges=self.additional_business_challenges,
             additional_kras=self.additional_kras,
             additional_functional_areas=self.additional_functional_areas,
+            custom_fields=self.custom_fields,
             updated_at=self.updated_at
         )
 
@@ -250,6 +259,7 @@ class WorkflowStatus(BaseModel):
     kpi_library: bool = False
     functional_specification: bool = False
     technical_mapping: bool = False
+    kpi_logic: bool = False
     kpi_tree: bool = False
     dashboard: bool = False
 
@@ -262,7 +272,7 @@ class ActivityEvent(BaseModel):
 
 
 class ExportItem(BaseModel):
-    id: Literal["prompt", "kpi_library", "functional_document", "json_bundle"]
+    id: Literal["prompt", "kpi_library", "functional_document", "kpi_driver_tree", "json_bundle"]
     label: str
     description: str
     formats: list[str]

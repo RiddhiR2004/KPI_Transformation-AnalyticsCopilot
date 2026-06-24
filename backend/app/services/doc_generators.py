@@ -1834,3 +1834,670 @@ def generate_docx_prompt(path: Path, prompt_text: str, context: BusinessContext)
 
     doc.save(path)
 
+
+class LandscapeNumberedCanvas(canvas.Canvas):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._saved_page_states: list[dict[str, Any]] = []
+
+    def showPage(self) -> None:
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self) -> None:
+        num_pages = len(self._saved_page_states)
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            self.draw_page_decorations(num_pages)
+            super().showPage()
+        super().save()
+
+    def draw_page_decorations(self, total_pages: int) -> None:
+        self.saveState()
+        
+        # Suppress headers/footers on the title page
+        if self._pageNumber == 1:
+            self.restoreState()
+            return
+
+        # Top border accent (EY Yellow)
+        self.setFillColor(colors.HexColor("#FFE600"))
+        self.rect(0, 597, 792, 15, fill=True, stroke=False)
+
+        # Header Text
+        self.setFont("Helvetica-Bold", 8)
+        self.setFillColor(colors.HexColor("#1B1B1B"))
+        self.drawString(54, 575, "EY KPI DRIVER TREE STUDIO")
+        
+        self.setFont("Helvetica", 8)
+        self.setFillColor(colors.HexColor("#666666"))
+        self.drawRightString(738, 575, "STRATEGY-TO-KPI TRACEABILITY")
+
+        # Top separator line
+        self.setStrokeColor(colors.HexColor("#DCDCD9"))
+        self.setLineWidth(0.5)
+        self.line(54, 565, 738, 565)
+
+        # Bottom separator line & footer text
+        self.line(54, 55, 738, 55)
+        self.setFont("Helvetica", 8)
+        self.drawString(54, 40, "Confidential - EY Advisory Work Product")
+        self.drawRightString(738, 40, f"Page {self._pageNumber} of {total_pages}")
+        
+        self.restoreState()
+
+
+def generate_pdf_driver_tree(path: Path, tree_data: dict, context: BusinessContext, profile: Any, doc_name: str | None = None) -> None:
+    """Generates a premium consolidated EY-branded KPI Driver Tree document in landscape orientation."""
+    import datetime
+    from reportlab.lib.pagesizes import letter, landscape
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    from reportlab.graphics.shapes import Drawing, Rect, Line, String
+    from reportlab.lib.colors import HexColor
+
+    pdf_title = doc_name if doc_name else f"EY KPI Driver Tree - {profile.client_name if profile else 'Client'}"
+    pdf_author = "EY KPI Advisory & Analytics"
+    pdf_subject = "KPI Driver Tree Traceability Document"
+    pdf_creator = "KPI Advisory & Analytics Copilot"
+
+    doc = SimpleDocTemplate(
+        str(path),
+        pagesize=landscape(letter),
+        leftMargin=54,
+        rightMargin=54,
+        topMargin=72,
+        bottomMargin=72,
+        title=pdf_title,
+        author=pdf_author,
+        subject=pdf_subject,
+        creator=pdf_creator
+    )
+
+    styles = getSampleStyleSheet()
+    
+    # Custom Palette
+    ey_yellow = colors.HexColor("#FFE600")
+    dark_gray = colors.HexColor("#1B1B1B")
+    border_color = colors.HexColor("#DCDCD9")
+    text_color = colors.HexColor("#2C2C2A")
+
+    # Typography / Paragraph Styles
+    title_style = ParagraphStyle(
+        'CoverTitleTree',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=28,
+        leading=34,
+        textColor=dark_gray,
+        spaceAfter=15
+    )
+    
+    subtitle_style = ParagraphStyle(
+        'CoverSubtitleTree',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=11,
+        leading=14,
+        textColor=colors.HexColor("#B49600"),
+        spaceAfter=10,
+        textTransform='uppercase'
+    )
+
+    body_style = ParagraphStyle(
+        'SpecBodyTree',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        leading=14,
+        textColor=text_color,
+        spaceAfter=12
+    )
+
+    tbl_label_style = ParagraphStyle(
+        'TblLabelTree',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=9,
+        leading=12,
+        textColor=dark_gray
+    )
+
+    tbl_value_style = ParagraphStyle(
+        'TblValueTree',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=9,
+        leading=12,
+        textColor=text_color
+    )
+
+    def draw_wrapped_text(d: Drawing, text: str, x: float, y: float, width: float, font_name: str = "Helvetica", font_size: float = 8, fill_color: Any = HexColor("#000000"), line_height: float = 10, max_lines: int = 2) -> None:
+        words = str(text or "").split()
+        lines = []
+        current_line = []
+        
+        for word in words:
+            test_line = " ".join(current_line + [word])
+            test_width = len(test_line) * font_size * 0.52
+            if test_width <= width:
+                current_line.append(word)
+            else:
+                if current_line:
+                    lines.append(" ".join(current_line))
+                current_line = [word]
+                if len(lines) >= max_lines - 1:
+                    break
+        if current_line and len(lines) < max_lines:
+            lines.append(" ".join(current_line))
+        elif current_line:
+            lines.append(" ".join(current_line)[:15] + "...")
+            
+        num_lines = len(lines)
+        if num_lines == 0:
+            return
+            
+        total_text_h = (num_lines - 1) * line_height
+        start_y = y + total_text_h / 2 - font_size / 3
+        
+        for idx, line in enumerate(lines):
+            d.add(String(x, start_y - idx * line_height, line, fontName=font_name, fontSize=font_size, fillColor=fill_color))
+
+    def draw_sfa_tree_flowable(sfa: dict) -> Drawing:
+        sd_list = sfa.get("drivers", []) if not sfa.get("collapsed") else []
+        
+        kpi_nodes = []
+        ssd_nodes = []
+        sd_nodes = []
+        
+        for sd in sd_list:
+            sd_name = sd.get("name")
+            sd_nodes.append(sd)
+            
+            if sd.get("collapsed"):
+                continue
+                
+            ssd_list = sd.get("sector_specific_drivers", []) or sd.get("sector_drivers", []) or []
+            for ssd in ssd_list:
+                ssd_name = ssd.get("name")
+                ssd["parent_sd_name"] = sd_name
+                ssd_nodes.append(ssd)
+                
+                if ssd.get("collapsed"):
+                    continue
+                    
+                kpi_list = ssd.get("kpis", []) or []
+                for kpi in kpi_list:
+                    kpi["parent_ssd_name"] = ssd_name
+                    kpi_nodes.append(kpi)
+                    
+        # Dimensions
+        dw = 684
+        dh = 380
+        d = Drawing(dw, dh)
+        
+        # Background
+        d.add(Rect(0, 0, dw, dh, fillColor=HexColor("#FAFAFA"), strokeColor=HexColor("#E2E8F0"), strokeWidth=0.5, rx=6, ry=6))
+        
+        n_kpis = len(kpi_nodes)
+        kpi_h = 24
+        
+        if n_kpis > 1:
+            total_kpi_h = n_kpis * kpi_h
+            gap = (320 - total_kpi_h) / (n_kpis - 1)
+            gap = max(6, min(30, gap))
+        else:
+            gap = 0
+            
+        total_col_height = n_kpis * kpi_h + (n_kpis - 1) * gap if n_kpis > 0 else 0
+        start_y = 30 + (320 - total_col_height) / 2
+        
+        # Positions
+        kpi_positions = {}
+        for idx, kpi in enumerate(kpi_nodes):
+            kname = kpi.get("kpi_name") or kpi.get("name") or "Unnamed KPI"
+            key = f"{kname}_{idx}"
+            kpi["_unique_key"] = key
+            kpi_positions[key] = start_y + idx * (kpi_h + gap) + kpi_h / 2
+            
+        ssd_positions = {}
+        for idx, ssd in enumerate(ssd_nodes):
+            sname = ssd.get("name")
+            key = f"{sname}_{idx}"
+            ssd["_unique_key"] = key
+            child_ys = [kpi_positions[k["_unique_key"]] for k in kpi_nodes if k.get("parent_ssd_name") == sname]
+            if child_ys:
+                ssd_positions[key] = sum(child_ys) / len(child_ys)
+            else:
+                ssd_positions[key] = dh / 2
+                
+        sd_positions = {}
+        for idx, sd in enumerate(sd_nodes):
+            sdname = sd.get("name")
+            key = f"{sdname}_{idx}"
+            sd["_unique_key"] = key
+            child_ys = [ssd_positions[s["_unique_key"]] for s in ssd_nodes if s.get("parent_sd_name") == sdname]
+            if child_ys:
+                sd_positions[key] = sum(child_ys) / len(child_ys)
+            else:
+                sd_positions[key] = dh / 2
+                
+        sfa_y = sum(sd_positions.values()) / len(sd_positions) if sd_positions else dh / 2
+        
+        # X Columns
+        X_sfa = 5
+        W_sfa = 110
+        
+        X_sd = 165
+        W_sd = 110
+        
+        X_ssd = 325
+        W_ssd = 110
+        
+        X_kpi = 485
+        W_kpi = 190
+        
+        # Draw connections
+        # 1. SFA to SD
+        for sd in sd_nodes:
+            sd_y = sd_positions[sd["_unique_key"]]
+            X1 = X_sfa + W_sfa
+            Y1 = sfa_y
+            X2 = X_sd
+            Y2 = sd_y
+            Xmid = (X1 + X2) / 2
+            d.add(Line(X1, Y1, Xmid, Y1, strokeColor=HexColor("#FFE600"), strokeWidth=1.5))
+            d.add(Line(Xmid, Y1, Xmid, Y2, strokeColor=HexColor("#FFE600"), strokeWidth=1.5))
+            d.add(Line(Xmid, Y2, X2, Y2, strokeColor=HexColor("#FFE600"), strokeWidth=1.5))
+            
+        # 2. SD to SSD
+        for ssd in ssd_nodes:
+            ssd_y = ssd_positions[ssd["_unique_key"]]
+            parent_sd_key = next((sd["_unique_key"] for sd in sd_nodes if sd.get("name") == ssd.get("parent_sd_name")), None)
+            if parent_sd_key:
+                Y1 = sd_positions[parent_sd_key]
+                X1 = X_sd + W_sd
+                X2 = X_ssd
+                Y2 = ssd_y
+                Xmid = (X1 + X2) / 2
+                d.add(Line(X1, Y1, Xmid, Y1, strokeColor=HexColor("#DCDCD9"), strokeWidth=1.0))
+                d.add(Line(Xmid, Y1, Xmid, Y2, strokeColor=HexColor("#DCDCD9"), strokeWidth=1.0))
+                d.add(Line(Xmid, Y2, X2, Y2, strokeColor=HexColor("#DCDCD9"), strokeWidth=1.0))
+                
+        # 3. SSD to KPI
+        for kpi in kpi_nodes:
+            kpi_y = kpi_positions[kpi["_unique_key"]]
+            parent_ssd_key = next((s["_unique_key"] for s in ssd_nodes if s.get("name") == kpi.get("parent_ssd_name")), None)
+            if parent_ssd_key:
+                Y1 = ssd_positions[parent_ssd_key]
+                X1 = X_ssd + W_ssd
+                X2 = X_kpi
+                Y2 = kpi_y
+                Xmid = (X1 + X2) / 2
+                d.add(Line(X1, Y1, Xmid, Y1, strokeColor=HexColor("#DCDCD9"), strokeWidth=1.0))
+                d.add(Line(Xmid, Y1, Xmid, Y2, strokeColor=HexColor("#DCDCD9"), strokeWidth=1.0))
+                d.add(Line(Xmid, Y2, X2, Y2, strokeColor=HexColor("#DCDCD9"), strokeWidth=1.0))
+                
+        # Draw SFA Card
+        d.add(Rect(X_sfa, sfa_y - 20, W_sfa, 40, fillColor=HexColor("#1B1B1B"), strokeColor=HexColor("#1B1B1B"), rx=4, ry=4))
+        d.add(Rect(X_sfa, sfa_y - 20, 4, 40, fillColor=HexColor("#FFE600"), strokeColor=None))
+        draw_wrapped_text(d, sfa.get("name"), X_sfa + 10, sfa_y, W_sfa - 15, font_name="Helvetica-Bold", font_size=8, fill_color=colors.white, line_height=9, max_lines=3)
+        
+        # Draw SD Cards
+        for sd in sd_nodes:
+            sd_y = sd_positions[sd["_unique_key"]]
+            d.add(Rect(X_sd, sd_y - 15, W_sd, 30, fillColor=HexColor("#F0F0F0"), strokeColor=HexColor("#B49600"), strokeWidth=0.5, rx=3, ry=3))
+            draw_wrapped_text(d, sd.get("name"), X_sd + 6, sd_y, W_sd - 12, font_name="Helvetica-Bold", font_size=7.5, fill_color=HexColor("#1B1B1B"), line_height=8.5, max_lines=2)
+            
+        # Draw SSD Cards
+        for ssd in ssd_nodes:
+            ssd_y = ssd_positions[ssd["_unique_key"]]
+            d.add(Rect(X_ssd, ssd_y - 15, W_ssd, 30, fillColor=HexColor("#FFFFFF"), strokeColor=HexColor("#DCDCD9"), strokeWidth=0.5, rx=3, ry=3))
+            draw_wrapped_text(d, ssd.get("name"), X_ssd + 6, ssd_y, W_ssd - 12, font_name="Helvetica", font_size=7, fill_color=HexColor("#2C2C2A"), line_height=8, max_lines=2)
+            
+        # Draw KPI Cards
+        for idx, kpi in enumerate(kpi_nodes):
+            kpi_y = kpi_positions[kpi["_unique_key"]]
+            d.add(Rect(X_kpi, kpi_y - 12, W_kpi, 24, fillColor=HexColor("#FFFFFF"), strokeColor=HexColor("#E2E8F0"), strokeWidth=0.5, rx=2, ry=2))
+            kname = kpi.get("kpi_name") or kpi.get("name") or "Unnamed KPI"
+            draw_wrapped_text(d, f"{idx+1:02d}. {kname}", X_kpi + 6, kpi_y, W_kpi - 12, font_name="Helvetica", font_size=7, fill_color=HexColor("#0F172A"), line_height=8, max_lines=2)
+            
+        return d
+
+    def draw_full_tree_overview(tree_data_inner: dict) -> Drawing:
+        """Draws the entire driver tree on a single landscape page overview."""
+        sfas = tree_data_inner.get("strategic_focus_areas", [])
+        if not sfas:
+            d = Drawing(684, 100)
+            d.add(String(20, 50, "No tree data available.", fontName="Helvetica", fontSize=10, fillColor=HexColor("#666666")))
+            return d
+
+        # -- Flatten the entire tree to count leaf nodes --
+        all_leaf_entries: list[dict] = []  # {sfa_idx, sd_idx, ssd_idx, kpi_idx, kpi_name, ssd_name, sd_name, sfa_name}
+        all_ssd_entries: list[dict] = []
+        all_sd_entries: list[dict] = []
+
+        for sfa_idx, sfa in enumerate(sfas):
+            sfa_name = sfa.get("name", f"SFA {sfa_idx + 1}")
+            drivers = sfa.get("drivers", []) if not sfa.get("collapsed") else []
+            if not drivers:
+                all_sd_entries.append({"sfa_idx": sfa_idx, "sd_idx": 0, "name": "(none)", "sfa_name": sfa_name, "has_children": False})
+            for sd_idx, sd in enumerate(drivers):
+                sd_name = sd.get("name", f"SD {sd_idx + 1}")
+                ssds = (sd.get("sector_specific_drivers", []) or sd.get("sector_drivers", [])) if not sd.get("collapsed") else []
+                all_sd_entries.append({"sfa_idx": sfa_idx, "sd_idx": sd_idx, "name": sd_name, "sfa_name": sfa_name, "has_children": len(ssds) > 0})
+                if not ssds:
+                    all_ssd_entries.append({"sfa_idx": sfa_idx, "sd_idx": sd_idx, "ssd_idx": 0, "name": "(none)", "sd_name": sd_name, "sfa_name": sfa_name, "has_children": False})
+                for ssd_idx, ssd in enumerate(ssds):
+                    ssd_name = ssd.get("name", f"SSD {ssd_idx + 1}")
+                    kpis = ssd.get("kpis", []) if not ssd.get("collapsed") else []
+                    all_ssd_entries.append({"sfa_idx": sfa_idx, "sd_idx": sd_idx, "ssd_idx": ssd_idx, "name": ssd_name, "sd_name": sd_name, "sfa_name": sfa_name, "has_children": len(kpis) > 0})
+                    if not kpis:
+                        all_leaf_entries.append({"sfa_idx": sfa_idx, "sd_idx": sd_idx, "ssd_idx": ssd_idx, "kpi_idx": 0, "kpi_name": "(none)", "ssd_name": ssd_name, "sd_name": sd_name, "sfa_name": sfa_name})
+                    for kpi_idx, kpi in enumerate(kpis):
+                        kpi_name = kpi.get("kpi_name") or kpi.get("name") or f"KPI {kpi_idx + 1}"
+                        all_leaf_entries.append({"sfa_idx": sfa_idx, "sd_idx": sd_idx, "ssd_idx": ssd_idx, "kpi_idx": kpi_idx, "kpi_name": kpi_name, "ssd_name": ssd_name, "sd_name": sd_name, "sfa_name": sfa_name})
+
+        n_leaves = max(len(all_leaf_entries), 1)
+
+        # -- Dynamic sizing based on leaf count --
+        avail_w = 684
+        avail_h = max(380, min(500, n_leaves * 18 + 60))  # scale drawing height
+
+        margin_top = 30
+        margin_bottom = 10
+        usable_h = avail_h - margin_top - margin_bottom
+
+        # Node sizing – scale down for dense trees
+        if n_leaves <= 10:
+            kpi_h = 20
+            kpi_gap = max(4, (usable_h - n_leaves * kpi_h) / max(n_leaves - 1, 1))
+        elif n_leaves <= 25:
+            kpi_h = 16
+            kpi_gap = max(2, (usable_h - n_leaves * kpi_h) / max(n_leaves - 1, 1))
+        else:
+            kpi_h = 12
+            kpi_gap = max(1, (usable_h - n_leaves * kpi_h) / max(n_leaves - 1, 1))
+
+        total_col_h = n_leaves * kpi_h + (n_leaves - 1) * kpi_gap
+        if total_col_h > usable_h:
+            avail_h = int(total_col_h + margin_top + margin_bottom + 20)
+            usable_h = avail_h - margin_top - margin_bottom
+
+        start_y = margin_bottom + (usable_h - total_col_h) / 2
+
+        d = Drawing(avail_w, avail_h)
+        d.add(Rect(0, 0, avail_w, avail_h, fillColor=HexColor("#FAFAFA"), strokeColor=HexColor("#E2E8F0"), strokeWidth=0.5, rx=6, ry=6))
+
+        # -- X column positions (5 columns: Root, SFA, SD, SSD, KPI) --
+        X_root = 5
+        W_root = 50
+        X_sfa = 70
+        W_sfa = 95
+        X_sd = 185
+        W_sd = 95
+        X_ssd = 300
+        W_ssd = 95
+        X_kpi = 415
+        W_kpi = 260
+        node_h = max(kpi_h, 20)  # min 20 for parent cards
+
+        # -- Assign Y positions to KPI leaves --
+        kpi_positions: dict[str, float] = {}
+        for idx, leaf in enumerate(all_leaf_entries):
+            key = f"kpi_{leaf['sfa_idx']}_{leaf['sd_idx']}_{leaf['ssd_idx']}_{leaf['kpi_idx']}"
+            kpi_positions[key] = start_y + idx * (kpi_h + kpi_gap) + kpi_h / 2
+
+        # -- SSD positions (centroid of children) --
+        ssd_positions: dict[str, float] = {}
+        for idx, ssd in enumerate(all_ssd_entries):
+            key = f"ssd_{ssd['sfa_idx']}_{ssd['sd_idx']}_{ssd['ssd_idx']}"
+            child_ys = [kpi_positions[k] for k, v in kpi_positions.items()
+                       if k.startswith(f"kpi_{ssd['sfa_idx']}_{ssd['sd_idx']}_{ssd['ssd_idx']}_")]
+            ssd_positions[key] = sum(child_ys) / len(child_ys) if child_ys else avail_h / 2
+
+        # -- SD positions (centroid of children) --
+        sd_positions: dict[str, float] = {}
+        for idx, sd in enumerate(all_sd_entries):
+            key = f"sd_{sd['sfa_idx']}_{sd['sd_idx']}"
+            child_ys = [ssd_positions[k] for k in ssd_positions
+                       if k.startswith(f"ssd_{sd['sfa_idx']}_{sd['sd_idx']}_")]
+            sd_positions[key] = sum(child_ys) / len(child_ys) if child_ys else avail_h / 2
+
+        # -- SFA positions (centroid of children) --
+        sfa_positions: dict[str, float] = {}
+        for sfa_idx, sfa in enumerate(sfas):
+            key = f"sfa_{sfa_idx}"
+            child_ys = [sd_positions[k] for k in sd_positions
+                       if k.startswith(f"sd_{sfa_idx}_")]
+            sfa_positions[key] = sum(child_ys) / len(child_ys) if child_ys else avail_h / 2
+
+        # -- Root position --
+        root_y = sum(sfa_positions.values()) / len(sfa_positions) if sfa_positions else avail_h / 2
+
+        # ====== Draw connections ======
+        # Root → SFA
+        for sfa_idx in range(len(sfas)):
+            key = f"sfa_{sfa_idx}"
+            if key not in sfa_positions:
+                continue
+            sfa_y = sfa_positions[key]
+            X1 = X_root + W_root
+            Y1 = root_y
+            X2 = X_sfa
+            Y2 = sfa_y
+            Xmid = (X1 + X2) / 2
+            d.add(Line(X1, Y1, Xmid, Y1, strokeColor=HexColor("#FFE600"), strokeWidth=1.2))
+            d.add(Line(Xmid, Y1, Xmid, Y2, strokeColor=HexColor("#FFE600"), strokeWidth=1.2))
+            d.add(Line(Xmid, Y2, X2, Y2, strokeColor=HexColor("#FFE600"), strokeWidth=1.2))
+
+        # SFA → SD
+        for sd in all_sd_entries:
+            sd_key = f"sd_{sd['sfa_idx']}_{sd['sd_idx']}"
+            sfa_key = f"sfa_{sd['sfa_idx']}"
+            if sd_key not in sd_positions or sfa_key not in sfa_positions:
+                continue
+            X1 = X_sfa + W_sfa
+            Y1 = sfa_positions[sfa_key]
+            X2 = X_sd
+            Y2 = sd_positions[sd_key]
+            Xmid = (X1 + X2) / 2
+            d.add(Line(X1, Y1, Xmid, Y1, strokeColor=HexColor("#B49600"), strokeWidth=0.8))
+            d.add(Line(Xmid, Y1, Xmid, Y2, strokeColor=HexColor("#B49600"), strokeWidth=0.8))
+            d.add(Line(Xmid, Y2, X2, Y2, strokeColor=HexColor("#B49600"), strokeWidth=0.8))
+
+        # SD → SSD
+        for ssd in all_ssd_entries:
+            ssd_key = f"ssd_{ssd['sfa_idx']}_{ssd['sd_idx']}_{ssd['ssd_idx']}"
+            sd_key = f"sd_{ssd['sfa_idx']}_{ssd['sd_idx']}"
+            if ssd_key not in ssd_positions or sd_key not in sd_positions:
+                continue
+            X1 = X_sd + W_sd
+            Y1 = sd_positions[sd_key]
+            X2 = X_ssd
+            Y2 = ssd_positions[ssd_key]
+            Xmid = (X1 + X2) / 2
+            d.add(Line(X1, Y1, Xmid, Y1, strokeColor=HexColor("#DCDCD9"), strokeWidth=0.7))
+            d.add(Line(Xmid, Y1, Xmid, Y2, strokeColor=HexColor("#DCDCD9"), strokeWidth=0.7))
+            d.add(Line(Xmid, Y2, X2, Y2, strokeColor=HexColor("#DCDCD9"), strokeWidth=0.7))
+
+        # SSD → KPI
+        for leaf in all_leaf_entries:
+            kpi_key = f"kpi_{leaf['sfa_idx']}_{leaf['sd_idx']}_{leaf['ssd_idx']}_{leaf['kpi_idx']}"
+            ssd_key = f"ssd_{leaf['sfa_idx']}_{leaf['sd_idx']}_{leaf['ssd_idx']}"
+            if kpi_key not in kpi_positions or ssd_key not in ssd_positions:
+                continue
+            X1 = X_ssd + W_ssd
+            Y1 = ssd_positions[ssd_key]
+            X2 = X_kpi
+            Y2 = kpi_positions[kpi_key]
+            Xmid = (X1 + X2) / 2
+            d.add(Line(X1, Y1, Xmid, Y1, strokeColor=HexColor("#DCDCD9"), strokeWidth=0.5))
+            d.add(Line(Xmid, Y1, Xmid, Y2, strokeColor=HexColor("#DCDCD9"), strokeWidth=0.5))
+            d.add(Line(Xmid, Y2, X2, Y2, strokeColor=HexColor("#DCDCD9"), strokeWidth=0.5))
+
+        # ====== Draw nodes ======
+        fs = max(5, min(7, 7 - (n_leaves - 10) * 0.1))  # dynamic font size
+
+        # Root node
+        root_h = 30
+        d.add(Rect(X_root, root_y - root_h / 2, W_root, root_h, fillColor=HexColor("#FFE600"), strokeColor=HexColor("#B49600"), strokeWidth=0.8, rx=4, ry=4))
+        draw_wrapped_text(d, "KPI Library", X_root + 4, root_y, W_root - 8, font_name="Helvetica-Bold", font_size=7, fill_color=HexColor("#1B1B1B"), line_height=8, max_lines=2)
+
+        # SFA nodes
+        sfa_card_h = max(24, node_h)
+        for sfa_idx, sfa in enumerate(sfas):
+            key = f"sfa_{sfa_idx}"
+            if key not in sfa_positions:
+                continue
+            y = sfa_positions[key]
+            d.add(Rect(X_sfa, y - sfa_card_h / 2, W_sfa, sfa_card_h, fillColor=HexColor("#1B1B1B"), strokeColor=HexColor("#1B1B1B"), rx=3, ry=3))
+            d.add(Rect(X_sfa, y - sfa_card_h / 2, 3, sfa_card_h, fillColor=HexColor("#FFE600"), strokeColor=None))
+            draw_wrapped_text(d, sfa.get("name"), X_sfa + 7, y, W_sfa - 12, font_name="Helvetica-Bold", font_size=fs, fill_color=colors.white, line_height=fs + 1, max_lines=3)
+
+        # SD nodes
+        sd_card_h = max(20, node_h - 4)
+        for sd in all_sd_entries:
+            key = f"sd_{sd['sfa_idx']}_{sd['sd_idx']}"
+            if key not in sd_positions or sd["name"] == "(none)":
+                continue
+            y = sd_positions[key]
+            d.add(Rect(X_sd, y - sd_card_h / 2, W_sd, sd_card_h, fillColor=HexColor("#F0F0F0"), strokeColor=HexColor("#B49600"), strokeWidth=0.5, rx=3, ry=3))
+            draw_wrapped_text(d, sd["name"], X_sd + 5, y, W_sd - 10, font_name="Helvetica-Bold", font_size=max(fs - 0.5, 5), fill_color=HexColor("#1B1B1B"), line_height=fs, max_lines=2)
+
+        # SSD nodes
+        ssd_card_h = max(18, node_h - 6)
+        for ssd in all_ssd_entries:
+            key = f"ssd_{ssd['sfa_idx']}_{ssd['sd_idx']}_{ssd['ssd_idx']}"
+            if key not in ssd_positions or ssd["name"] == "(none)":
+                continue
+            y = ssd_positions[key]
+            d.add(Rect(X_ssd, y - ssd_card_h / 2, W_ssd, ssd_card_h, fillColor=HexColor("#FFFFFF"), strokeColor=HexColor("#DCDCD9"), strokeWidth=0.5, rx=2, ry=2))
+            draw_wrapped_text(d, ssd["name"], X_ssd + 5, y, W_ssd - 10, font_name="Helvetica", font_size=max(fs - 1, 4.5), fill_color=HexColor("#2C2C2A"), line_height=fs - 0.5, max_lines=2)
+
+        # KPI nodes
+        for leaf in all_leaf_entries:
+            kpi_key = f"kpi_{leaf['sfa_idx']}_{leaf['sd_idx']}_{leaf['ssd_idx']}_{leaf['kpi_idx']}"
+            if kpi_key not in kpi_positions or leaf["kpi_name"] == "(none)":
+                continue
+            y = kpi_positions[kpi_key]
+            d.add(Rect(X_kpi, y - kpi_h / 2, W_kpi, kpi_h, fillColor=HexColor("#FFFFFF"), strokeColor=HexColor("#E2E8F0"), strokeWidth=0.4, rx=2, ry=2))
+            draw_wrapped_text(d, leaf["kpi_name"], X_kpi + 5, y, W_kpi - 10, font_name="Helvetica", font_size=max(fs - 1, 4.5), fill_color=HexColor("#0F172A"), line_height=fs - 0.5, max_lines=2)
+
+        # Column header labels
+        label_y = avail_h - 12
+        for lbl, lx in [("Root", X_root), ("Strategic Focus", X_sfa), ("Standard Driver", X_sd), ("Sector Driver", X_ssd), ("Operational KPI", X_kpi)]:
+            d.add(String(lx, label_y, lbl, fontName="Helvetica-Bold", fontSize=5.5, fillColor=HexColor("#999999")))
+
+        return d
+
+    story = []
+
+    # --- Cover Page Layout ---
+    story.append(Spacer(1, 40))
+    story.append(Paragraph("EY KPI Advisory & Analytics", subtitle_style))
+    story.append(Paragraph(f"KPI Driver Tree Specification", title_style))
+    if profile and profile.client_name:
+        story.append(Paragraph(f"Prepared for: {profile.client_name}", body_style))
+    
+    # Yellow colored accent bar
+    bar_data = [['']]
+    bar_table = Table(bar_data, colWidths=[684], rowHeights=[4])
+    bar_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), ey_yellow),
+        ('PADDING', (0,0), (-1,-1), 0),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+        ('TOPPADDING', (0,0), (-1,-1), 0),
+    ]))
+    story.append(bar_table)
+    story.append(Spacer(1, 20))
+    story.append(Paragraph("A hierarchical strategy-to-KPI decomposition mapping business focus areas, strategic drivers, and sector-specific operational metrics.", body_style))
+    story.append(Spacer(1, 30))
+
+    # Add metadata table
+    meta_data = [
+        [Paragraph("Document Version", tbl_label_style), Paragraph("1.0 (Approved)" if tree_data.get("status") == "approved" else "1.0 (Draft)", tbl_value_style)],
+        [Paragraph("Generated Date", tbl_label_style), Paragraph(datetime.date.today().strftime("%B %d, %Y"), tbl_value_style)],
+        [Paragraph("Industry Sector", tbl_label_style), Paragraph(context.industry or (profile.industry if profile else "Not Specified"), tbl_value_style)],
+        [Paragraph("Organizational Level", tbl_label_style), Paragraph(context.organization_level or "Not Specified", tbl_value_style)],
+    ]
+    meta_table = Table(meta_data, colWidths=[150, 400])
+    meta_table.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+        ('TOPPADDING', (0,0), (-1,-1), 8),
+        ('LINEBELOW', (0,0), (-1,-1), 0.5, border_color),
+    ]))
+    story.append(meta_table)
+    
+    story.append(PageBreak())
+
+    # --- Full Tree Overview Page ---
+    overview_title_style = ParagraphStyle(
+        'OverviewTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=16,
+        leading=20,
+        textColor=dark_gray,
+        spaceBefore=0,
+        spaceAfter=6,
+        keepWithNext=True
+    )
+    overview_desc_style = ParagraphStyle(
+        'OverviewDesc',
+        parent=styles['Normal'],
+        fontName='Helvetica-Oblique',
+        fontSize=9,
+        leading=12.5,
+        textColor=colors.HexColor("#555555"),
+        spaceAfter=14
+    )
+    story.append(Paragraph("Complete KPI Driver Tree Overview", overview_title_style))
+    story.append(Paragraph(
+        "A consolidated view of the full strategy-to-KPI decomposition hierarchy — from root source "
+        "through strategic focus areas, standard drivers, sector-specific drivers, to operational KPIs.",
+        overview_desc_style
+    ))
+    overview_drawing = draw_full_tree_overview(tree_data)
+    story.append(overview_drawing)
+    story.append(PageBreak())
+
+    # --- Render SFAs ---
+    sfas = tree_data.get("strategic_focus_areas", [])
+    for sfa_idx, sfa in enumerate(sfas):
+        sfa_title_style = ParagraphStyle(
+            f'SfaTitle_{sfa_idx}',
+            parent=styles['Normal'],
+            fontName='Helvetica-Bold',
+            fontSize=15,
+            leading=18,
+            textColor=dark_gray,
+            spaceBefore=0,
+            spaceAfter=4,
+            keepWithNext=True
+        )
+        sfa_desc_style = ParagraphStyle(
+            f'SfaDesc_{sfa_idx}',
+            parent=styles['Normal'],
+            fontName='Helvetica-Oblique',
+            fontSize=9,
+            leading=12.5,
+            textColor=colors.HexColor("#555555"),
+            spaceAfter=10
+        )
+        
+        story.append(Paragraph(f"Strategic Focus Area {sfa_idx+1}: {sfa.get('name')}", sfa_title_style))
+        if sfa.get('description'):
+            story.append(Paragraph(sfa.get('description'), sfa_desc_style))
+            
+        tree_drawing = draw_sfa_tree_flowable(sfa)
+        story.append(tree_drawing)
+        
+        if sfa_idx < len(sfas) - 1:
+            story.append(PageBreak())
+            
+    doc.build(story, canvasmaker=LandscapeNumberedCanvas)
+

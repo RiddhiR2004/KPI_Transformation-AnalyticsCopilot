@@ -24,6 +24,8 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
   const [editForm, setEditForm] = useState<KPI | null>(null);
   const [functionalAreas, setFunctionalAreas] = useState<string[]>([]);
   const [kpiCategories, setKpiCategories] = useState<string[]>([]);
+  const [catalogItems, setCatalogItems] = useState<KPI[]>([]);
+  const [catalogSearch, setCatalogSearch] = useState("");
   const navigate = useNavigate();
   const pageSize = 6;
 
@@ -31,6 +33,7 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
     refresh();
     metadataService.getMetadataNames("functional-areas").then(setFunctionalAreas);
     metadataService.getMetadataNames("kpi-categories").then(setKpiCategories);
+    api.getCatalog().then(setCatalogItems).catch(err => console.error("Failed to load catalog", err));
   }, [exports]);
 
   async function refresh() {
@@ -110,6 +113,9 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
         functional_area: editForm.functional_area,
         kpi_category: editForm.kpi_category,
         why_important: editForm.why_important,
+        kra: editForm.kra,
+        source_system: editForm.source_system,
+        sap_module: editForm.sap_module,
       };
       
       let updated: KPILibrary;
@@ -518,8 +524,13 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
                       </select>
                     </div>
                     <div>
-                      <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">KRA (Read-Only)</span>
-                      <span className="text-xs font-semibold text-[#F5F5F5] block mt-1">{editForm?.kra || "—"}</span>
+                      <label className="label">KRA</label>
+                      <input
+                        type="text"
+                        className="field text-xs font-semibold"
+                        value={editForm?.kra || ""}
+                        onChange={(e) => setFormVal("kra", e.target.value)}
+                      />
                     </div>
                     <div>
                       <label className="label">Refresh Cadence</label>
@@ -580,7 +591,7 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
                   {/* Enterprise Governance */}
                   <div className="bg-[#111111]/40 border border-[#303030] p-4 rounded-sm space-y-4">
                     <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#FFE600]">Enterprise Governance & Infrastructure</h4>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-4 gap-4">
                       <div className="col-span-1">
                         <label className="label">Business Owner</label>
                         <input
@@ -600,8 +611,22 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
                         />
                       </div>
                       <div className="col-span-1">
-                        <span className="text-[9px] uppercase tracking-wider text-[#B0B0B0] block">Source System (Read-Only)</span>
-                        <span className="text-xs font-semibold text-[#F5F5F5] block mt-1">{editForm?.source_system || "—"}</span>
+                        <label className="label">Source System</label>
+                        <input
+                          type="text"
+                          className="field text-xs font-semibold"
+                          value={editForm?.source_system || ""}
+                          onChange={(e) => setFormVal("source_system", e.target.value)}
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <label className="label">SAP Module</label>
+                        <input
+                          type="text"
+                          className="field text-xs font-semibold"
+                          value={editForm?.sap_module || ""}
+                          onChange={(e) => setFormVal("sap_module", e.target.value)}
+                        />
                       </div>
                     </div>
                   </div>

@@ -31,6 +31,7 @@ FILES = {
     "activity_log": DATA_DIR / "activity_log.json",
     "functional_spec": DATA_DIR / "functional_specification.json",
     "approved_kpis": DATA_DIR / "approved_kpi_library.json",
+    "kpi_tree": DATA_DIR / "kpi_tree.json",
 }
 
 
@@ -73,6 +74,7 @@ def read_json(path: Path, default: Any) -> Any:
                 "additional_business_challenges": json.loads(row.additional_business_challenges or "[]"),
                 "additional_kras": json.loads(row.additional_kras or "[]"),
                 "additional_functional_areas": json.loads(row.additional_functional_areas or "[]"),
+                "custom_fields": json.loads(getattr(row, "custom_fields", None) or "[]"),
                 "updated_at": row.updated_at.isoformat() if row.updated_at else now_iso(),
             }
             
@@ -154,7 +156,12 @@ def read_json(path: Path, default: Any) -> Any:
                 return default
             return {
                 "name": row.name,
-                "data": json.loads(row.data),
+                "client_id": row.client_id,
+                "version": row.version,
+                "status": row.status,
+                "created_by": row.created_by,
+                "updated_by": row.updated_by,
+                "data": json.loads(row.tree_json or row.data or "{}"),
                 "updated_at": row.updated_at.isoformat() if row.updated_at else now_iso(),
             }
             
@@ -193,6 +200,7 @@ def write_json(path: Path, data: Any) -> None:
             row.additional_business_challenges = json.dumps(validated.additional_business_challenges)
             row.additional_kras = json.dumps(validated.additional_kras)
             row.additional_functional_areas = json.dumps(validated.additional_functional_areas)
+            row.custom_fields = json.dumps([f.model_dump() for f in validated.custom_fields])
             row.updated_at = datetime.now()
             session.commit()
             
@@ -295,6 +303,12 @@ def write_json(path: Path, data: Any) -> None:
                     row = KPITree(id=1)
                     session.add(row)
             row.name = data.get("name", "Default Tree")
+            row.client_id = data.get("client_id")
+            row.version = data.get("version", 1)
+            row.status = data.get("status", "draft")
+            row.created_by = data.get("created_by", "")
+            row.updated_by = data.get("updated_by", "")
+            row.tree_json = json.dumps(data.get("data", {}))
             row.data = json.dumps(data.get("data", {}))
             row.updated_at = datetime.now()
             session.commit()
@@ -328,6 +342,7 @@ def seed_from_dict(data: dict[str, Any]) -> None:
                 additional_business_challenges=json.dumps(bc_data.get("additional_business_challenges", [])),
                 additional_kras=json.dumps(bc_data.get("additional_kras", [])),
                 additional_functional_areas=json.dumps(bc_data.get("additional_functional_areas", [])),
+                custom_fields=json.dumps(bc_data.get("custom_fields", [])),
                 updated_at=updated_at
             ))
 

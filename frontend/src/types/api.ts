@@ -1,3 +1,8 @@
+export type CustomContextField = {
+  label: string;
+  value: string;
+};
+
 export type BusinessContext = {
   industry: string;
   organization_level: string;
@@ -10,6 +15,7 @@ export type BusinessContext = {
   additional_business_challenges?: string[];
   additional_kras?: string[];
   additional_functional_areas?: string[];
+  custom_fields?: CustomContextField[];
 };
 
 export type PromptRecord = {
@@ -83,6 +89,7 @@ export type WorkflowStatus = {
   kpi_library: boolean;
   functional_specification: boolean;
   technical_mapping: boolean;
+  kpi_logic: boolean;
   kpi_tree: boolean;
   dashboard: boolean;
 };
@@ -95,11 +102,84 @@ export type ActivityEvent = {
 };
 
 export type ExportItem = {
-  id: "prompt" | "kpi_library" | "functional_document" | "json_bundle";
+  id: "prompt" | "kpi_library" | "functional_document" | "kpi_driver_tree" | "json_bundle";
   label: string;
   description: string;
   formats: string[];
   available: boolean;
+};
+
+export type KpiTreeSourceContext = {
+  strategic_objectives: string[];
+  business_challenges: string[];
+  kras: string[];
+  functional_areas: string[];
+  custom_parameters: string[];
+};
+
+export type KpiTreeKpiNode = {
+  kpi_name: string;
+  kpi_description?: string;
+  source_context?: KpiTreeSourceContext;
+  x_offset?: number;
+  y_offset?: number;
+  x_position?: number;
+  y_position?: number;
+  collapsed?: boolean;
+};
+
+export type KpiTreeSectorDriverNode = {
+  name: string;
+  description?: string;
+  business_rationale?: string;
+  source_context?: KpiTreeSourceContext;
+  kpis: KpiTreeKpiNode[];
+  x_offset?: number;
+  y_offset?: number;
+  x_position?: number;
+  y_position?: number;
+  collapsed?: boolean;
+};
+
+export type KpiTreeStandardDriverNode = {
+  name: string;
+  description?: string;
+  business_rationale?: string;
+  source_context?: KpiTreeSourceContext;
+  sector_specific_drivers: KpiTreeSectorDriverNode[];
+  x_offset?: number;
+  y_offset?: number;
+  x_position?: number;
+  y_position?: number;
+  collapsed?: boolean;
+};
+
+export type KpiTreeStrategicFocusAreaNode = {
+  name: string;
+  description?: string;
+  business_rationale?: string;
+  source_context?: KpiTreeSourceContext;
+  drivers: KpiTreeStandardDriverNode[];
+  x_offset?: number;
+  y_offset?: number;
+  x_position?: number;
+  y_position?: number;
+  collapsed?: boolean;
+};
+
+export type KpiTreeData = {
+  strategic_focus_areas: KpiTreeStrategicFocusAreaNode[];
+};
+
+export type KpiTreeRecord = {
+  name: string;
+  client_id?: number;
+  version: number;
+  status: "draft" | "approved";
+  created_by?: string;
+  updated_by?: string;
+  data: KpiTreeData;
+  updated_at?: string;
 };
 
 export type FunctionalSpecItem = {
