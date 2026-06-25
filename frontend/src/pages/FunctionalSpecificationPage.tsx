@@ -910,6 +910,17 @@ export function FunctionalSpecificationPage({ onChange, exports }: { onChange: (
                 </button>
               )}
 
+              {/* Proceed to Next Step */}
+              {isApproved && (
+                <Link
+                  to="/step-4"
+                  className="button-yellow border border-black/10 !py-1.5 !px-3 !text-xs flex items-center gap-1.5"
+                >
+                  Proceed to Technical Data Flow Mapping
+                  <ChevronRight size={14} />
+                </Link>
+              )}
+
               {/* Print Button (only shown in preview tab) */}
               {activeTab === "preview" && (
                 <button

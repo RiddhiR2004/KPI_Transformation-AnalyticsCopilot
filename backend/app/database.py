@@ -157,6 +157,18 @@ class ApprovedKPIs(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
+class TechnicalDataMappingDB(Base):
+    __tablename__ = "technical_data_mapping"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    engagement_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    items: Mapped[str] = mapped_column(Text, default="[]")  # JSON string
+    executive_summary: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(50), default="draft")  # "draft" or "approved"
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
 class TranscriptAnalysis(Base):
     __tablename__ = "transcript_analysis"
 
@@ -467,7 +479,8 @@ def init_db() -> None:
                 "kpi_library",
                 "kpi_tree",
                 "functional_specification",
-                "approved_kpis"
+                "approved_kpis",
+                "technical_data_mapping"
             ]
             for table_name in tables_to_migrate:
                 cursor_table = conn.exec_driver_sql(f"PRAGMA table_info({table_name})")

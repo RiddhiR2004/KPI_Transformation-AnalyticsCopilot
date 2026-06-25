@@ -16,6 +16,7 @@ from app.database import (
     ActivityLog,
     FunctionalSpecification,
     ApprovedKPIs,
+    TechnicalDataMappingDB,
     DATA_DIR,
     TranscriptAnalysis,
     active_engagement_id_ctx,
@@ -32,6 +33,7 @@ FILES = {
     "functional_spec": DATA_DIR / "functional_specification.json",
     "approved_kpis": DATA_DIR / "approved_kpi_library.json",
     "kpi_tree": DATA_DIR / "kpi_tree.json",
+    "technical_mapping": DATA_DIR / "technical_data_mapping.json",
 }
 
 
@@ -162,6 +164,20 @@ def read_json(path: Path, default: Any) -> Any:
                 "created_by": row.created_by,
                 "updated_by": row.updated_by,
                 "data": json.loads(row.tree_json or row.data or "{}"),
+                "updated_at": row.updated_at.isoformat() if row.updated_at else now_iso(),
+            }
+            
+        elif key == "technical_mapping":
+            if eng_id is not None:
+                row = session.scalar(select(TechnicalDataMappingDB).filter_by(engagement_id=eng_id))
+            else:
+                row = session.scalar(select(TechnicalDataMappingDB).filter_by(id=1))
+            if not row:
+                return default
+            return {
+                "items": json.loads(row.items),
+                "executive_summary": row.executive_summary or "",
+                "status": row.status or "draft",
                 "updated_at": row.updated_at.isoformat() if row.updated_at else now_iso(),
             }
             
@@ -310,6 +326,23 @@ def write_json(path: Path, data: Any) -> None:
             row.updated_by = data.get("updated_by", "")
             row.tree_json = json.dumps(data.get("data", {}))
             row.data = json.dumps(data.get("data", {}))
+            row.updated_at = datetime.now()
+            session.commit()
+
+        elif key == "technical_mapping":
+            if eng_id is not None:
+                row = session.scalar(select(TechnicalDataMappingDB).filter_by(engagement_id=eng_id))
+                if not row:
+                    row = TechnicalDataMappingDB(engagement_id=eng_id)
+                    session.add(row)
+            else:
+                row = session.scalar(select(TechnicalDataMappingDB).filter_by(id=1))
+                if not row:
+                    row = TechnicalDataMappingDB(id=1)
+                    session.add(row)
+            row.items = json.dumps(data.get("items", []))
+            row.executive_summary = data.get("executive_summary", "")
+            row.status = data.get("status", "draft")
             row.updated_at = datetime.now()
             session.commit()
 

@@ -88,10 +88,10 @@ export type WorkflowStatus = {
   prompt_generation: boolean;
   kpi_library: boolean;
   functional_specification: boolean;
-  technical_mapping: boolean;
-  kpi_logic: boolean;
-  kpi_tree: boolean;
-  dashboard: boolean;
+  technical_mapping?: boolean;
+  kpi_tree?: boolean;
+  kpi_logic?: boolean;
+  dashboard?: boolean;
 };
 
 export type ActivityEvent = {
@@ -102,7 +102,7 @@ export type ActivityEvent = {
 };
 
 export type ExportItem = {
-  id: "prompt" | "kpi_library" | "functional_document" | "kpi_driver_tree" | "json_bundle";
+  id: "prompt" | "kpi_library" | "functional_document" | "technical_mapping" | "kpi_driver_tree" | "json_bundle";
   label: string;
   description: string;
   formats: string[];
@@ -246,6 +246,44 @@ export type FunctionalSpecItem = {
 export type FunctionalSpecification = {
   items: FunctionalSpecItem[];
   approved_items?: FunctionalSpecItem[];
+  executive_summary?: string;
+  status?: string;
+  updated_at?: string;
+};
+
+export type TechnicalDimensionItem = {
+  dimension_type: string;
+  dimension: string;
+  dimension_requirement: string;
+  example: string;
+  source_logic_table_field: string;
+  is_further_input_required: string;
+  source_sap: string;
+  table_field_sap: string;
+  owner_if_manual: string;
+  comments: string;
+};
+
+export type TechnicalDataMappingItem = {
+  id: string;
+  kpi_name: string;
+  priority: string;
+  critical_to_measure: string;
+  type_of_kpi: string;
+  description: string;
+  logic_calculation: string;
+  dimensions: string;
+  measures: string;
+  uom: string;
+  technical_details: string;
+  signed_off_by: string;
+  requirement_from: string;
+  action: string;
+  dimension_list: TechnicalDimensionItem[];
+};
+
+export type TechnicalDataMapping = {
+  items: TechnicalDataMappingItem[];
   executive_summary?: string;
   status?: string;
   updated_at?: string;

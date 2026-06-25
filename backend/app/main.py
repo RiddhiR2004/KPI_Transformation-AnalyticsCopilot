@@ -2156,6 +2156,7 @@ def workflow_status() -> WorkflowStatus:
     prompt = bool(read_json(FILES["prompts"], {}))
     library = bool(read_json(FILES["kpi_library"], {}).get("items"))
     spec = bool(read_json(FILES["functional_spec"], {}).get("items"))
+    tech_mapping = bool(read_json(FILES["technical_mapping"], {}).get("items"))
     
     # Check if tree exists
     with SessionLocal() as session:
@@ -2173,6 +2174,7 @@ def workflow_status() -> WorkflowStatus:
         kpi_library=library,
         functional_specification=spec,
         kpi_tree=has_tree,
+        technical_mapping=tech_mapping,
     )
 
 
@@ -2586,6 +2588,223 @@ async def generate_spec(request: Request) -> dict[str, Any]:
     }
 
 
+# -----------------------------------------------------------------------------------------
+# TECHNICAL DATA MAPPING ENDPOINTS (Step 4)
+# -----------------------------------------------------------------------------------------
+
+from app.models import TechnicalDataMapping, TechnicalDataMappingItem, TechnicalDimensionItem
+from app.database import TechnicalDataMappingDB
+
+@app.get("/technical-mapping")
+def get_technical_mapping() -> dict[str, Any]:
+    return read_json(FILES["technical_mapping"], {})
+
+
+@app.post("/technical-mapping")
+def save_technical_mapping(request: Request, mapping: TechnicalDataMapping) -> TechnicalDataMapping:
+    mapping.updated_at = datetime.now()
+    write_json(FILES["technical_mapping"], mapping.model_dump(mode="json"))
+    
+    with SessionLocal() as session:
+        eng_id = active_engagement_id_ctx.get()
+        if eng_id is not None:
+            db_mapping = session.scalar(select(TechnicalDataMappingDB).filter_by(engagement_id=eng_id))
+        else:
+            db_mapping = session.scalar(select(TechnicalDataMappingDB).filter_by(id=1))
+            
+        if not db_mapping:
+            db_mapping = TechnicalDataMappingDB(engagement_id=eng_id)
+            session.add(db_mapping)
+            
+        db_mapping.items = json.dumps([item.model_dump(mode="json") for item in mapping.items])
+        db_mapping.executive_summary = mapping.executive_summary
+        db_mapping.status = mapping.status
+        db_mapping.updated_at = mapping.updated_at
+        session.commit()
+
+    log_activity("Technical Data Mapping Saved", f"Saved updates to Technical Data Mapping. Status: {mapping.status}")
+    
+    log_audit(
+        request=request,
+        action="Update",
+        module="Technical Data Mapping",
+        entity_type="TDM",
+        entity_name="Technical Data Mapping",
+        new_value=f"Status: {mapping.status}, Items: {len(mapping.items)}"
+    )
+    return mapping
+
+
+@app.post("/generate-technical-mapping")
+async def generate_technical_mapping(request: Request) -> dict[str, Any]:
+    context = current_context()
+    approved_data = read_json(FILES["approved_kpis"], {})
+    approved_items_raw = approved_data.get("items") or []
+    approved_kpis = [KPI(**item) for item in approved_items_raw]
+    if not approved_kpis:
+        raise HTTPException(status_code=400, detail="No approved KPIs in library. Please approve KPIs in Step 2 first.")
+    
+    provider = get_provider()
+    
+    if isinstance(provider, DemoProvider):
+        # Demo generation
+        mapping_items = []
+        for idx, k in enumerate(approved_kpis):
+            priority = "L1" if idx % 3 == 0 else ("L2" if idx % 3 == 1 else "L3")
+            mapping_item = TechnicalDataMappingItem(
+                id=k.id,
+                kpi_name=k.kpi_name,
+                priority=priority,
+                critical_to_measure="Process",
+                type_of_kpi=k.functional_area or "Operations",
+                description=k.kpi_description or "Technical description not provided.",
+                logic_calculation=k.formula or "Source / Target",
+                dimensions="Time, Region, Plant, Product",
+                measures="Count, Sum",
+                uom="Percentage",
+                technical_details="Daily snapshot required.",
+                signed_off_by="Process Owner",
+                requirement_from="Business User",
+                action="Improve"
+            )
+            # Add some demo dimensions
+            mapping_item.dimension_list = [
+                TechnicalDimensionItem(
+                    dimension_type="Standard",
+                    dimension="Plant",
+                    dimension_requirement="Identify location",
+                    example="1000",
+                    source_logic_table_field="Plant Master",
+                    is_further_input_required="No",
+                    source_sap="MM"
+                ),
+                TechnicalDimensionItem(
+                    dimension_type="Standard",
+                    dimension="Date",
+                    dimension_requirement="Time analysis",
+                    example="2023-10-01",
+                    source_logic_table_field="Posting Date",
+                    is_further_input_required="No",
+                    source_sap="FI"
+                )
+            ]
+            mapping_items.append(mapping_item)
+            
+        mapping = TechnicalDataMapping(
+            items=mapping_items,
+            executive_summary="Generated Technical Data Mapping for all approved KPIs. Ready for engineering review."
+        )
+    else:
+        # LLM Generation
+        from app.services.prompting import TDM_SYSTEM_PROMPT
+        
+        # We also need the FSD definitions if they exist to provide better context
+        fsd_data = read_json(FILES["functional_spec"], {})
+        fsd_items = fsd_data.get("items", [])
+        
+        # Build prompt inputs
+        kpis_json = json.dumps([k.model_dump(mode="json") for k in approved_kpis], indent=2)
+        fsd_json = json.dumps(fsd_items, indent=2) if fsd_items else "No functional specification generated yet."
+        
+        user_prompt = f"""
+        === APPROVED KPIs ===
+        {kpis_json}
+        
+        === EXISTING FUNCTIONAL SPECIFICATION (For Context) ===
+        {fsd_json}
+        
+        Please generate the Technical Data Mapping document for all these approved KPIs.
+        """
+        
+        try:
+            payload = await provider.generate_json(
+                TDM_SYSTEM_PROMPT,
+                user_prompt,
+                step_name="generate_technical_mapping"
+            )
+            
+            mapping = TechnicalDataMapping(**payload)
+        except Exception as exc:
+            logger.error(f"Failed to generate Technical Data Mapping: {exc}", exc_info=True)
+            raise HTTPException(status_code=502, detail=f"Failed to generate Technical Data Mapping: {exc}")
+    
+    mapping.status = "draft"
+    mapping.updated_at = datetime.now()
+    
+    write_json(FILES["technical_mapping"], mapping.model_dump(mode="json"))
+    
+    with SessionLocal() as session:
+        eng_id = active_engagement_id_ctx.get()
+        if eng_id is not None:
+            db_mapping = session.scalar(select(TechnicalDataMappingDB).filter_by(engagement_id=eng_id))
+        else:
+            db_mapping = session.scalar(select(TechnicalDataMappingDB).filter_by(id=1))
+            
+        if not db_mapping:
+            db_mapping = TechnicalDataMappingDB(engagement_id=eng_id)
+            session.add(db_mapping)
+            
+        db_mapping.items = json.dumps([item.model_dump(mode="json") for item in mapping.items])
+        db_mapping.executive_summary = mapping.executive_summary
+        db_mapping.status = mapping.status
+        db_mapping.updated_at = mapping.updated_at
+        session.commit()
+        
+    log_activity("Technical Data Mapping Generated", f"AI generated mapping for {len(mapping.items)} KPIs.")
+    
+    log_audit(
+        request=request,
+        action="Generate",
+        module="Technical Data Mapping",
+        entity_type="TDM",
+        entity_name="Technical Data Mapping",
+        new_value=f"Generated mapping for {len(mapping.items)} KPIs"
+    )
+    
+    return mapping.model_dump(mode="json")
+
+
+@app.post("/approve-technical-mapping")
+def approve_technical_mapping(request: Request) -> dict[str, Any]:
+    mapping_data = read_json(FILES["technical_mapping"], {})
+    if not mapping_data or not mapping_data.get("items"):
+        raise HTTPException(status_code=400, detail="Technical Data Mapping has not been generated yet.")
+        
+    with SessionLocal() as session:
+        eng_id = active_engagement_id_ctx.get()
+        if eng_id is not None:
+            db_mapping = session.scalar(select(TechnicalDataMappingDB).filter_by(engagement_id=eng_id))
+        else:
+            db_mapping = session.scalar(select(TechnicalDataMappingDB).filter_by(id=1))
+            
+        if not db_mapping:
+            raise HTTPException(status_code=404, detail="Technical Data Mapping record not found.")
+            
+        db_mapping.status = "approved"
+        db_mapping.updated_at = datetime.now()
+        session.commit()
+        session.refresh(db_mapping)
+        
+        log_audit(
+            request=request,
+            action="Approve",
+            module="Technical Data Mapping",
+            entity_type="TDM",
+            entity_name="Technical Data Mapping",
+            new_value="Approved Technical Data Mapping",
+            db_session=session
+        )
+        updated_at_str = db_mapping.updated_at.isoformat()
+        
+    log_activity("Technical Data Mapping Approved", "The technical data mapping document was signed off.")
+    return {
+        "status": "success",
+        "message": "Technical data mapping approved",
+        "updated_at": updated_at_str
+    }
+
+
+
 
 @app.get("/exports")
 def exports() -> list[ExportItem]:
@@ -2606,6 +2825,7 @@ def exports() -> list[ExportItem]:
         ExportItem(id="prompt", label="Export Prompt", description="KPI generation prompt from Prompt Studio", formats=["DOCX", "JSON"], available=has_prompt),
         ExportItem(id="kpi_library", label="Export KPI Library", description="Approved and draft KPI library", formats=["XLSX", "CSV", "JSON"], available=has_kpis),
         ExportItem(id="functional_document", label="Functional Specification", description="Governed business functional specification document", formats=["DOCX", "PDF", "JSON"], available=has_spec),
+        ExportItem(id="technical_mapping", label="Technical Data Mapping", description="Technical data blueprint for engineering teams", formats=["DOCX", "PDF", "JSON"], available=True),
         ExportItem(id="kpi_driver_tree", label="KPI Driver Tree", description="Approved strategy-to-KPI driver tree specification", formats=["PDF", "JSON"], available=has_tree),
         ExportItem(id="json_bundle", label="Export JSON Bundle", description="Complete session data for audit or migration", formats=["JSON"], available=True),
     ]
@@ -2693,6 +2913,27 @@ def download_export(request: Request, export_id: str, fmt: str, doc_name: str | 
                 path.write_text(json.dumps(tree_data, indent=2, default=str), encoding="utf-8")
             else:
                 raise HTTPException(status_code=400, detail=f"Unsupported format for KPI Driver Tree: {fmt}")
+    elif export_id == "technical_mapping":
+        mapping_data = read_json(FILES["technical_mapping"], {})
+        if not mapping_data or not mapping_data.get("items"):
+            raise HTTPException(status_code=400, detail="Technical Data Mapping has not been generated.")
+        
+        mapping = TechnicalDataMapping(**mapping_data)
+        context_data = read_json(FILES["business_context"], {})
+        context = BusinessContext(**context_data) if context_data else BusinessContext()
+        
+        path = EXPORT_DIR / f"technical-data-mapping.{fmt}"
+        if fmt == "docx":
+            from app.services.doc_generators import generate_docx_tdm
+            generate_docx_tdm(path, mapping, context)
+        elif fmt == "pdf":
+            from app.services.doc_generators import generate_pdf_tdm
+            generate_pdf_tdm(path, mapping, context, doc_name=doc_name)
+        elif fmt == "json":
+            import json
+            path.write_text(json.dumps(mapping.model_dump(mode="json"), indent=2, default=str), encoding="utf-8")
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported format for Technical Data Mapping: {fmt}")
     elif export_id == "json_bundle":
         path = export_json_bundle()
     else:
