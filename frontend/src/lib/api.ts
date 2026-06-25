@@ -18,6 +18,8 @@ import type {
   EngagementCreate,
   EngagementRecord,
   KpiTreeRecord,
+  TechnicalDataMapping,
+  FunctionalSpecItem,
 } from "../types/api";
 
 const jsonHeaders = { "Content-Type": "application/json" };
@@ -74,10 +76,38 @@ export const api = {
   addKpi: (item: Partial<KPI>) =>
     request<KPILibrary>("/kpi-library/add", { method: "POST", headers: jsonHeaders, body: JSON.stringify({ item }) }),
   getFunctionalSpec: () => request<FunctionalSpecification>("/functional-spec"),
-  saveFunctionalSpec: (body: FunctionalSpecification) =>
-    request<FunctionalSpecification>("/functional-spec", { method: "POST", headers: jsonHeaders, body: JSON.stringify(body) }),
-  generateSpec: () => request<FunctionalSpecification>("/generate-spec", { method: "POST" }),
-  approveSpec: () => request<{ status: string; message: string; updated_at: string }>("/approve-spec", { method: "POST" }),
+  saveFunctionalSpec: (spec: FunctionalSpecification) =>
+    request<FunctionalSpecification>("/functional-spec", {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify(spec),
+    }),
+  generateSpec: () =>
+    request<{ items: FunctionalSpecItem[]; executive_summary: string }>("/generate-spec", {
+      method: "POST",
+    }),
+  approveSpec: () =>
+    request<{ status: string; message: string; updated_at: string }>("/approve-spec", {
+      method: "POST",
+    }),
+
+  // Technical Data Mapping
+  getTechnicalMapping: () => request<TechnicalDataMapping>("/technical-mapping"),
+  saveTechnicalMapping: (mapping: TechnicalDataMapping) =>
+    request<TechnicalDataMapping>("/technical-mapping", {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify(mapping),
+    }),
+  generateTechnicalMapping: () =>
+    request<TechnicalDataMapping>("/generate-technical-mapping", {
+      method: "POST",
+    }),
+  approveTechnicalMapping: () =>
+    request<{ status: string; message: string; updated_at: string }>("/approve-technical-mapping", {
+      method: "POST",
+    }),
+
   getKpiTree: () => request<KpiTreeRecord>("/kpi-tree"),
   saveKpiTree: (payload: {
     name: string;

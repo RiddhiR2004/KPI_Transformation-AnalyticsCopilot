@@ -205,6 +205,44 @@ class FunctionalSpecification(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.now)
 
 
+class TechnicalDimensionItem(BaseModel):
+    dimension_type: str = ""
+    dimension: str = ""
+    dimension_requirement: str = ""
+    example: str = ""
+    source_logic_table_field: str = ""
+    is_further_input_required: str = "No"
+    source_sap: str = ""
+    table_field_sap: str = ""
+    owner_if_manual: str = ""
+    comments: str = ""
+
+
+class TechnicalDataMappingItem(BaseModel):
+    id: str
+    kpi_name: str
+    priority: str = "L2"  # L1, L2, L3
+    critical_to_measure: str = ""  # Revenue, Cost, Process, Quality
+    type_of_kpi: str = ""  # Functional area grouping
+    description: str = ""
+    logic_calculation: str = ""
+    dimensions: str = ""
+    measures: str = ""
+    uom: str = ""  # Unit of Measure
+    technical_details: str = ""
+    signed_off_by: str = ""
+    requirement_from: str = ""
+    action: str = ""  # Increase / Grow / Improve / Reduce / Maintain
+    dimension_list: list[TechnicalDimensionItem] = Field(default_factory=list)
+
+
+class TechnicalDataMapping(BaseModel):
+    items: list[TechnicalDataMappingItem] = Field(default_factory=list)
+    executive_summary: str = ""
+    status: str = "draft"  # "draft" or "approved"
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+
 class KPILibrary(BaseModel):
     items: list[KPI] = Field(default_factory=list)
     quality: dict[str, Any] = Field(default_factory=dict)
@@ -272,7 +310,7 @@ class ActivityEvent(BaseModel):
 
 
 class ExportItem(BaseModel):
-    id: Literal["prompt", "kpi_library", "functional_document", "kpi_driver_tree", "json_bundle"]
+    id: Literal["prompt", "kpi_library", "functional_document", "technical_mapping", "kpi_driver_tree", "json_bundle"]
     label: str
     description: str
     formats: list[str]

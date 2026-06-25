@@ -2501,3 +2501,266 @@ def generate_pdf_driver_tree(path: Path, tree_data: dict, context: BusinessConte
             
     doc.build(story, canvasmaker=LandscapeNumberedCanvas)
 
+
+def generate_docx_tdm(path: Path, mapping: Any, context: BusinessContext) -> None:
+    """Generates a technical data mapping Word Document."""
+    import datetime
+    doc = Document()
+    
+    items = mapping.items
+    spec_status = (mapping.status or "DRAFT").upper()
+    exec_summary = mapping.executive_summary or ""
+    updated_at_str = mapping.updated_at.strftime("%B %d, %Y") if hasattr(mapping, "updated_at") and mapping.updated_at else datetime.date.today().strftime("%B %d, %Y")
+
+    for section in doc.sections:
+        section.top_margin = Inches(0.75)
+        section.bottom_margin = Inches(0.75)
+        section.left_margin = Inches(0.75)
+        section.right_margin = Inches(0.75)
+
+    styles = doc.styles
+    normal_style = styles['Normal']
+    normal_font = normal_style.font
+    normal_font.name = 'Calibri'
+    normal_font.size = Pt(11)
+    normal_font.color.rgb = RGBColor(30, 30, 30)
+
+    # Title Page
+    title_p = doc.add_paragraph()
+    title_p.paragraph_format.space_before = Pt(24)
+    title_p.paragraph_format.space_after = Pt(4)
+    title_run = title_p.add_run("KPI Advisory & Analytics")
+    title_run.font.name = 'Calibri'
+    title_run.font.size = Pt(12)
+    title_run.font.bold = True
+    title_run.font.color.rgb = RGBColor(180, 150, 0)
+
+    main_title_p = doc.add_paragraph()
+    main_title_p.paragraph_format.space_after = Pt(12)
+    main_title_run = main_title_p.add_run("Technical Data Mapping Document")
+    main_title_run.font.name = 'Calibri'
+    main_title_run.font.size = Pt(22)
+    main_title_run.font.bold = True
+    main_title_run.font.color.rgb = RGBColor(27, 27, 27)
+
+    accent_table = doc.add_table(rows=1, cols=1)
+    accent_table.autofit = False
+    accent_table.columns[0].width = Inches(7.0)
+    accent_cell = accent_table.cell(0, 0)
+    set_cell_shading(accent_cell, "FFE600")
+    set_cell_margins(accent_cell, top=15, bottom=15, left=0, right=0)
+    
+    desc_p = doc.add_paragraph()
+    desc_p.paragraph_format.space_before = Pt(12)
+    desc_p.paragraph_format.space_after = Pt(24)
+    desc_run = desc_p.add_run("A detailed blueprint translating functional metric specifications into engineering requirements, calculations, and data source mappings.")
+    desc_run.font.name = 'Calibri'
+    desc_run.font.size = Pt(10.5)
+    desc_run.font.italic = True
+    desc_run.font.color.rgb = RGBColor(100, 100, 100)
+
+    doc.add_page_break()
+
+    # Meta
+    meta_title = doc.add_paragraph()
+    meta_title.paragraph_format.space_before = Pt(12)
+    meta_title.paragraph_format.space_after = Pt(8)
+    meta_title_run = meta_title.add_run("Document Control & Metadata")
+    meta_title_run.font.size = Pt(13)
+    meta_title_run.font.bold = True
+    meta_title_run.font.color.rgb = RGBColor(27, 27, 27)
+
+    meta_table = doc.add_table(rows=6, cols=2)
+    meta_table.style = 'Table Grid'
+    meta_fields = [
+        ("Document Version", "1.0"),
+        ("Generated Date", updated_at_str),
+        ("Industry", clean_or_fallback(context.industry, "Not Specified")),
+        ("Organizational Level", clean_or_fallback(context.organization_level, "Not Specified")),
+        ("Number of Technical Mappings", f"{len(items)} Metrics"),
+        ("Approval Status", spec_status)
+    ]
+    for i, (label, val) in enumerate(meta_fields):
+        row = meta_table.rows[i]
+        cell_lbl = row.cells[0]
+        cell_lbl.text = label
+        set_cell_shading(cell_lbl, "F0F0F0")
+        set_cell_margins(cell_lbl, top=40, bottom=40, left=80, right=80)
+        cell_lbl.paragraphs[0].runs[0].font.bold = True
+        cell_lbl.paragraphs[0].runs[0].font.size = Pt(8.5)
+        cell_lbl.width = Inches(2.2)
+
+        cell_val = row.cells[1]
+        cell_val.text = str(val)
+        set_cell_margins(cell_val, top=40, bottom=40, left=80, right=80)
+        cell_val.paragraphs[0].runs[0].font.size = Pt(8.5)
+        cell_val.width = Inches(4.8)
+
+    doc.add_page_break()
+
+    # Exec Summary
+    exec_title = doc.add_paragraph()
+    exec_title.paragraph_format.space_before = Pt(12)
+    exec_title.paragraph_format.space_after = Pt(12)
+    exec_title_run = exec_title.add_run("1. Executive Summary")
+    exec_title_run.font.size = Pt(16)
+    exec_title_run.font.bold = True
+    exec_title_run.font.color.rgb = RGBColor(27, 27, 27)
+
+    exec_p = doc.add_paragraph()
+    exec_p.paragraph_format.space_after = Pt(18)
+    exec_p.paragraph_format.line_spacing = 1.15
+    exec_p.add_run(exec_summary or "This document outlines the technical data mappings for the approved performance metrics.")
+
+    doc.add_page_break()
+
+    # KPIs
+    kpi_sec_title = doc.add_paragraph()
+    kpi_sec_title.paragraph_format.space_before = Pt(12)
+    kpi_sec_title.paragraph_format.space_after = Pt(8)
+    kpi_sec_title_run = kpi_sec_title.add_run("2. Individual Technical Mappings")
+    kpi_sec_title_run.font.size = Pt(16)
+    kpi_sec_title_run.font.bold = True
+    kpi_sec_title_run.font.color.rgb = RGBColor(27, 27, 27)
+
+    for index, item in enumerate(items, start=1):
+        kpi_p = doc.add_paragraph()
+        kpi_p.paragraph_format.space_before = Pt(16)
+        kpi_p.paragraph_format.space_after = Pt(8)
+        kpi_p.paragraph_format.keep_with_next = True
+        
+        num_run = kpi_p.add_run(f"Metric {index:02d}: ")
+        num_run.font.size = Pt(13)
+        num_run.font.bold = True
+        num_run.font.color.rgb = RGBColor(180, 150, 0)
+        
+        name_run = kpi_p.add_run(item.kpi_name)
+        name_run.font.size = Pt(13)
+        name_run.font.bold = True
+        name_run.font.color.rgb = RGBColor(27, 27, 27)
+
+        # Meta
+        kpi_meta_tbl = doc.add_table(rows=2, cols=4)
+        kpi_meta_tbl.style = 'Table Grid'
+        
+        kpi_meta_fields = [
+            ("Priority", clean_or_fallback(item.priority, "L2")),
+            ("Critical to Measure", clean_or_fallback(item.critical_to_measure, "Not Specified")),
+            ("Type of KPI", clean_or_fallback(item.type_of_kpi, "Operations")),
+            ("Action", clean_or_fallback(item.action, "Improve"))
+        ]
+        
+        row_lbls = kpi_meta_tbl.rows[0]
+        row_vals = kpi_meta_tbl.rows[1]
+        
+        for col_idx, (lbl, val) in enumerate(kpi_meta_fields):
+            c_lbl = row_lbls.cells[col_idx]
+            c_lbl.text = lbl
+            set_cell_shading(c_lbl, "F0F0F0")
+            set_cell_margins(c_lbl, top=40, bottom=40, left=60, right=60)
+            c_lbl.paragraphs[0].runs[0].font.bold = True
+            c_lbl.paragraphs[0].runs[0].font.size = Pt(8.5)
+            
+            c_val = row_vals.cells[col_idx]
+            c_val.text = val
+            set_cell_margins(c_val, top=40, bottom=40, left=60, right=60)
+            c_val.paragraphs[0].runs[0].font.size = Pt(8.5)
+
+        doc.add_paragraph().paragraph_format.space_after = Pt(4)
+
+        # Tech Details
+        calc_fields = [
+            ("Description", clean_or_fallback(item.description, "Description not provided.")),
+            ("Logic / Calculation", clean_or_fallback(item.logic_calculation, "Logic not provided.")),
+            ("Dimensions", clean_or_fallback(item.dimensions, "")),
+            ("Measures", clean_or_fallback(item.measures, "")),
+            ("UoM", clean_or_fallback(item.uom, "")),
+            ("Technical Details", clean_or_fallback(item.technical_details, "")),
+        ]
+        
+        calc_tbl = doc.add_table(rows=len(calc_fields), cols=2)
+        calc_tbl.style = 'Table Grid'
+        for r_idx, (lbl, val) in enumerate(calc_fields):
+            row = calc_tbl.rows[r_idx]
+            c_lbl = row.cells[0]
+            c_lbl.text = lbl
+            set_cell_shading(c_lbl, "F9F9F9")
+            set_cell_margins(c_lbl, top=40, bottom=40, left=80, right=80)
+            c_lbl.paragraphs[0].runs[0].font.bold = True
+            c_lbl.paragraphs[0].runs[0].font.size = Pt(9)
+            c_lbl.width = Inches(2.0)
+            
+            c_val = row.cells[1]
+            c_val.text = val
+            set_cell_margins(c_val, top=40, bottom=40, left=80, right=80)
+            c_val.paragraphs[0].runs[0].font.size = Pt(9)
+            c_val.width = Inches(5.0)
+
+        # Dimensions
+        if hasattr(item, 'dimension_list') and item.dimension_list:
+            dim_title_p = doc.add_paragraph()
+            dim_title_p.paragraph_format.space_before = Pt(8)
+            dim_title_p.paragraph_format.space_after = Pt(4)
+            dim_title_run = dim_title_p.add_run("Dimension List")
+            dim_title_run.font.bold = True
+            dim_title_run.font.size = Pt(10)
+            
+            dim_tbl = doc.add_table(rows=1 + len(item.dimension_list), cols=4)
+            dim_tbl.style = 'Table Grid'
+            dim_headers = ["Dimension Type", "Dimension", "Requirement", "Source/Table"]
+            for col_idx, text in enumerate(dim_headers):
+                cell = dim_tbl.cell(0, col_idx)
+                cell.text = text
+                set_cell_shading(cell, "1B1B1B")
+                set_cell_margins(cell, top=40, bottom=40, left=60, right=60)
+                cell.paragraphs[0].runs[0].font.bold = True
+                cell.paragraphs[0].runs[0].font.size = Pt(8.5)
+                cell.paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 255, 255)
+
+            for d_idx, d_item in enumerate(item.dimension_list, start=1):
+                row = dim_tbl.rows[d_idx]
+                c0 = row.cells[0]
+                c0.text = d_item.dimension_type
+                set_cell_margins(c0, top=40, bottom=40, left=60, right=60)
+                c0.paragraphs[0].runs[0].font.size = Pt(8.5)
+                
+                c1 = row.cells[1]
+                c1.text = d_item.dimension
+                set_cell_margins(c1, top=40, bottom=40, left=60, right=60)
+                c1.paragraphs[0].runs[0].font.size = Pt(8.5)
+                
+                c2 = row.cells[2]
+                c2.text = d_item.dimension_requirement
+                set_cell_margins(c2, top=40, bottom=40, left=60, right=60)
+                c2.paragraphs[0].runs[0].font.size = Pt(8.5)
+                
+                c3 = row.cells[3]
+                c3.text = d_item.source_logic_table_field
+                set_cell_margins(c3, top=40, bottom=40, left=60, right=60)
+                c3.paragraphs[0].runs[0].font.size = Pt(8.5)
+                
+        doc.add_page_break()
+
+    doc.save(path)
+
+
+def generate_pdf_tdm(path: Path, mapping: Any, context: BusinessContext, doc_name: str | None = None) -> None:
+    """Generates a technical data mapping PDF Document."""
+    story = []
+    styles = getSampleStyleSheet()
+    
+    title_style = ParagraphStyle('MainTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=22, leading=26, textColor=colors.HexColor("#1B1B1B"))
+    story.append(Paragraph("Technical Data Mapping Document", title_style))
+    story.append(Spacer(1, 20))
+    story.append(Paragraph("A detailed blueprint translating functional metric specifications into engineering requirements, calculations, and data source mappings.", styles['Normal']))
+    
+    doc = SimpleDocTemplate(
+        str(path),
+        pagesize=letter,
+        rightMargin=54,
+        leftMargin=54,
+        topMargin=54,
+        bottomMargin=54
+    )
+    doc.build(story, canvasmaker=NumberedCanvas)
+
