@@ -410,10 +410,10 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                 {/* Proceed to Next Step */}
                 {isApproved && (
                   <Link
-                    to="/step-5"
+                    to="/step-6"
                     className="button-yellow border border-black/10 !py-1.5 !px-3 !text-xs flex items-center gap-1.5"
                   >
-                    Proceed to KPI Logic Scripting
+                    Proceed to Dashboard & Visualization Design
                     <ChevronRight size={14} />
                   </Link>
                 )}

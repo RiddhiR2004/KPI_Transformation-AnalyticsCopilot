@@ -121,6 +121,9 @@ export type KpiTreeKpiNode = {
   kpi_name: string;
   kpi_description?: string;
   source_context?: KpiTreeSourceContext;
+  classification?: string;
+  classification_confidence?: number;
+  classification_source?: string;
   x_offset?: number;
   y_offset?: number;
   x_position?: number;
@@ -280,6 +283,8 @@ export type TechnicalDataMappingItem = {
   requirement_from: string;
   action: string;
   dimension_list: TechnicalDimensionItem[];
+  data_type?: string;
+  sql_formula?: string;
 };
 
 export type TechnicalDataMapping = {

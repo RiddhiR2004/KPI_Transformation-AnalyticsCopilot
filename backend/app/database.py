@@ -101,6 +101,22 @@ class KPITree(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
+    generated_by: Mapped[str] = mapped_column(String(255), default="")
+    generated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    approved_by: Mapped[str] = mapped_column(String(255), default="")
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    llm_provider: Mapped[str] = mapped_column(String(100), default="")
+    llm_model: Mapped[str] = mapped_column(String(100), default="")
+    generation_time_ms: Mapped[int] = mapped_column(Integer, default=0)
+
+    total_focus_areas: Mapped[int] = mapped_column(Integer, default=0)
+    total_standard_drivers: Mapped[int] = mapped_column(Integer, default=0)
+    total_sector_drivers: Mapped[int] = mapped_column(Integer, default=0)
+    total_kpis: Mapped[int] = mapped_column(Integer, default=0)
+    total_revenue_kpis: Mapped[int] = mapped_column(Integer, default=0)
+    total_cost_kpis: Mapped[int] = mapped_column(Integer, default=0)
+    total_progress_kpis: Mapped[int] = mapped_column(Integer, default=0)
+
 
 class ActivityLog(Base):
     __tablename__ = "activity_log"
@@ -466,7 +482,21 @@ def init_db() -> None:
                 ("version", "INTEGER DEFAULT 1"),
                 ("status", "VARCHAR(50) DEFAULT 'draft'"),
                 ("created_by", "VARCHAR(255) DEFAULT ''"),
-                ("updated_by", "VARCHAR(255) DEFAULT ''")
+                ("updated_by", "VARCHAR(255) DEFAULT ''"),
+                ("generated_by", "VARCHAR(255) DEFAULT ''"),
+                ("generated_at", "DATETIME"),
+                ("approved_by", "VARCHAR(255) DEFAULT ''"),
+                ("approved_at", "DATETIME"),
+                ("llm_provider", "VARCHAR(100) DEFAULT ''"),
+                ("llm_model", "VARCHAR(100) DEFAULT ''"),
+                ("generation_time_ms", "INTEGER DEFAULT 0"),
+                ("total_focus_areas", "INTEGER DEFAULT 0"),
+                ("total_standard_drivers", "INTEGER DEFAULT 0"),
+                ("total_sector_drivers", "INTEGER DEFAULT 0"),
+                ("total_kpis", "INTEGER DEFAULT 0"),
+                ("total_revenue_kpis", "INTEGER DEFAULT 0"),
+                ("total_cost_kpis", "INTEGER DEFAULT 0"),
+                ("total_progress_kpis", "INTEGER DEFAULT 0")
             ]
             for col_name, col_def in new_cols_tree:
                 if col_name not in existing_cols_tree:

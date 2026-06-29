@@ -1778,6 +1778,84 @@ def add_kpi(request: Request, add_req: KPIAddRequest) -> KPILibrary:
     return library
 
 
+def classify_kpi_heuristically(kpi: KPI) -> str:
+    name = (kpi.kpi_name or "").lower()
+    desc = (kpi.kpi_description or "").lower()
+    why = (kpi.why_important or "").lower()
+    purpose = (getattr(kpi, "business_purpose", "") or "").lower()
+    
+    # Text to check
+    full_text = f"{name} {desc} {why} {purpose}"
+    
+    # Check for Revenue
+    revenue_keywords = ["revenue", "sales", "customer acquisition", "customer retention", "market share", "cross-sell", "upsell", "pricing", "conversion", "retention"]
+    if any(kw in full_text for kw in revenue_keywords):
+        return "Critical to Revenue"
+        
+    # Check for Cost
+    cost_keywords = ["cost", "optimization", "inventory", "procurement", "manufacturing cost", "resource utilization", "waste", "productivity", "efficiency", "savings", "margin"]
+    if any(kw in full_text for kw in cost_keywords):
+        return "Critical to Cost"
+        
+    # Default to Progress
+    return "Critical to Progress"
+
+
+def sync_classifications_from_tree(tree_dict: dict, request: Request | None):
+    # Extract KPI classifications from tree JSON
+    classifications = {}
+    sfas = tree_dict.get("strategic_focus_areas", [])
+    for sfa in sfas:
+        for sd in sfa.get("drivers", []):
+            for ssd in sd.get("sector_specific_drivers", []) or sd.get("sector_drivers", []) or []:
+                for kpi in ssd.get("kpis", []):
+                    name = kpi.get("name") or kpi.get("kpi_name")
+                    classification = kpi.get("classification") or "Critical to Progress"
+                    if name:
+                        classifications[name] = {
+                            "classification": classification,
+                            "classification_confidence": kpi.get("classification_confidence", 0.9 if classification != "Critical to Progress" else 1.0),
+                            "classification_source": kpi.get("classification_source", "AI")
+                        }
+                        
+    if not classifications:
+        return
+        
+    # Read current library
+    library_data = read_json(FILES["kpi_library"], {})
+    items = library_data.get("items") or []
+    updated = False
+    
+    for item in items:
+        name = item.get("kpi_name")
+        if name in classifications:
+            cls_info = classifications[name]
+            # Only update if changed
+            if item.get("classification") != cls_info["classification"] or item.get("classification_source") != cls_info["classification_source"]:
+                item["classification"] = cls_info["classification"]
+                item["classification_confidence"] = float(cls_info["classification_confidence"])
+                item["classification_source"] = cls_info["classification_source"]
+                updated = True
+                
+    if updated:
+        write_json(FILES["kpi_library"], library_data)
+        # Sync approved KPIs
+        approved_items = [item for item in items if item.get("status") == "approved"]
+        write_json(FILES["approved_kpis"], {"items": approved_items})
+        
+        # Log audit: KPI Library Classification Synced
+        with SessionLocal() as session:
+            log_audit(
+                request=request,
+                action="KPI Library Classification Synced",
+                module="KPI Library",
+                entity_type="KPI Library",
+                entity_name="KPI Library",
+                new_value=f"Synced {len(classifications)} classifications from tree",
+                db_session=session
+            )
+
+
 def generate_demo_driver_tree(context: BusinessContext, approved_kpis: list[KPI], profile: Any) -> dict:
     sfas = []
     
@@ -1854,6 +1932,9 @@ def generate_demo_driver_tree(context: BusinessContext, approved_kpis: list[KPI]
                         "description": k.kpi_description,
                         "importance": k.why_important or f"Critical for measuring {kra} in {area}.",
                         "placement_rationale": f"Directly traces from strategic objectives to {k.kpi_name} under {kra}.",
+                        "classification": classify_kpi_heuristically(k),
+                        "classification_confidence": 1.0,
+                        "classification_source": "AI",
                         "source_context": {
                             "strategic_objectives": ssd_context["strategic_objectives"],
                             "business_challenges": ssd_context["business_challenges"],
@@ -1961,7 +2042,46 @@ def save_kpi_tree(request: Request, payload: KpiTreeSaveRequest):
         row.data = json.dumps(payload.data)
         row.updated_by = user_name
         row.updated_at = datetime.now()
+
+        # Update metadata counts
+        total_focus_areas = len(payload.data.get("strategic_focus_areas", []))
+        total_standard_drivers = 0
+        total_sector_drivers = 0
+        total_kpis = 0
+        total_revenue_kpis = 0
+        total_cost_kpis = 0
+        total_progress_kpis = 0
+        
+        for sfa in payload.data.get("strategic_focus_areas", []):
+            drivers = sfa.get("drivers", [])
+            total_standard_drivers += len(drivers)
+            for sd in drivers:
+                ssds = sd.get("sector_specific_drivers", []) or sd.get("sector_drivers", []) or []
+                total_sector_drivers += len(ssds)
+                for ssd in ssds:
+                    kpis = ssd.get("kpis", [])
+                    total_kpis += len(kpis)
+                    for k in kpis:
+                        cls = k.get("classification") or "Critical to Progress"
+                        if cls == "Critical to Revenue":
+                            total_revenue_kpis += 1
+                        elif cls == "Critical to Cost":
+                            total_cost_kpis += 1
+                        else:
+                            total_progress_kpis += 1
+                            
+        row.total_focus_areas = total_focus_areas
+        row.total_standard_drivers = total_standard_drivers
+        row.total_sector_drivers = total_sector_drivers
+        row.total_kpis = total_kpis
+        row.total_revenue_kpis = total_revenue_kpis
+        row.total_cost_kpis = total_cost_kpis
+        row.total_progress_kpis = total_progress_kpis
+
         session.commit()
+        
+        # Sync to library
+        sync_classifications_from_tree(payload.data, request)
         
         log_audit(
             request=request,
@@ -1999,6 +2119,12 @@ def approve_kpi_tree(request: Request, payload: KpiTreeApproveRequest):
         row.status = status_val
         row.updated_by = user_name
         row.updated_at = datetime.now()
+        if payload.approved:
+            row.approved_by = user_name
+            row.approved_at = datetime.now()
+        else:
+            row.approved_by = ""
+            row.approved_at = None
         session.commit()
         
         log_audit(
@@ -2039,6 +2165,8 @@ async def generate_kpi_tree(request: Request):
         if not profile:
             profile = session.query(ClientProfile).order_by(ClientProfile.id.desc()).first()
             
+    import time
+    start_time = time.perf_counter()
     provider = get_provider()
     
     # Check if we are running in DemoProvider mode or not
@@ -2104,6 +2232,8 @@ async def generate_kpi_tree(request: Request):
             logger.error(f"KPI Driver Tree LLM generation failed: {exc}. Falling back to demo generator.", exc_info=True)
             tree_json_dict = generate_demo_driver_tree(context, approved_kpis, profile)
 
+    gen_time_ms = int((time.perf_counter() - start_time) * 1000)
+
     # Save to database
     with SessionLocal() as session:
         client_id = profile.id if profile else None
@@ -2131,8 +2261,55 @@ async def generate_kpi_tree(request: Request):
         row.data = json.dumps(tree_json_dict)
         row.updated_by = user_name
         row.updated_at = datetime.now()
+        
+        # Populate metadata
+        row.generated_by = user_name
+        row.generated_at = datetime.now()
+        row.approved_by = ""
+        row.approved_at = None
+        row.llm_provider = provider.name
+        row.llm_model = provider.model
+        row.generation_time_ms = gen_time_ms
+
+        total_focus_areas = len(tree_json_dict.get("strategic_focus_areas", []))
+        total_standard_drivers = 0
+        total_sector_drivers = 0
+        total_kpis = 0
+        total_revenue_kpis = 0
+        total_cost_kpis = 0
+        total_progress_kpis = 0
+        
+        for sfa in tree_json_dict.get("strategic_focus_areas", []):
+            drivers = sfa.get("drivers", [])
+            total_standard_drivers += len(drivers)
+            for sd in drivers:
+                ssds = sd.get("sector_specific_drivers", []) or sd.get("sector_drivers", []) or []
+                total_sector_drivers += len(ssds)
+                for ssd in ssds:
+                    kpis = ssd.get("kpis", [])
+                    total_kpis += len(kpis)
+                    for k in kpis:
+                        cls = k.get("classification") or "Critical to Progress"
+                        if cls == "Critical to Revenue":
+                            total_revenue_kpis += 1
+                        elif cls == "Critical to Cost":
+                            total_cost_kpis += 1
+                        else:
+                            total_progress_kpis += 1
+                            
+        row.total_focus_areas = total_focus_areas
+        row.total_standard_drivers = total_standard_drivers
+        row.total_sector_drivers = total_sector_drivers
+        row.total_kpis = total_kpis
+        row.total_revenue_kpis = total_revenue_kpis
+        row.total_cost_kpis = total_cost_kpis
+        row.total_progress_kpis = total_progress_kpis
+
         session.commit()
         
+        # Sync classifications to library
+        sync_classifications_from_tree(tree_json_dict, request)
+
         action_val = "Version Regenerated" if prev_version > 0 else "Tree Generated"
         log_audit(
             request=request,
@@ -2143,6 +2320,25 @@ async def generate_kpi_tree(request: Request):
             new_value=json.dumps({"version": row.version, "status": row.status}),
             db_session=session
         )
+        
+        # Log Business Classification Generated audit event
+        log_audit(
+            request=request,
+            action="Business Classification Generated",
+            module="KPI Driver Tree",
+            entity_type="KPI Driver Tree",
+            entity_name=row.name,
+            new_value=json.dumps({
+                "version": row.version,
+                "status": row.status,
+                "total_kpis": total_kpis,
+                "total_revenue_kpis": total_revenue_kpis,
+                "total_cost_kpis": total_cost_kpis,
+                "total_progress_kpis": total_progress_kpis
+            }),
+            db_session=session
+        )
+
         log_activity("KPI Driver Tree Generated", f"Traceability tree generated (Version {row.version})")
         
         return {

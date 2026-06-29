@@ -46,6 +46,19 @@ export function BusinessAssetsSection({ onApprovedChange }: { onApprovedChange: 
       setClientProfile(data);
       if (data && data.insights) {
         setExtractedInsights(data.insights);
+        if (data.insights.length > 0) {
+          const activeClientId = parseInt(localStorage.getItem("active_client_id") || "0", 10);
+          const activeEngagementId = parseInt(localStorage.getItem("active_engagement_id") || "0", 10);
+          void api.logAuditEvent({
+            module: "KPI Library",
+            action: "AI Insight Viewed",
+            status: "Success",
+            entity_type: "Strategic Insights",
+            entity_name: "Strategic Insights List",
+            client_id: activeClientId || undefined,
+            engagement_id: activeEngagementId || undefined
+          });
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load client profile");
@@ -159,6 +172,18 @@ export function BusinessAssetsSection({ onApprovedChange }: { onApprovedChange: 
       setExtractedInsights(items);
       setStagedFiles([]); // Clear upload staging list since they are preprocessed
       setSuccess("Dynamic asset analysis complete! Extracted insights are loaded below for review.");
+      
+      const activeClientId = parseInt(localStorage.getItem("active_client_id") || "0", 10);
+      const activeEngagementId = parseInt(localStorage.getItem("active_engagement_id") || "0", 10);
+      void api.logAuditEvent({
+        module: "KPI Library",
+        action: "AI Insight Viewed",
+        status: "Success",
+        entity_type: "Strategic Insights",
+        entity_name: "Strategic Insights List",
+        client_id: activeClientId || undefined,
+        engagement_id: activeEngagementId || undefined
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Dynamic asset extraction failed.");
     } finally {

@@ -535,6 +535,11 @@ STRICT GENERATION PRINCIPLES:
    - functional_areas: list of matching functional areas
    - custom_parameters: list of matching custom parameters / fields (e.g. ESG, Customer Retention, etc.)
 5. Every approved KPI provided in the input list must appear exactly once in the tree. No KPI duplication, no orphan KPIs.
+6. KPI Business Impact Classification: For every KPI node in the tree, dynamically evaluate and assign exactly one of the following business impact classifications based on the KPI name, description, purpose, importance, objectives, priorities, challenges, functional area, and custom context:
+   - "Critical to Revenue": KPIs that directly influence revenue growth, sales performance, customer acquisition/retention, market share, cross-selling/upselling, and pricing performance.
+   - "Critical to Cost": KPIs that primarily influence cost optimization, operational/inventory/procurement/manufacturing costs, resource utilization, waste reduction, productivity, and efficiency.
+   - "Critical to Progress": KPIs that primarily measure transformation progress, operational performance, quality, compliance, delivery, customer experience, innovation, project execution, sustainability, or continuous improvement.
+   Every KPI must have a "classification" field set to one of these three exact values.
 
 JSON OUTPUT SCHEMA:
 Your response must be a single JSON object matching this exact schema:
@@ -581,6 +586,7 @@ Your response must be a single JSON object matching this exact schema:
                   "description": "KPI Description",
                   "importance": "Why this KPI is important",
                   "placement_rationale": "Consulting explanation of why this KPI fits this branch.",
+                  "classification": "Critical to Revenue | Critical to Cost | Critical to Progress",
                   "source_context": {
                     "strategic_objectives": [],
                     "business_challenges": [],

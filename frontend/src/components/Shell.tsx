@@ -7,11 +7,11 @@ import type { ActivityEvent, ExportItem, WorkflowStatus } from "../types/api";
 const steps = [
   { to: "/step-1", label: "Business Context", icon: Target, statusKey: "business_context" as keyof WorkflowStatus },
   { to: "/step-2", label: "KPI Library Generation", icon: Table2, statusKey: "kpi_library" as keyof WorkflowStatus },
-  { to: "/step-3", label: "Functional Specification", icon: FileText, statusKey: "functional_specification" as keyof WorkflowStatus },
-  { to: "/step-4", label: "Technical Data Flow Mapping", icon: Network, statusKey: "technical_mapping" as keyof WorkflowStatus },
-  { to: "/step-5", label: "KPI Logic Scripting", icon: Workflow, statusKey: "kpi_logic" as keyof WorkflowStatus },
-  { to: "/step-6", label: "KPI Driver Tree", icon: Workflow, statusKey: "kpi_tree" as keyof WorkflowStatus },
-  { to: "/step-7", label: "Dashboard Prep", icon: BarChart3, statusKey: "dashboard" as keyof WorkflowStatus }
+  { to: "/step-3", label: "KPI Driver Tree", icon: Workflow, statusKey: "kpi_tree" as keyof WorkflowStatus },
+  { to: "/step-4", label: "Functional Specification", icon: FileText, statusKey: "functional_specification" as keyof WorkflowStatus },
+  { to: "/step-5", label: "Technical Data Flow Mapping", icon: Network, statusKey: "technical_mapping" as keyof WorkflowStatus },
+  { to: "/step-6", label: "Dashboard & Visualization", icon: BarChart3, statusKey: "dashboard" as keyof WorkflowStatus },
+  { to: "/step-7", label: "Implementation Roadmap", icon: Workflow, statusKey: "kpi_logic" as keyof WorkflowStatus }
 ];
 
 export function Shell({

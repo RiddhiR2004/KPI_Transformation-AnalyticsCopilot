@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { 
   Building2, Search, Plus, Trash2, Check, X, Download, 
   ZoomIn, ZoomOut, Maximize, ArrowRight, Eye, Edit3, Loader2, Info, Zap, FileText,
@@ -17,6 +17,7 @@ type SelectedNodeInfo = {
   name: string;
   description: string;
   business_rationale: string;
+  classification?: string;
   source_context: KpiTreeSourceContext;
   originalRef: any;
 };
@@ -36,6 +37,12 @@ export function KpiDriverTreePage({ onChange }: { onChange: () => void }) {
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [newParamName, setNewParamName] = useState("");
   const [newParamValue, setNewParamValue] = useState("");
+  
+  const [selectedFilter, setSelectedFilter] = useState<string>("All KPIs");
+  const [selectedSfaFilter, setSelectedSfaFilter] = useState<string | null>(null);
+  const [selectedSdFilter, setSelectedSdFilter] = useState<string | null>(null);
+  const [selectedSsdFilter, setSelectedSsdFilter] = useState<string | null>(null);
+  const [selectedFaFilter, setSelectedFaFilter] = useState<string | null>(null);
 
   const isSameBranch = (idA: string, idB: string) => {
     if (!idA || !idB) return false;
@@ -62,9 +69,10 @@ export function KpiDriverTreePage({ onChange }: { onChange: () => void }) {
   };
 
   const isAnyHovered = hoveredNodeId !== null;
-  const isNodeHigh = (nodeId: string) => {
+  const isNodeHigh = (node: any) => {
+    if (isFilterActive && !isFilterMatched(node)) return false;
     if (!isAnyHovered) return true;
-    return isSameBranch(nodeId, hoveredNodeId!);
+    return isSameBranch(node.id, hoveredNodeId!);
   };
 
   // Pan & Zoom state
@@ -504,6 +512,301 @@ export function KpiDriverTreePage({ onChange }: { onChange: () => void }) {
     const scaleY = 500 / (layout.height + 100);
     const bestScale = Math.max(0.4, Math.min(1.2, Math.min(scaleX, scaleY)));
     setTransform({ x: 20, y: 20, scale: bestScale });
+  };
+
+  // Dynamically count KPI classifications for the dashboard
+  const summaryCounts = useMemo(() => {
+    let revenue = 0;
+    let cost = 0;
+    let progress = 0;
+    
+    if (treeData) {
+      treeData.strategic_focus_areas.forEach(sfa => {
+        (sfa.drivers || []).forEach(sd => {
+          const ssds = sd.sector_specific_drivers || [];
+          ssds.forEach((ssd: any) => {
+            (ssd.kpis || []).forEach((kpi: any) => {
+              const cls = kpi.classification || "Critical to Progress";
+              if (cls === "Critical to Revenue") revenue++;
+              else if (cls === "Critical to Cost") cost++;
+              else progress++;
+            });
+          });
+        });
+      });
+    }
+    
+    return { revenue, cost, progress };
+  }, [treeData]);
+
+  // Options for advanced filters
+  const sfaFilterOptions = useMemo(() => {
+    if (!treeData) return [];
+    return treeData.strategic_focus_areas.map((sfa, idx) => ({ id: `sfa-${idx}`, name: sfa.name }));
+  }, [treeData]);
+
+  const sdFilterOptions = useMemo(() => {
+    if (!treeData) return [];
+    const list: any[] = [];
+    treeData.strategic_focus_areas.forEach((sfa, sfaIdx) => {
+      (sfa.drivers || []).forEach((sd, sdIdx) => {
+        list.push({ id: `sd-${sfaIdx}-${sdIdx}`, name: `${sfa.name} → ${sd.name}` });
+      });
+    });
+    return list;
+  }, [treeData]);
+
+  const ssdFilterOptions = useMemo(() => {
+    if (!treeData) return [];
+    const list: any[] = [];
+    treeData.strategic_focus_areas.forEach((sfa, sfaIdx) => {
+      (sfa.drivers || []).forEach((sd, sdIdx) => {
+        const ssds = sd.sector_specific_drivers || [];
+        ssds.forEach((ssd: any, ssdIdx: any) => {
+          list.push({ id: `ssd-${sfaIdx}-${sdIdx}-${ssdIdx}`, name: `${sd.name} → ${ssd.name}` });
+        });
+      });
+    });
+    return list;
+  }, [treeData]);
+
+  const functionalAreaOptions = useMemo(() => {
+    if (!treeData) return [];
+    const set = new Set<string>();
+    treeData.strategic_focus_areas.forEach(sfa => {
+      (sfa.drivers || []).forEach(sd => {
+        const ssds = sd.sector_specific_drivers || [];
+        ssds.forEach((ssd: any) => {
+          (ssd.kpis || []).forEach((kpi: any) => {
+            if (kpi.source_context?.functional_areas) {
+              kpi.source_context.functional_areas.forEach((a: string) => set.add(a));
+            }
+          });
+        });
+      });
+    });
+    return Array.from(set);
+  }, [treeData]);
+
+  const nodeHasFilterDescendant = (node: any, filterVal: string) => {
+    if (!treeData) return false;
+    const parts = node.id.split("-");
+    const sfaIdx = parseInt(parts[1], 10);
+    const sfas = treeData.strategic_focus_areas;
+    if (isNaN(sfaIdx) || sfaIdx >= sfas.length) return false;
+    const sfa = sfas[sfaIdx];
+    
+    if (node.type === "sfa") {
+      return sfa.drivers.some((sd: any) => 
+        (sd.sector_specific_drivers || []).some((ssd: any) => 
+          ssd.kpis.some((k: any) => k.classification === filterVal)
+        )
+      );
+    } else if (node.type === "sd") {
+      const sdIdx = parseInt(parts[2], 10);
+      const sd = sfa.drivers[sdIdx];
+      if (!sd) return false;
+      return (sd.sector_specific_drivers || []).some((ssd: any) => 
+        ssd.kpis.some((k: any) => k.classification === filterVal)
+      );
+    } else if (node.type === "ssd") {
+      const sdIdx = parseInt(parts[2], 10);
+      const ssdIdx = parseInt(parts[3], 10);
+      const sd = sfa.drivers[sdIdx];
+      if (!sd) return false;
+      const ssds = sd.sector_specific_drivers || [];
+      const ssd = ssds[ssdIdx];
+      if (!ssd) return false;
+      return ssd.kpis.some((k: any) => k.classification === filterVal);
+    }
+    return false;
+  };
+
+  const nodeHasFaDescendant = (node: any, faVal: string) => {
+    if (!treeData) return false;
+    const parts = node.id.split("-");
+    const sfaIdx = parseInt(parts[1], 10);
+    const sfas = treeData.strategic_focus_areas;
+    if (isNaN(sfaIdx) || sfaIdx >= sfas.length) return false;
+    const sfa = sfas[sfaIdx];
+    
+    if (node.type === "sfa") {
+      return sfa.drivers.some((sd: any) => 
+        (sd.sector_specific_drivers || []).some((ssd: any) => 
+          ssd.kpis.some((k: any) => k.source_context?.functional_areas?.includes(faVal))
+        )
+      );
+    } else if (node.type === "sd") {
+      const sdIdx = parseInt(parts[2], 10);
+      const sd = sfa.drivers[sdIdx];
+      if (!sd) return false;
+      return (sd.sector_specific_drivers || []).some((ssd: any) => 
+        ssd.kpis.some((k: any) => k.source_context?.functional_areas?.includes(faVal))
+      );
+    } else if (node.type === "ssd") {
+      const sdIdx = parseInt(parts[2], 10);
+      const ssdIdx = parseInt(parts[3], 10);
+      const sd = sfa.drivers[sdIdx];
+      if (!sd) return false;
+      const ssds = sd.sector_specific_drivers || [];
+      const ssd = ssds[ssdIdx];
+      if (!ssd) return false;
+      return ssd.kpis.some((k: any) => k.source_context?.functional_areas?.includes(faVal));
+    }
+    return false;
+  };
+
+  const isFilterActive = selectedFilter !== "All KPIs" || selectedSfaFilter !== null || selectedSdFilter !== null || selectedSsdFilter !== null || selectedFaFilter !== null;
+
+  const isFilterMatched = (node: any) => {
+    if (node.id === "root" || node.type === "root") return true;
+    if (!isFilterActive) return true;
+    
+    const parts = node.id.split("-");
+    const nodeType = node.type;
+    
+    // 1. Classification Filter
+    if (selectedFilter !== "All KPIs") {
+      if (nodeType === "kpi") {
+        if ((node.data?.classification || "Critical to Progress") !== selectedFilter) return false;
+      } else {
+        if (!nodeHasFilterDescendant(node, selectedFilter)) return false;
+      }
+    }
+    
+    // 2. SFA Filter
+    if (selectedSfaFilter !== null) {
+      const sfaIdx = parseInt(selectedSfaFilter.split("-")[1], 10);
+      const targetSfaIdx = parseInt(parts[1], 10);
+      if (targetSfaIdx !== sfaIdx) return false;
+    }
+    
+    // 3. SD Filter
+    if (selectedSdFilter !== null) {
+      const filterParts = selectedSdFilter.split("-");
+      const filterSfaIdx = parseInt(filterParts[1], 10);
+      const filterSdIdx = parseInt(filterParts[2], 10);
+      
+      const targetSfaIdx = parseInt(parts[1], 10);
+      const targetSdIdx = parseInt(parts[2], 10);
+      if (targetSfaIdx !== filterSfaIdx) return false;
+      if (!isNaN(targetSdIdx) && targetSdIdx !== filterSdIdx) return false;
+    }
+    
+    // 4. SSD Filter
+    if (selectedSsdFilter !== null) {
+      const filterParts = selectedSsdFilter.split("-");
+      const filterSfaIdx = parseInt(filterParts[1], 10);
+      const filterSdIdx = parseInt(filterParts[2], 10);
+      const filterSsdIdx = parseInt(filterParts[3], 10);
+      
+      const targetSfaIdx = parseInt(parts[1], 10);
+      const targetSdIdx = parseInt(parts[2], 10);
+      const targetSsdIdx = parseInt(parts[3], 10);
+      if (targetSfaIdx !== filterSfaIdx) return false;
+      if (!isNaN(targetSdIdx) && targetSdIdx !== filterSdIdx) return false;
+      if (!isNaN(targetSsdIdx) && targetSsdIdx !== filterSsdIdx) return false;
+    }
+    
+    // 5. Functional Area Filter
+    if (selectedFaFilter !== null) {
+      if (nodeType === "kpi") {
+        const fas = node.data?.source_context?.functional_areas || [];
+        if (!fas.includes(selectedFaFilter)) return false;
+      } else {
+        if (!nodeHasFaDescendant(node, selectedFaFilter)) return false;
+      }
+    }
+    
+    return true;
+  };
+
+  const getKpiCardColors = (classification: string | undefined, highlighted: boolean) => {
+    const cls = classification || "Critical to Progress";
+    if (highlighted) {
+      if (cls === "Critical to Revenue") return "bg-emerald-950/20 border-emerald-500 text-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.15)]";
+      if (cls === "Critical to Cost") return "bg-rose-950/20 border-rose-500 text-rose-300 shadow-[0_0_10px_rgba(244,63,94,0.15)]";
+      return "bg-blue-950/20 border-blue-500 text-blue-300 shadow-[0_0_10px_rgba(59,130,246,0.15)]";
+    }
+    if (cls === "Critical to Revenue") return "bg-[#0A0A0A] border-emerald-900/40 text-emerald-500/80";
+    if (cls === "Critical to Cost") return "bg-[#0A0A0A] border-rose-900/40 text-rose-500/80";
+    return "bg-[#0A0A0A] border-blue-900/40 text-blue-500/80";
+  };
+
+  const getKpiCardInlineStyles = (classification: string | undefined, highlighted: boolean) => {
+    const cls = classification || "Critical to Progress";
+    if (highlighted) {
+      if (cls === "Critical to Revenue") {
+        return {
+          backgroundColor: "rgba(6, 78, 59, 0.2)",
+          borderColor: "#10b981",
+          color: "#6ee7b7",
+          boxShadow: "0 0 10px rgba(16, 185, 129, 0.15)"
+        };
+      }
+      if (cls === "Critical to Cost") {
+        return {
+          backgroundColor: "rgba(136, 19, 55, 0.2)",
+          borderColor: "#f43f5e",
+          color: "#fda4af",
+          boxShadow: "0 0 10px rgba(244, 63, 94, 0.15)"
+        };
+      }
+      return {
+        backgroundColor: "rgba(30, 58, 138, 0.2)",
+        borderColor: "#3b82f6",
+        color: "#93c5fd",
+        boxShadow: "0 0 10px rgba(59, 130, 246, 0.15)"
+      };
+    }
+    
+    // Non-highlighted (dimmed)
+    if (cls === "Critical to Revenue") {
+      return {
+        backgroundColor: "#0A0A0A",
+        borderColor: "rgba(16, 185, 129, 0.15)",
+        color: "rgba(16, 185, 129, 0.5)"
+      };
+    }
+    if (cls === "Critical to Cost") {
+      return {
+        backgroundColor: "#0A0A0A",
+        borderColor: "rgba(244, 63, 94, 0.15)",
+        color: "rgba(244, 63, 94, 0.5)"
+      };
+    }
+    return {
+      backgroundColor: "#0A0A0A",
+      borderColor: "rgba(59, 130, 246, 0.15)",
+      color: "rgba(59, 130, 246, 0.5)"
+    };
+  };
+
+  const centerNode = (nodeX: number, nodeY: number, nodeWidth: number, nodeHeight: number) => {
+    if (!canvasWrapperRef.current) return;
+    const wrapperW = canvasWrapperRef.current.clientWidth;
+    const wrapperH = canvasWrapperRef.current.clientHeight;
+    const scale = transform.scale;
+    const targetX = wrapperW / 2 - (nodeX + nodeWidth / 2) * scale;
+    const targetY = wrapperH / 2 - (nodeY + nodeHeight / 2) * scale;
+    setIsPanning(false);
+    setTransform({ x: targetX, y: targetY, scale });
+  };
+
+  const logFilterApplied = (filterType: string, filterValue: string | null) => {
+    const activeClientId = parseInt(localStorage.getItem("active_client_id") || "0", 10);
+    const activeEngagementId = parseInt(localStorage.getItem("active_engagement_id") || "0", 10);
+    void api.logAuditEvent({
+      module: "KPI Driver Tree",
+      action: "Branch Filter Applied",
+      status: "Success",
+      entity_type: filterType,
+      entity_name: filterValue || "All",
+      previous_value: "",
+      new_value: filterValue || "All",
+      client_id: activeClientId || undefined,
+      engagement_id: activeEngagementId || undefined
+    });
   };
 
   // Generate Tree
@@ -1126,7 +1429,14 @@ export function KpiDriverTreePage({ onChange }: { onChange: () => void }) {
   };
 
   // Update selected node fields in draft state
-  const handleUpdateNodeFields = (fields: { name?: string; description?: string; business_rationale?: string }) => {
+  const handleUpdateNodeFields = (fields: { 
+    name?: string; 
+    description?: string; 
+    business_rationale?: string;
+    classification?: string;
+    classification_confidence?: number;
+    classification_source?: string;
+  }) => {
     if (!selectedNode || !treeData) return;
     
     const { id, type } = selectedNode;
@@ -1167,7 +1477,10 @@ export function KpiDriverTreePage({ onChange }: { onChange: () => void }) {
       ssd.kpis[kpiIdx] = {
         ...ssd.kpis[kpiIdx],
         kpi_name: fields.name !== undefined ? fields.name : ssd.kpis[kpiIdx].kpi_name,
-        kpi_description: fields.description !== undefined ? fields.description : ssd.kpis[kpiIdx].kpi_description
+        kpi_description: fields.description !== undefined ? fields.description : ssd.kpis[kpiIdx].kpi_description,
+        classification: fields.classification !== undefined ? fields.classification : ssd.kpis[kpiIdx].classification,
+        classification_confidence: fields.classification_confidence !== undefined ? fields.classification_confidence : ssd.kpis[kpiIdx].classification_confidence,
+        classification_source: fields.classification_source !== undefined ? fields.classification_source : ssd.kpis[kpiIdx].classification_source
       };
     }
     
@@ -1704,11 +2017,20 @@ export function KpiDriverTreePage({ onChange }: { onChange: () => void }) {
   const layout = treeData ? calculateLayout(treeData, nodeOffsets) : { nodes: [], edges: [], width: 1520, height: 600 };
   const isDraft = treeRecord?.status === "draft" || !treeRecord?.status;
 
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim() || !layout) return [];
+    const query = searchQuery.toLowerCase();
+    
+    return layout.nodes.filter((node: any) => 
+      node.type !== "root" && node.name.toLowerCase().includes(query)
+    );
+  }, [searchQuery, layout]);
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
       <section className="border-l-8 border-[#ffe600] bg-[#1B1B1B] p-7 border border-[#303030] rounded-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#FFE600]">Step 06</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#FFE600]">Step 03</p>
         <h2 className="mt-2 text-4xl font-semibold tracking-tight text-[#F5F5F5]">KPI Driver Tree Studio</h2>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-[#B0B0B0]">
           Decompose client strategic objectives into standard drivers, sector-specific drivers, and approved operational KPIs. 
@@ -1731,6 +2053,35 @@ export function KpiDriverTreePage({ onChange }: { onChange: () => void }) {
           </div>
         )}
       </section>
+
+      {/* Business Impact Summary Dashboard */}
+      {treeData && (
+        <div className="bg-[#1B1B1B] border border-[#303030] p-4 rounded-sm">
+          <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#FFE600] mb-2.5">
+            Business Impact Summary
+          </h4>
+          <div className="flex flex-wrap items-center gap-6">
+            <div className="flex items-center gap-2 bg-[#111111] px-4 py-2 border border-[#303030] rounded-sm min-w-[160px]">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
+              <div className="text-xs font-semibold text-[#F5F5F5]">
+                Critical to Revenue: <span className="font-bold text-emerald-400">{summaryCounts.revenue} KPIs</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 bg-[#111111] px-4 py-2 border border-[#303030] rounded-sm min-w-[160px]">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.5)]" />
+              <div className="text-xs font-semibold text-[#F5F5F5]">
+                Critical to Cost: <span className="font-bold text-rose-400">{summaryCounts.cost} KPIs</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 bg-[#111111] px-4 py-2 border border-[#303030] rounded-sm min-w-[160px]">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_6px_rgba(59,130,246,0.5)]" />
+              <div className="text-xs font-semibold text-[#F5F5F5]">
+                Critical to Progress: <span className="font-bold text-blue-400">{summaryCounts.progress} KPIs</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       {errorMessage && (
@@ -1855,67 +2206,231 @@ export function KpiDriverTreePage({ onChange }: { onChange: () => void }) {
             </div>
 
             {/* Canvas Toolbar & Search */}
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-[#111111] p-3 border border-[#303030] rounded-sm">
-              {/* Pan & Zoom Controls */}
-              <div className="flex items-center gap-1 border border-[#303030] bg-[#1E1E1E] p-1 rounded-sm">
-                <button 
-                  onClick={zoomIn} 
-                  title="Zoom In"
-                  className="p-1.5 text-[#B0B0B0] hover:text-white hover:bg-[#303030] rounded-sm transition-colors"
-                >
-                  <ZoomIn size={14} />
-                </button>
-                <button 
-                  onClick={zoomOut} 
-                  title="Zoom Out"
-                  className="p-1.5 text-[#B0B0B0] hover:text-white hover:bg-[#303030] rounded-sm transition-colors"
-                >
-                  <ZoomOut size={14} />
-                </button>
-                <button 
-                  onClick={resetZoom} 
-                  title="Reset Workspace"
-                  className="p-1.5 text-[#B0B0B0] hover:text-white hover:bg-[#303030] rounded-sm transition-colors text-[10px] font-bold"
-                >
-                  100%
-                </button>
-                <button 
-                  onClick={fitToScreen} 
-                  title="Fit to Screen"
-                  className="p-1.5 text-[#B0B0B0] hover:text-white hover:bg-[#303030] rounded-sm transition-colors border-r border-[#303030] pr-2.5 mr-1"
-                >
-                  <Maximize size={14} />
-                </button>
-                <button 
-                  onClick={handleToggleManualLayout} 
-                  title={manualLayout ? "Switch to Auto Layout" : "Switch to Manual Layout"}
-                  className={`px-2.5 py-1 text-[10px] font-black tracking-wider rounded-sm transition-all duration-300 flex items-center gap-1.5 ${
-                    manualLayout 
-                      ? "bg-[#FFE600] text-[#1B1B1B] shadow-[0_0_10px_rgba(255,230,0,0.2)]" 
-                      : "text-[#B0B0B0] hover:text-white hover:bg-[#303030]"
-                  }`}
-                >
-                  <Zap size={10} className={manualLayout ? "animate-pulse" : ""} />
-                  {manualLayout ? "MANUAL LAYOUT" : "AUTO LAYOUT"}
-                </button>
+            <div className="flex flex-col gap-3 bg-[#111111] p-3 border border-[#303030] rounded-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                {/* Pan & Zoom Controls */}
+                <div className="flex items-center gap-1 border border-[#303030] bg-[#1E1E1E] p-1 rounded-sm">
+                  <button 
+                    onClick={zoomIn} 
+                    title="Zoom In"
+                    className="p-1.5 text-[#B0B0B0] hover:text-white hover:bg-[#303030] rounded-sm transition-colors"
+                  >
+                    <ZoomIn size={14} />
+                  </button>
+                  <button 
+                    onClick={zoomOut} 
+                    title="Zoom Out"
+                    className="p-1.5 text-[#B0B0B0] hover:text-white hover:bg-[#303030] rounded-sm transition-colors"
+                  >
+                    <ZoomOut size={14} />
+                  </button>
+                  <button 
+                    onClick={resetZoom} 
+                    title="Reset Workspace"
+                    className="p-1.5 text-[#B0B0B0] hover:text-white hover:bg-[#303030] rounded-sm transition-colors text-[10px] font-bold"
+                  >
+                    100%
+                  </button>
+                  <button 
+                    onClick={fitToScreen} 
+                    title="Fit to Screen"
+                    className="p-1.5 text-[#B0B0B0] hover:text-white hover:bg-[#303030] rounded-sm transition-colors border-r border-[#303030] pr-2.5 mr-1"
+                  >
+                    <Maximize size={14} />
+                  </button>
+                  <button 
+                    onClick={handleToggleManualLayout} 
+                    title={manualLayout ? "Switch to Auto Layout" : "Switch to Manual Layout"}
+                    className={`px-2.5 py-1 text-[10px] font-black tracking-wider rounded-sm transition-all duration-300 flex items-center gap-1.5 ${
+                      manualLayout 
+                        ? "bg-[#FFE600] text-[#1B1B1B] shadow-[0_0_10px_rgba(255,230,0,0.2)]" 
+                        : "text-[#B0B0B0] hover:text-white hover:bg-[#303030]"
+                    }`}
+                  >
+                    <Zap size={10} className={manualLayout ? "animate-pulse" : ""} />
+                    {manualLayout ? "MANUAL LAYOUT" : "AUTO LAYOUT"}
+                  </button>
+                </div>
+
+                {/* KPI Search Bar */}
+                <div className="relative w-full sm:w-64 z-50">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input 
+                    type="text" 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search SFA, SD, SSD, or KPIs..." 
+                    className="w-full bg-[#1E1E1E] border border-[#303030] pl-9 pr-8 py-1.5 text-xs text-white rounded-sm focus:outline-none focus:border-[#FFE600] transition-colors"
+                  />
+                  {searchQuery && (
+                    <button 
+                      onClick={() => setSearchQuery("")} 
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                  
+                  {/* Search Results Suggestions */}
+                  {searchResults.length > 0 && (
+                    <div className="absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-[#1B1B1B] border border-[#303030] rounded-sm shadow-xl z-50">
+                      {searchResults.map((node: any) => (
+                        <button
+                          key={node.id}
+                          onClick={() => {
+                            setSelectedNode({
+                              id: node.id,
+                              type: node.type,
+                              name: node.name,
+                              description: node.data?.kpi_description || node.data?.description || "",
+                              business_rationale: node.data?.business_rationale || "",
+                              classification: node.data?.classification || undefined,
+                              source_context: node.data?.source_context || {
+                                strategic_objectives: [],
+                                business_challenges: [],
+                                kras: [],
+                                functional_areas: [],
+                                custom_parameters: []
+                              },
+                              originalRef: node.data
+                            });
+                            
+                            centerNode(node.x, node.y, node.width, node.height);
+                            
+                            const activeClientId = parseInt(localStorage.getItem("active_client_id") || "0", 10);
+                            const activeEngagementId = parseInt(localStorage.getItem("active_engagement_id") || "0", 10);
+                            void api.logAuditEvent({
+                              module: "KPI Driver Tree",
+                              action: "Search Performed",
+                              status: "Success",
+                              entity_type: node.type,
+                              entity_name: node.name,
+                              previous_value: searchQuery,
+                              new_value: node.name,
+                              client_id: activeClientId || undefined,
+                              engagement_id: activeEngagementId || undefined
+                            });
+                            
+                            setSearchQuery("");
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs hover:bg-[#FFE600]/10 border-b border-[#303030]/30 last:border-b-0 text-white flex justify-between items-center"
+                        >
+                          <span className="truncate mr-2 text-left">{node.name}</span>
+                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
+                            node.type === "sfa" ? "bg-purple-950 text-purple-400 border border-purple-800/30" :
+                            node.type === "sd" ? "bg-amber-950 text-amber-400 border border-amber-800/30" :
+                            node.type === "ssd" ? "bg-blue-950 text-blue-400 border border-blue-800/30" :
+                            "bg-emerald-950 text-emerald-400 border border-emerald-800/30"
+                          }`}>
+                            {node.type.toUpperCase()}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* KPI Search Bar */}
-              <div className="relative w-full sm:w-64">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input 
-                  type="text" 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search KPIs inside tree..." 
-                  className="w-full bg-[#1E1E1E] border border-[#303030] pl-9 pr-4 py-1.5 text-xs text-white rounded-sm focus:outline-none focus:border-[#FFE600] transition-colors"
-                />
-                {searchQuery && (
-                  <button 
-                    onClick={() => setSearchQuery("")} 
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+              {/* Advanced Filtering row */}
+              <div className="flex flex-wrap items-center gap-2 border-t border-[#303030]/50 pt-2.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#B0B0B0] pr-1">Filters:</span>
+                
+                {/* Classification Quick Filter */}
+                <select
+                  value={selectedFilter}
+                  onChange={(e) => {
+                    const prev = selectedFilter;
+                    const val = e.target.value;
+                    setSelectedFilter(val);
+                    logFilterApplied("Business Impact", val);
+                  }}
+                  className="bg-[#1E1E1E] border border-[#303030] text-[10px] text-white p-1 rounded-sm focus:outline-none focus:border-[#FFE600] h-7"
+                >
+                  <option value="All KPIs">All Impact Classifications</option>
+                  <option value="Critical to Revenue">🟢 Critical to Revenue</option>
+                  <option value="Critical to Cost">🔴 Critical to Cost</option>
+                  <option value="Critical to Progress">🔵 Critical to Progress</option>
+                </select>
+
+                {/* SFA Filter */}
+                <select
+                  value={selectedSfaFilter || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedSfaFilter(val || null);
+                    logFilterApplied("Strategic Focus Area", val || "All");
+                  }}
+                  className="bg-[#1E1E1E] border border-[#303030] text-[10px] text-white p-1 rounded-sm focus:outline-none focus:border-[#FFE600] h-7 max-w-[150px]"
+                >
+                  <option value="">All Focus Areas</option>
+                  {sfaFilterOptions.map((opt: { id: string; name: string }) => (
+                    <option key={opt.id} value={opt.id}>{opt.name}</option>
+                  ))}
+                </select>
+
+                {/* SD Filter */}
+                <select
+                  value={selectedSdFilter || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedSdFilter(val || null);
+                    logFilterApplied("Standard Driver", val || "All");
+                  }}
+                  className="bg-[#1E1E1E] border border-[#303030] text-[10px] text-white p-1 rounded-sm focus:outline-none focus:border-[#FFE600] h-7 max-w-[180px]"
+                >
+                  <option value="">All Standard Drivers</option>
+                  {sdFilterOptions.map((opt: { id: string; name: string }) => (
+                    <option key={opt.id} value={opt.id}>{opt.name}</option>
+                  ))}
+                </select>
+
+                {/* SSD Filter */}
+                <select
+                  value={selectedSsdFilter || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedSsdFilter(val || null);
+                    logFilterApplied("Sector Driver", val || "All");
+                  }}
+                  className="bg-[#1E1E1E] border border-[#303030] text-[10px] text-white p-1 rounded-sm focus:outline-none focus:border-[#FFE600] h-7 max-w-[180px]"
+                >
+                  <option value="">All Sector Drivers</option>
+                  {ssdFilterOptions.map((opt: { id: string; name: string }) => (
+                    <option key={opt.id} value={opt.id}>{opt.name}</option>
+                  ))}
+                </select>
+
+                {/* FA Filter */}
+                <select
+                  value={selectedFaFilter || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedFaFilter(val || null);
+                    logFilterApplied("Functional Area", val || "All");
+                  }}
+                  className="bg-[#1E1E1E] border border-[#303030] text-[10px] text-white p-1 rounded-sm focus:outline-none focus:border-[#FFE600] h-7"
+                >
+                  <option value="">All Functional Areas</option>
+                  {functionalAreaOptions.map((opt: string) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+
+                {/* Reset Filters Button */}
+                {isFilterActive && (
+                  <button
+                    onClick={() => {
+                      setSelectedFilter("All KPIs");
+                      setSelectedSfaFilter(null);
+                      setSelectedSdFilter(null);
+                      setSelectedSsdFilter(null);
+                      setSelectedFaFilter(null);
+                      logFilterApplied("Clear All", "All");
+                    }}
+                    className="text-[9px] font-bold text-red-400 hover:text-red-300 border border-red-500/20 bg-red-500/5 px-2 py-0.5 rounded-sm h-7 flex items-center gap-1 transition-colors"
                   >
-                    <X size={12} />
+                    <X size={10} />
+                    Reset
                   </button>
                 )}
               </div>
@@ -1971,7 +2486,10 @@ export function KpiDriverTreePage({ onChange }: { onChange: () => void }) {
                   {layout.edges.map(edge => {
                     const dx = Math.abs(edge.to.x - edge.from.x) * 0.45;
                     const dStr = `M ${edge.from.x} ${edge.from.y} C ${edge.from.x + dx} ${edge.from.y}, ${edge.to.x - dx} ${edge.to.y}, ${edge.to.x} ${edge.to.y}`;
-                    const isHigh = !isAnyHovered || (isSameBranch(edge.fromId, hoveredNodeId!) && isSameBranch(edge.toId, hoveredNodeId!));
+                    const fromNode = layout.nodes.find(n => n.id === edge.fromId);
+                    const toNode = layout.nodes.find(n => n.id === edge.toId);
+                    const matchesFilter = fromNode && toNode ? (isFilterMatched(fromNode) && isFilterMatched(toNode)) : true;
+                    const isHigh = (!isAnyHovered || (isSameBranch(edge.fromId, hoveredNodeId!) && isSameBranch(edge.toId, hoveredNodeId!))) && matchesFilter;
                     return (
                       <path 
                         key={edge.id}
@@ -1981,6 +2499,7 @@ export function KpiDriverTreePage({ onChange }: { onChange: () => void }) {
                         fill="none"
                         filter={isHigh ? "url(#shadow-glow)" : undefined}
                         className="transition-all duration-300"
+                        style={{ opacity: matchesFilter ? 1 : 0.2 }}
                       />
                     );
                   })}
@@ -2031,7 +2550,7 @@ export function KpiDriverTreePage({ onChange }: { onChange: () => void }) {
                     // Render KPI Card Node
                     if (isKpi) {
                       const label = `KPI-${String(node.index).padStart(3, '0')}`;
-                      const isHigh = isNodeHigh(node.id);
+                      const isHigh = isNodeHigh(node);
                       return (
                         <div
                           key={node.id}
@@ -2044,6 +2563,7 @@ export function KpiDriverTreePage({ onChange }: { onChange: () => void }) {
                               name: node.name,
                               description: node.data.kpi_description || node.data.description || "",
                               business_rationale: "",
+                              classification: node.data.classification || undefined,
                               source_context: node.data.source_context || {
                                 strategic_objectives: [],
                                 business_challenges: [],
@@ -2060,20 +2580,32 @@ export function KpiDriverTreePage({ onChange }: { onChange: () => void }) {
                             left: `${node.x}px`,
                             top: `${node.y}px`,
                             width: `${node.width}px`,
-                            height: `${node.height}px`
+                            height: `${node.height}px`,
+                            ...(draggingNodeId === node.id || isSelected || isMatch 
+                              ? {} 
+                              : getKpiCardInlineStyles(node.data?.classification, isHigh))
                           }}
-                          className={`absolute group flex items-center gap-2.5 px-3 border rounded-sm no-pan ${
+                          className={`absolute group flex items-center gap-2.5 px-3 border rounded-sm no-pan transition-all duration-300 ${
                             draggingNodeId === node.id
                               ? "bg-[#FFE600]/25 border-[#FFE600] ring-2 ring-[#FFE600]/50 scale-[1.03] shadow-[0_0_15px_rgba(255,230,0,0.35)] z-50 cursor-grabbing transition-none"
                               : isSelected 
-                              ? "bg-[#FFE600]/10 border-[#FFE600] ring-1 ring-[#FFE600] cursor-grab transition-all duration-300" 
+                              ? "bg-[#FFE600]/10 border-[#FFE600] ring-1 ring-[#FFE600] cursor-grab" 
                               : isMatch 
-                              ? "bg-green-500/10 border-green-500 ring-2 ring-green-500/50 animate-pulse cursor-grab transition-all duration-300" 
-                              : isHigh
-                              ? "bg-[#111111] border-[#FFE600] text-[#FFE600] shadow-[0_0_8px_rgba(255,230,0,0.1)] cursor-grab transition-all duration-300"
-                              : "bg-[#0A0A0A] border-[#303030]/60 text-gray-500 opacity-60 cursor-grab transition-all duration-300"
-                          } hover:border-[#FFE600]/80`}
+                              ? "bg-green-500/15 border-green-400 ring-2 ring-green-500/50 animate-pulse cursor-grab" 
+                              : ""
+                          } hover:border-[#FFE600]/80 ${!isHigh ? "opacity-30" : "opacity-100"}`}
                         >
+                          <div 
+                            className="absolute left-0 top-0 bottom-0 w-1 rounded-l-sm"
+                            style={{
+                              backgroundColor: 
+                                (node.data?.classification || "Critical to Progress") === "Critical to Revenue"
+                                  ? "#10b981"
+                                  : (node.data?.classification || "Critical to Progress") === "Critical to Cost"
+                                  ? "#f43f5e"
+                                  : "#3b82f6"
+                            }}
+                          />
                           <span className={`text-[8px] font-mono font-bold px-1.5 py-0.5 rounded-sm shrink-0 border transition-all duration-300 ${
                             isHigh 
                               ? "bg-yellow-950/40 border-yellow-800 text-yellow-400"
@@ -2112,7 +2644,7 @@ export function KpiDriverTreePage({ onChange }: { onChange: () => void }) {
                       subtitle = `${count} ${count === 1 ? 'KPI' : 'KPIs'}`;
                     }
 
-                    const isHigh = isNodeHigh(node.id);
+                    const isHigh = isNodeHigh(node);
 
                     return (
                       <div
@@ -2144,15 +2676,15 @@ export function KpiDriverTreePage({ onChange }: { onChange: () => void }) {
                           width: `${node.width}px`,
                           height: `${node.height}px`
                         }}
-                        className={`absolute group border rounded-md p-3 flex flex-col justify-center text-center shadow-md no-pan ${
+                        className={`absolute group border rounded-md p-3 flex flex-col justify-center text-center shadow-md no-pan transition-all duration-300 ${
                           draggingNodeId === node.id
                             ? 'bg-[#FFE600]/25 border-[#FFE600] text-[#FFE600] ring-2 ring-[#FFE600]/50 scale-[1.03] shadow-[0_0_15px_rgba(255,230,0,0.35)] z-50 cursor-grabbing transition-none'
                             : isSelected 
-                            ? 'bg-[#FFE600]/10 border-[#FFE600] text-[#FFE600] shadow-[0_0_15px_rgba(255,230,0,0.25)] ring-1 ring-[#FFE600] cursor-grab transition-all duration-300' 
+                            ? 'bg-[#FFE600]/10 border-[#FFE600] text-[#FFE600] shadow-[0_0_15px_rgba(255,230,0,0.25)] ring-1 ring-[#FFE600] cursor-grab' 
                             : isHigh
-                            ? 'bg-[#1B1B1B] border-[#FFE600] text-[#FFE600] shadow-[0_0_12px_rgba(255,230,0,0.15)] cursor-grab transition-all duration-300'
-                            : 'bg-[#151515] border-[#303030]/60 text-gray-500 opacity-60 cursor-grab transition-all duration-300'
-                        } hover:border-[#FFE600]/80`}
+                            ? 'bg-[#1B1B1B] border-[#FFE600] text-[#FFE600] shadow-[0_0_12px_rgba(255,230,0,0.15)] cursor-grab'
+                            : 'bg-[#151515] border-[#303030]/60 text-gray-500 cursor-grab'
+                        } hover:border-[#FFE600]/80 ${!isHigh ? "opacity-30" : "opacity-100"}`}
                       >
                         {/* Collapse/Expand Toggle Button */}
                         <button
@@ -2225,6 +2757,25 @@ export function KpiDriverTreePage({ onChange }: { onChange: () => void }) {
                       </div>
                     );
                   })}
+                </div>
+              </div>
+
+              {/* Floating Legend */}
+              <div className="absolute bottom-4 left-4 bg-[#1B1B1B]/95 border border-[#303030] p-3 rounded-sm shadow-xl z-20 flex flex-col gap-2 pointer-events-auto max-w-[200px] backdrop-blur-sm">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-[#FFE600] border-b border-[#303030] pb-1.5 mb-0.5">
+                  Business Impact Legend
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 shadow-[0_0_6px_rgba(16,185,129,0.4)]" />
+                  <span className="text-[10px] text-[#B0B0B0] font-medium truncate">Critical to Revenue</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0 shadow-[0_0_6px_rgba(244,63,94,0.4)]" />
+                  <span className="text-[10px] text-[#B0B0B0] font-medium truncate">Critical to Cost</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0 shadow-[0_0_6px_rgba(59,130,246,0.4)]" />
+                  <span className="text-[10px] text-[#B0B0B0] font-medium truncate">Critical to Progress</span>
                 </div>
               </div>
             </div>
@@ -2345,6 +2896,55 @@ export function KpiDriverTreePage({ onChange }: { onChange: () => void }) {
                         className="w-full bg-[#252525] border border-[#333] px-3 py-1.5 text-xs text-white rounded focus:outline-none focus:border-[#FFE600] resize-none"
                       />
                     </div>
+
+                  {selectedNode.type === "kpi" && (
+                    <div className="border border-[#303030] bg-[#1E1E1E] p-3 rounded space-y-2">
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block">
+                        Business Impact Classification
+                      </label>
+                      <select
+                        value={selectedNode.classification || "Critical to Progress"}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const prev = selectedNode.classification || "Critical to Progress";
+                          handleUpdateNodeFields({ 
+                            classification: val,
+                            classification_confidence: 1.0,
+                            classification_source: "Manual Override"
+                          });
+                          
+                          // Log Business Classification Overridden audit log
+                          const activeClientId = parseInt(localStorage.getItem("active_client_id") || "0", 10);
+                          const activeEngagementId = parseInt(localStorage.getItem("active_engagement_id") || "0", 10);
+                          void api.logAuditEvent({
+                            module: "KPI Driver Tree",
+                            action: "Business Classification Overridden",
+                            status: "Success",
+                            entity_type: "KPI Node",
+                            entity_name: selectedNode.name,
+                            previous_value: prev,
+                            new_value: val,
+                            client_id: activeClientId || undefined,
+                            engagement_id: activeEngagementId || undefined
+                          });
+                          
+                          // Trigger save and sync back to KPI library
+                          setTimeout(() => {
+                            void handleSave();
+                          }, 50);
+                        }}
+                        className="w-full bg-[#111] border border-[#333] text-xs text-white p-1 rounded focus:outline-none focus:border-[#FFE600]"
+                      >
+                        <option value="Critical to Revenue">Critical to Revenue</option>
+                        <option value="Critical to Cost">Critical to Cost</option>
+                        <option value="Critical to Progress">Critical to Progress</option>
+                      </select>
+                      <div className="flex justify-between items-center text-[9px] text-[#B0B0B0] pt-1">
+                        <span>Confidence: <span className="text-[#FFE600]">{(selectedNode.originalRef?.classification_confidence !== undefined ? selectedNode.originalRef.classification_confidence : 1.0) * 100}%</span></span>
+                        <span>Source: <span className="text-[#FFE600]">{selectedNode.originalRef?.classification_source || "AI"}</span></span>
+                      </div>
+                    </div>
+                  )}
 
                   {selectedNode.type === "kpi" && (
                     <div className="border border-[#FFE600]/20 bg-[#FFE600]/5 p-3 rounded">

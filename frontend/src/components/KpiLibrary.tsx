@@ -249,7 +249,7 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
           </button>
           {hasApproved && (
             <button className="button-yellow border border-black/10" onClick={() => navigate("/step-3")}>
-              Proceed to Spec
+              Proceed to KPI Driver Tree
               <ChevronRight size={16} />
             </button>
           )}

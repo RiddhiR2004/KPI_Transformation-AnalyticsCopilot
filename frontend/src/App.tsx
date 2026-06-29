@@ -72,11 +72,11 @@ export default function App() {
         {/* Workflow Steps */}
         <Route path="/step-1" element={<BusinessContextPage onChange={refresh} />} />
         <Route path="/step-2" element={<KpiLibraryPage onChange={refresh} exports={exports} />} />
-        <Route path="/step-3" element={<FunctionalSpecificationPage onChange={refresh} exports={exports} />} />
-        <Route path="/step-4" element={<TechnicalDataMappingPage onChange={refresh} exports={exports} />} />
-        <Route path="/step-5" element={<RestrictedStepPage step="05" title="KPI Logic" />} />
-        <Route path="/step-6" element={<KpiDriverTreePage onChange={refresh} />} />
-        <Route path="/step-7" element={<RestrictedStepPage step="07" title="Dashboard" />} />
+        <Route path="/step-3" element={<KpiDriverTreePage onChange={refresh} />} />
+        <Route path="/step-4" element={<FunctionalSpecificationPage onChange={refresh} exports={exports} />} />
+        <Route path="/step-5" element={<TechnicalDataMappingPage onChange={refresh} exports={exports} />} />
+        <Route path="/step-6" element={<RestrictedStepPage step="06" title="Dashboard & Visualization Design" />} />
+        <Route path="/step-7" element={<RestrictedStepPage step="07" title="Implementation Roadmap" />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Shell>

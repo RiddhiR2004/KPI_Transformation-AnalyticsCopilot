@@ -1107,7 +1107,14 @@ def generate_pdf_spec(path: Path, spec: Any, context: BusinessContext, doc_name:
         exec_summary = spec.executive_summary or ""
         updated_at_str = spec.updated_at.strftime("%B %d, %Y") if hasattr(spec, "updated_at") and spec.updated_at else datetime.date.today().strftime("%B %d, %Y")
 
-    pdf_title = doc_name if doc_name else "KPI Functional Specification Document"
+    import re
+    pdf_title = "KPI Functional Specification Document"
+    if doc_name:
+        title_temp = re.sub(r'\.pdf$', '', doc_name, flags=re.IGNORECASE)
+        title_temp = re.sub(r'_v(\d+(\.\d+)*)', r' - v\1', title_temp)
+        title_temp = title_temp.replace('_', ' ')
+        pdf_title = title_temp.strip()
+
     pdf_author = "KPI Advisory & Analytics"
     pdf_subject = "KPI Functional Specification Document"
     pdf_creator = "KPI Advisory & Analytics Copilot"
@@ -1897,7 +1904,14 @@ def generate_pdf_driver_tree(path: Path, tree_data: dict, context: BusinessConte
     from reportlab.graphics.shapes import Drawing, Rect, Line, String
     from reportlab.lib.colors import HexColor
 
-    pdf_title = doc_name if doc_name else f"EY KPI Driver Tree - {profile.client_name if profile else 'Client'}"
+    import re
+    pdf_title = f"EY KPI Driver Tree - {profile.client_name if profile else 'Client'}"
+    if doc_name:
+        title_temp = re.sub(r'\.pdf$', '', doc_name, flags=re.IGNORECASE)
+        title_temp = re.sub(r'_v(\d+(\.\d+)*)', r' - v\1', title_temp)
+        title_temp = title_temp.replace('_', ' ')
+        pdf_title = title_temp.strip()
+
     pdf_author = "EY KPI Advisory & Analytics"
     pdf_subject = "KPI Driver Tree Traceability Document"
     pdf_creator = "KPI Advisory & Analytics Copilot"
@@ -2135,9 +2149,18 @@ def generate_pdf_driver_tree(path: Path, tree_data: dict, context: BusinessConte
                 X2 = X_kpi
                 Y2 = kpi_y
                 Xmid = (X1 + X2) / 2
-                d.add(Line(X1, Y1, Xmid, Y1, strokeColor=HexColor("#DCDCD9"), strokeWidth=1.0))
-                d.add(Line(Xmid, Y1, Xmid, Y2, strokeColor=HexColor("#DCDCD9"), strokeWidth=1.0))
-                d.add(Line(Xmid, Y2, X2, Y2, strokeColor=HexColor("#DCDCD9"), strokeWidth=1.0))
+                
+                cls = kpi.get("classification") or "Critical to Progress"
+                if cls == "Critical to Revenue":
+                    stroke_col = HexColor("#137333")
+                elif cls == "Critical to Cost":
+                    stroke_col = HexColor("#C5221F")
+                else:
+                    stroke_col = HexColor("#1A73E8")
+                    
+                d.add(Line(X1, Y1, Xmid, Y1, strokeColor=stroke_col, strokeWidth=0.75))
+                d.add(Line(Xmid, Y1, Xmid, Y2, strokeColor=stroke_col, strokeWidth=0.75))
+                d.add(Line(Xmid, Y2, X2, Y2, strokeColor=stroke_col, strokeWidth=0.75))
                 
         # Draw SFA Card
         d.add(Rect(X_sfa, sfa_y - 20, W_sfa, 40, fillColor=HexColor("#1B1B1B"), strokeColor=HexColor("#1B1B1B"), rx=4, ry=4))
@@ -2159,10 +2182,44 @@ def generate_pdf_driver_tree(path: Path, tree_data: dict, context: BusinessConte
         # Draw KPI Cards
         for idx, kpi in enumerate(kpi_nodes):
             kpi_y = kpi_positions[kpi["_unique_key"]]
-            d.add(Rect(X_kpi, kpi_y - 12, W_kpi, 24, fillColor=HexColor("#FFFFFF"), strokeColor=HexColor("#E2E8F0"), strokeWidth=0.5, rx=2, ry=2))
+            cls = kpi.get("classification") or "Critical to Progress"
+            if cls == "Critical to Revenue":
+                bg_color = HexColor("#E6F4EA")
+                border_col = HexColor("#137333")
+                indicator_col = HexColor("#137333")
+                txt_col = HexColor("#137333")
+            elif cls == "Critical to Cost":
+                bg_color = HexColor("#FCE8E6")
+                border_col = HexColor("#C5221F")
+                indicator_col = HexColor("#C5221F")
+                txt_col = HexColor("#C5221F")
+            else:
+                bg_color = HexColor("#E8F0FE")
+                border_col = HexColor("#1A73E8")
+                indicator_col = HexColor("#1A73E8")
+                txt_col = HexColor("#1A73E8")
+                
+            d.add(Rect(X_kpi, kpi_y - 12, W_kpi, 24, fillColor=bg_color, strokeColor=border_col, strokeWidth=0.5, rx=2, ry=2))
+            d.add(Rect(X_kpi, kpi_y - 12, 3, 24, fillColor=indicator_col, strokeColor=None))
             kname = kpi.get("kpi_name") or kpi.get("name") or "Unnamed KPI"
-            draw_wrapped_text(d, f"{idx+1:02d}. {kname}", X_kpi + 6, kpi_y, W_kpi - 12, font_name="Helvetica", font_size=7, fill_color=HexColor("#0F172A"), line_height=8, max_lines=2)
+            draw_wrapped_text(d, f"{idx+1:02d}. {kname}", X_kpi + 8, kpi_y, W_kpi - 16, font_name="Helvetica-Bold", font_size=7, fill_color=txt_col, line_height=8, max_lines=2)
             
+        # Draw Legend inside drawing sheet
+        legend_y = 12
+        d.add(Rect(5, legend_y - 4, 380, 14, fillColor=HexColor("#FFFFFF"), strokeColor=HexColor("#E2E8F0"), strokeWidth=0.5, rx=2, ry=2))
+        
+        # Revenue dot
+        d.add(Rect(10, legend_y - 2, 8, 8, fillColor=HexColor("#137333"), strokeColor=None, rx=1, ry=1))
+        d.add(String(23, legend_y - 1, "Critical to Revenue", fontName="Helvetica", fontSize=6.5, fillColor=HexColor("#2C2C2A")))
+        
+        # Cost dot
+        d.add(Rect(130, legend_y - 2, 8, 8, fillColor=HexColor("#C5221F"), strokeColor=None, rx=1, ry=1))
+        d.add(String(143, legend_y - 1, "Critical to Cost", fontName="Helvetica", fontSize=6.5, fillColor=HexColor("#2C2C2A")))
+        
+        # Progress dot
+        d.add(Rect(250, legend_y - 2, 8, 8, fillColor=HexColor("#1A73E8"), strokeColor=None, rx=1, ry=1))
+        d.add(String(263, legend_y - 1, "Critical to Progress", fontName="Helvetica", fontSize=6.5, fillColor=HexColor("#2C2C2A")))
+
         return d
 
     def draw_full_tree_overview(tree_data_inner: dict) -> Drawing:
@@ -2499,6 +2556,123 @@ def generate_pdf_driver_tree(path: Path, tree_data: dict, context: BusinessConte
         if sfa_idx < len(sfas) - 1:
             story.append(PageBreak())
             
+    # --- Summary Page ---
+    story.append(PageBreak())
+    summary_title_style = ParagraphStyle(
+        'SummaryTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=16,
+        leading=20,
+        textColor=dark_gray,
+        spaceBefore=0,
+        spaceAfter=6,
+        keepWithNext=True
+    )
+    story.append(Paragraph("Executive Business Impact & SFA Summary", summary_title_style))
+    story.append(Paragraph(
+        "This section summarizes the distribution of operational KPIs across key business impact classifications and provides SFA breakdown statistics.",
+        overview_desc_style
+    ))
+    
+    # 1. Calculate overall counts
+    tot_revenue = 0
+    tot_cost = 0
+    tot_progress = 0
+    sfa_stats = []
+    
+    for sfa_idx, sfa in enumerate(sfas):
+        sfa_name = sfa.get("name", f"SFA {sfa_idx + 1}")
+        sfa_revenue = 0
+        sfa_cost = 0
+        sfa_progress = 0
+        
+        drivers = sfa.get("drivers", [])
+        tot_sds = len(drivers)
+        tot_ssds = 0
+        tot_kpis = 0
+        
+        for sd in drivers:
+            ssds = sd.get("sector_specific_drivers", []) or sd.get("sector_drivers", []) or []
+            tot_ssds += len(ssds)
+            for ssd in ssds:
+                kpis = ssd.get("kpis", [])
+                tot_kpis += len(kpis)
+                for k in kpis:
+                    cls = k.get("classification") or "Critical to Progress"
+                    if cls == "Critical to Revenue":
+                        sfa_revenue += 1
+                        tot_revenue += 1
+                    elif cls == "Critical to Cost":
+                        sfa_cost += 1
+                        tot_cost += 1
+                    else:
+                        sfa_progress += 1
+                        tot_progress += 1
+                        
+        sfa_stats.append({
+            "name": sfa_name,
+            "sds": tot_sds,
+            "ssds": tot_ssds,
+            "kpis": tot_kpis,
+            "revenue": sfa_revenue,
+            "cost": sfa_cost,
+            "progress": sfa_progress
+        })
+        
+    # Build Overall Summary Table
+    summary_data = [
+        [Paragraph("Business Impact Classification", tbl_label_style), Paragraph("KPI Distribution Count", tbl_label_style), Paragraph("Description", tbl_label_style)],
+        [Paragraph("<font color='#137333'><b>🟢 Critical to Revenue</b></font>", tbl_value_style), Paragraph(f"<b>{tot_revenue} KPIs</b>", tbl_value_style), Paragraph("Metrics directly influencing top-line growth, sales velocity, and customer conversion/retention.", tbl_value_style)],
+        [Paragraph("<font color='#C5221F'><b>🔴 Critical to Cost</b></font>", tbl_value_style), Paragraph(f"<b>{tot_cost} KPIs</b>", tbl_value_style), Paragraph("Metrics driving bottom-line efficiency, operational savings, and cost optimization.", tbl_value_style)],
+        [Paragraph("<font color='#1A73E8'><b>🔵 Critical to Progress</b></font>", tbl_value_style), Paragraph(f"<b>{tot_progress} KPIs</b>", tbl_value_style), Paragraph("Metrics tracking execution milestones, quality control, compliance, and transformation progress.", tbl_value_style)]
+    ]
+    summary_table = Table(summary_data, colWidths=[150, 150, 384])
+    summary_table.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('LINEBELOW', (0,0), (-1,-1), 0.5, border_color),
+        ('BACKGROUND', (0,0), (-1,0), HexColor("#F5F5F5")),
+    ]))
+    story.append(summary_table)
+    story.append(Spacer(1, 15))
+    
+    # Build SFA breakdown table
+    breakdown_data = [
+        [
+            Paragraph("Strategic Focus Area (SFA)", tbl_label_style),
+            Paragraph("SDs", tbl_label_style),
+            Paragraph("SSDs", tbl_label_style),
+            Paragraph("Total KPIs", tbl_label_style),
+            Paragraph("Revenue KPIs", tbl_label_style),
+            Paragraph("Cost KPIs", tbl_label_style),
+            Paragraph("Progress KPIs", tbl_label_style)
+        ]
+    ]
+    for stat in sfa_stats:
+        breakdown_data.append([
+            Paragraph(f"<b>{stat['name']}</b>", tbl_value_style),
+            Paragraph(str(stat['sds']), tbl_value_style),
+            Paragraph(str(stat['ssds']), tbl_value_style),
+            Paragraph(f"<b>{stat['kpis']}</b>", tbl_value_style),
+            Paragraph(f"<font color='#137333'><b>{stat['revenue']}</b></font>", tbl_value_style),
+            Paragraph(f"<font color='#C5221F'><b>{stat['cost']}</b></font>", tbl_value_style),
+            Paragraph(f"<font color='#1A73E8'><b>{stat['progress']}</b></font>", tbl_value_style),
+        ])
+    
+    breakdown_table = Table(breakdown_data, colWidths=[234, 50, 50, 70, 90, 90, 100])
+    breakdown_table.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('LINEBELOW', (0,0), (-1,-1), 0.5, border_color),
+        ('BACKGROUND', (0,0), (-1,0), HexColor("#F5F5F5")),
+    ]))
+    story.append(breakdown_table)
+
     doc.build(story, canvasmaker=LandscapeNumberedCanvas)
 
 
@@ -2747,11 +2921,19 @@ def generate_docx_tdm(path: Path, mapping: Any, context: BusinessContext) -> Non
 def generate_pdf_tdm(path: Path, mapping: Any, context: BusinessContext, doc_name: str | None = None) -> None:
     """Generates a technical data mapping PDF Document."""
     import datetime
+    import re
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, KeepTogether
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import letter
     from reportlab.lib.units import inch
+    
+    pdf_title = "Technical Data Flow Mapping - v1.0"
+    if doc_name:
+        title_temp = re.sub(r'\.pdf$', '', doc_name, flags=re.IGNORECASE)
+        title_temp = re.sub(r'_v(\d+(\.\d+)*)', r' - v\1', title_temp)
+        title_temp = title_temp.replace('_', ' ')
+        pdf_title = title_temp.strip()
     
     if isinstance(mapping, list):
         items = mapping
@@ -2776,7 +2958,7 @@ def generate_pdf_tdm(path: Path, mapping: Any, context: BusinessContext, doc_nam
 
     # Cover Page
     story.append(Paragraph("KPI Advisory & Analytics", sub_title_style))
-    story.append(Paragraph(doc_name or "Technical Data Mapping Document", title_style))
+    story.append(Paragraph(pdf_title, title_style))
     story.append(Spacer(1, 20))
     story.append(Paragraph("A detailed blueprint translating functional metric specifications into engineering requirements, calculations, and data source mappings.", body_style))
     story.append(Spacer(1, 40))
@@ -2927,7 +3109,11 @@ def generate_pdf_tdm(path: Path, mapping: Any, context: BusinessContext, doc_nam
         rightMargin=54,
         leftMargin=54,
         topMargin=54,
-        bottomMargin=54
+        bottomMargin=54,
+        title=pdf_title,
+        author="KPI Advisory & Analytics",
+        subject="Technical Data Flow Mapping Document",
+        creator="KPI Advisory & Analytics Copilot"
     )
     doc.build(story, canvasmaker=NumberedCanvas)
 
