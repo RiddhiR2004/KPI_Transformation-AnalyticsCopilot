@@ -225,12 +225,14 @@ function EngagementGrid({
   const getStepInfo = (eng: EngagementRecord) => {
     const ws = eng.workflow_status;
     if (!ws) return { label: "Not started", color: "text-[#555] border-[#333] bg-[#1a1a1a]", pct: 0 };
+    if (ws.technical_mapping)
+      return { label: "Step 4 — Technical Mapping", color: "text-cyan-400 border-cyan-800 bg-cyan-950/30", pct: 100 };
     if (ws.functional_specification)
-      return { label: "Step 3 — Functional Spec", color: "text-emerald-400 border-emerald-800 bg-emerald-950/30", pct: 100 };
+      return { label: "Step 3 — Functional Spec", color: "text-emerald-400 border-emerald-800 bg-emerald-950/30", pct: 80 };
     if (ws.kpi_library)
-      return { label: "Step 2 — KPI Library", color: "text-[#FFE600] border-[#FFE600]/30 bg-[#FFE600]/5", pct: 66 };
+      return { label: "Step 2 — KPI Library", color: "text-[#FFE600] border-[#FFE600]/30 bg-[#FFE600]/5", pct: 60 };
     if (ws.business_context)
-      return { label: "Step 1 — Business Context", color: "text-[#FFE600] border-[#FFE600]/30 bg-[#FFE600]/5", pct: 33 };
+      return { label: "Step 1 — Business Context", color: "text-[#FFE600] border-[#FFE600]/30 bg-[#FFE600]/5", pct: 40 };
     return { label: "Not started", color: "text-[#555] border-[#333] bg-[#1a1a1a]", pct: 0 };
   };
 
