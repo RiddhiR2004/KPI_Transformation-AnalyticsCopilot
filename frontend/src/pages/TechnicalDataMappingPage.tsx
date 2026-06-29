@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { Check, CheckCircle, ChevronRight, Download, Loader2, Play, Printer, RefreshCw, Edit3, Save } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api, exportUrl } from "../lib/api";
 import {
@@ -19,16 +20,33 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
   const [activeTab, setActiveTab] = useState<"editor" | "preview">("editor");
   const [activeSection, setActiveSection] = useState<"synopsis" | "detailed" | "dimensions">("synopsis");
   const [previewPageNum, setPreviewPageNum] = useState(1);
-  const totalPages = 4;
+  const totalPages = 7;
   const [editingItem, setEditingItem] = useState<TechnicalDataMappingItem | null>(null);
   const [expandedKpis, setExpandedKpis] = useState<Record<string, boolean>>({});
   
   const [isEditingExec, setIsEditingExec] = useState(false);
   const [execSummaryValue, setExecSummaryValue] = useState("");
+  const [docName, setDocName] = useState("");
+
+  const tdmExport = exports.find((e) => e.id === "technical_mapping");
 
   useEffect(() => {
     void fetchData();
   }, []);
+
+  useEffect(() => {
+    if (clientProfile && clientProfile.client_name && (docName === "" || docName === "KPI_Technical_Data_Mapping")) {
+      const clientPart = clientProfile.client_name.trim().replace(/\s+/g, "_");
+      const industryPart = (clientProfile.industry || "").trim().replace(/\s+/g, "_");
+      const parts = [];
+      if (clientPart) parts.push(clientPart);
+      if (industryPart) parts.push(industryPart);
+      parts.push("KPI_Technical_Data_Mapping");
+      setDocName(parts.join("_"));
+    } else if (!docName) {
+      setDocName("KPI_Technical_Data_Mapping");
+    }
+  }, [clientProfile]);
 
   async function fetchData() {
     try {
@@ -113,6 +131,7 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
     try {
       await api.approveTechnicalMapping();
       setMapping((prev) => prev ? { ...prev, status: "approved" } : null);
+      onChange();
       setSaveStatus("Technical Data Mapping Approved!");
       setTimeout(() => setSaveStatus(""), 3000);
     } catch (err) {
@@ -127,6 +146,7 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
       const updatedMapping = { ...mapping, status: "draft" };
       await api.saveTechnicalMapping(updatedMapping);
       setMapping(updatedMapping);
+      onChange();
       setSaveStatus("Document reopened to Draft");
       setTimeout(() => setSaveStatus(""), 3000);
     } catch (err) {
@@ -209,24 +229,6 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
       </section>
 
       <div className="space-y-6">
-        <div className="flex justify-between items-start mb-6">
-          {saveStatus && (
-            <div className="px-4 py-2 bg-green-50 text-green-700 rounded-md text-sm font-medium animate-pulse">
-              {saveStatus}
-            </div>
-          )}
-          {isApproved && (
-            <div className="px-4 py-2 bg-blue-50 text-blue-700 rounded-md text-sm font-medium border border-blue-200">
-              <span className="flex items-center">
-                <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                Document Approved
-              </span>
-            </div>
-          )}
-        </div>
-
         {error && !error.includes("RESOURCE_EXHAUSTED") && !error.includes("Quota exceeded") && !error.includes("429") && (
           <div className="mb-6 p-4 bg-red-50 text-red-700 border border-red-200 rounded-md flex items-start">
             <svg className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -291,123 +293,204 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
             <button
               onClick={generateMapping}
               disabled={generating}
-              className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-black bg-ey-yellow hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ey-yellow disabled:opacity-50"
+              className="button-yellow !px-6 !py-3 flex items-center justify-center mx-auto"
             >
               {generating ? (
                 <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                  <Loader2 size={20} className="animate-spin mr-3" />
                   Generating Mappings...
                 </>
               ) : (
                 <>
-                  <svg className="mr-2 -ml-1 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                  </svg>
+                  <Play size={20} className="mr-2 -ml-1" />
                   Generate Technical Mapping
                 </>
               )}
             </button>
           </div>
         ) : (
-          <div>
-            <div className="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0">
-              <div className="flex border-b border-[#303030]">
-                <button
-                  onClick={() => setActiveTab("editor")}
-                  className={`py-2 px-4 text-sm font-medium border-b-2 ${
-                    activeTab === "editor"
-                      ? "border-ey-yellow text-[#F5F5F5]"
-                      : "border-transparent text-[#B0B0B0] hover:text-[#D5D5D5] hover:border-[#303030]"
-                  }`}
-                >
-                  Document Editor
-                </button>
-                <button
-                  onClick={() => setActiveTab("preview")}
-                  className={`py-2 px-4 text-sm font-medium border-b-2 ${
-                    activeTab === "preview"
-                      ? "border-ey-yellow text-[#F5F5F5]"
-                      : "border-transparent text-[#B0B0B0] hover:text-[#D5D5D5] hover:border-[#303030]"
-                  }`}
-                >
-                  Document Preview
-                </button>
-              </div>
+          <div className="space-y-8 max-w-6xl mx-auto">
+            {/* Top Sticky/Control Action Bar */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-[#1B1B1B] border border-[#303030] p-4 rounded-sm gap-4 sticky top-0 z-40 shadow-lg">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-[10px] font-bold tracking-widest text-[#FFE600] uppercase">Document Status</span>
+                {isApproved ? (
+                  <span className="inline-flex items-center gap-1 border border-green-500/30 bg-green-500/10 text-green-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                    <Check size={10} />
+                    Approved Technical Mapping
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 border border-yellow-500/30 bg-yellow-500/10 text-yellow-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                    Draft Technical Mapping
+                  </span>
+                )}
+                {saveStatus && <span className="text-xs text-[#FFE600] animate-pulse">{saveStatus}</span>}
 
-              <div className="flex space-x-3">
-                <div className="flex items-center gap-2">
-                  <button onClick={() => handleExport("docx")} className="button-secondary !py-1.5 !px-3 !text-xs flex items-center gap-1.5 border border-[#303030] text-[#B0B0B0] hover:border-yellow-500/30 hover:text-yellow-400">
-                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                    Download Excel
+                {/* Tab Swapper */}
+                <div className="flex bg-[#111111] p-1 rounded-sm border border-[#303030] sm:ml-4 shrink-0">
+                  <button
+                    type="button"
+                    className={`px-3 py-1 text-[11px] font-bold rounded-sm transition-all ${
+                      activeTab === "editor"
+                        ? "bg-[#FFE600] text-black"
+                        : "text-[#B0B0B0] hover:text-[#F5F5F5]"
+                    }`}
+                    onClick={() => setActiveTab("editor")}
+                  >
+                    Document Editor
                   </button>
-                  <button onClick={() => handleExport("pdf")} className="button-secondary !py-1.5 !px-3 !text-xs flex items-center gap-1.5 border border-[#303030] text-[#B0B0B0] hover:border-yellow-500/30 hover:text-yellow-400">
-                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                    Download PDF
+                  <button
+                    type="button"
+                    className={`px-3 py-1 text-[11px] font-bold rounded-sm transition-all ${
+                      activeTab === "preview"
+                        ? "bg-[#FFE600] text-black"
+                        : "text-[#B0B0B0] hover:text-[#F5F5F5]"
+                    }`}
+                    onClick={() => setActiveTab("preview")}
+                  >
+                    Document Preview
                   </button>
                 </div>
+              </div>
 
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto md:justify-end">
+                {/* Document Name Customization */}
+                <div className="flex items-center gap-2 bg-[#111111] px-2 py-1.5 rounded-sm border border-[#303030]">
+                  <span className="text-[10px] font-bold tracking-widest text-[#B0B0B0] uppercase whitespace-nowrap">Doc Name:</span>
+                  <input
+                    type="text"
+                    value={docName}
+                    onChange={(e) => setDocName(e.target.value)}
+                    placeholder="Enter document name..."
+                    className="bg-transparent text-xs text-[#F5F5F5] placeholder-gray-600 focus:outline-none w-48 sm:w-64"
+                  />
+                </div>
+
+                {/* Export buttons */}
+                <div className="flex items-center gap-2">
+                  {tdmExport?.available ? (
+                    tdmExport.formats.map((format) => (
+                      <a
+                        key={format}
+                        href={`${exportUrl("technical_mapping", format)}${exportUrl("technical_mapping", format).includes('?') ? '&' : '?'}doc_name=${encodeURIComponent(docName)}`}
+                        download={`${docName || "KPI_Technical_Data_Mapping"}.${format.toLowerCase()}`}
+                        className="button-secondary !py-1.5 !px-3 !text-xs flex items-center gap-1.5"
+                        id={`export-${format.toLowerCase()}`}
+                      >
+                        <Download size={12} />
+                        Download {format}
+                      </a>
+                    ))
+                  ) : (
+                    <span className="text-[11px] text-[#B0B0B0]/40">Compiling exports...</span>
+                  )}
+                </div>
+
+                {/* Approve / Reopen triggers */}
                 {!isApproved ? (
-                  <button
+                  <button 
+                    className="button-secondary !py-1.5 !px-3 !text-xs border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10 flex items-center gap-1.5" 
                     onClick={approveMapping}
-                    className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-gray-900 hover:bg-black focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900"
+                    id="approve-mapping-btn"
                   >
+                    <CheckCircle size={14} />
                     Approve Document
                   </button>
                 ) : (
-                  <button
+                  <button 
+                    className="button-secondary !py-1.5 !px-3 !text-xs border border-[#303030] text-[#B0B0B0] hover:border-yellow-500/30 hover:text-yellow-400 flex items-center gap-1.5" 
                     onClick={reopenMapping}
-                    className="inline-flex items-center px-4 py-2 border border-[#303030] shadow-sm text-sm font-medium rounded-md text-[#D5D5D5] bg-[#1B1B1B] hover:bg-[#111111] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ey-yellow"
+                    id="reopen-mapping-btn"
                   >
-                    Reopen to Draft
+                    <RefreshCw size={14} />
+                    Reopen to Edit
                   </button>
                 )}
-                <Link
-                  to="/step-5"
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-black bg-[#FFE600] hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#FFE600]"
+
+                {/* Proceed to Next Step */}
+                {isApproved && (
+                  <Link
+                    to="/step-5"
+                    className="button-yellow border border-black/10 !py-1.5 !px-3 !text-xs flex items-center gap-1.5"
+                  >
+                    Proceed to KPI Logic Scripting
+                    <ChevronRight size={14} />
+                  </Link>
+                )}
+
+                {/* Print Button (only shown in preview tab) */}
+                {activeTab === "preview" && (
+                  <button
+                    type="button"
+                    className="button-secondary !py-1.5 !px-3 !text-xs border border-gray-500 text-gray-300 hover:bg-gray-500/10 flex items-center gap-1.5"
+                    onClick={() => window.print()}
+                    id="print-spec-btn"
+                  >
+                    <Printer size={12} />
+                    Print / PDF
+                  </button>
+                )}
+
+                {/* Re-synthesize button */}
+                <button 
+                  className="button-yellow border border-black/10 !py-1.5 !px-3 !text-xs flex items-center gap-1.5" 
+                  onClick={generateMapping} 
+                  disabled={generating}
+                  id="re-synthesize-mapping-btn"
                 >
-                  Proceed to KPI Logic Scripting
-                </Link>
+                  <Loader2 size={12} className={generating ? "animate-spin" : ""} />
+                  Re-synthesize Mapping
+                </button>
               </div>
             </div>
 
             {activeTab === "editor" ? (
-              <div className="space-y-8 bg-[#1B1B1B]/40 border border-[#303030] p-8 md:p-12 rounded-sm shadow-xl relative">
-                {/* Executive Summary */}
-                <div className="bg-[#111111] p-6 rounded-lg border border-[#303030]">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-medium text-[#F5F5F5] flex items-center">
-                      <svg className="w-5 h-5 mr-2 text-[#B0B0B0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      Executive Summary
-                    </h3>
-                    {!isApproved && (
-                      <button
+              <div className="space-y-8 bg-[#1B1B1B] border border-[#303030] p-8 md:p-12 rounded-sm relative">
+                {/* 1. Executive Summary */}
+                <div id="section-exec-summary" className="space-y-4 border-t border-[#303030]/60 pt-8 scroll-mt-24">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xl font-bold text-[#F5F5F5]">1. Executive Summary</h3>
+                    {!isEditingExec ? (
+                      <button 
+                        className="button-yellow !py-1 !px-2.5 !text-xs flex items-center gap-1.5" 
                         onClick={() => {
-                          if (isEditingExec) saveExecutiveSummary();
-                          else setIsEditingExec(true);
+                          setExecSummaryValue(mapping?.executive_summary || "");
+                          setIsEditingExec(true);
                         }}
-                        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                        disabled={isApproved}
+                        title={isApproved ? "Reopen document to edit contents" : ""}
+                        id="edit-exec-summary-btn"
                       >
-                        {isEditingExec ? "Save Summary" : "Edit Summary"}
+                        <Edit3 size={12} />
+                        Edit Summary
                       </button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button className="button-secondary !py-1 !px-2.5 !text-xs" onClick={() => setIsEditingExec(false)}>Cancel</button>
+                        <button className="button-yellow !py-1 !px-2.5 !text-xs flex items-center gap-1.5" onClick={saveExecutiveSummary} id="save-exec-summary-btn">
+                          <Save size={12} />
+                          Save Summary
+                        </button>
+                      </div>
                     )}
                   </div>
-                  
-                  {isEditingExec ? (
-                    <textarea
-                      value={execSummaryValue}
-                      onChange={(e) => setExecSummaryValue(e.target.value)}
-                      rows={5}
-                      className="w-full rounded-md border-[#303030] shadow-sm focus:border-ey-yellow focus:ring-ey-yellow sm:text-sm"
-                    />
+                  <p className="text-xs text-[#B0B0B0] leading-relaxed">
+                    This document-wide Executive Summary establishes the technical context, downstream alignment goals, and engineering specifications for performance measurement governance.
+                  </p>
+
+                  {!isEditingExec ? (
+                    <div className="border border-[#303030] bg-[#111111] p-6 rounded-sm whitespace-pre-wrap text-sm leading-7 text-[#D5D5D5] border-l-4 border-l-[#FFE600]">
+                      {execSummaryValue || "No executive summary provided. Please click 'Edit Summary' or regenerate to establish one."}
+                    </div>
                   ) : (
-                    <p className="text-[#D5D5D5] text-sm whitespace-pre-wrap leading-relaxed">
-                      {execSummaryValue || "No executive summary provided."}
-                    </p>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[#B0B0B0]">Executive Summary Text</label>
+                      <textarea
+                        className="field min-h-[250px] leading-6 text-xs w-full bg-[#111111] text-[#F5F5F5]"
+                        value={execSummaryValue}
+                        onChange={(e) => setExecSummaryValue(e.target.value)}
+                      />
+                    </div>
                   )}
                 </div>
 
@@ -1031,10 +1114,10 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                   </div>
                 </div>
 
-                {/* PAGE 4+: ACTUAL CONTENT */}
+                {/* PAGE 4: EXECUTIVE SUMMARY */}
                 <div className={`${previewPageNum === 4 ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
                   <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
-                    <div>Blueprint Content</div>
+                    <div>1. Executive Summary</div>
                     <div>Technical Data Mapping Document</div>
                   </div>
                   
@@ -1043,7 +1126,22 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                       <h2 className="text-xl font-bold text-gray-900 border-b border-gray-200 pb-2">1. Executive Summary</h2>
                       <p className="text-sm text-gray-700 whitespace-pre-wrap">{execSummaryValue || "No summary provided."}</p>
                     </div>
+                  </div>
 
+                  <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase mt-8">
+                    <div>Confidential - Advisory Work Product</div>
+                    <div>Page 4 of {totalPages}</div>
+                  </div>
+                </div>
+
+                {/* PAGE 5: KPI SYNOPSIS */}
+                <div className={`${previewPageNum === 5 ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
+                  <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
+                    <div>2. KPI Synopsis</div>
+                    <div>Technical Data Mapping Document</div>
+                  </div>
+                  
+                  <div className="flex-grow space-y-12">
                     <div className="space-y-4">
                       <h2 className="text-xl font-bold text-gray-900 border-b border-gray-200 pb-2">2. KPI Synopsis</h2>
                       <table className="min-w-full divide-y divide-gray-200 border border-gray-200">
@@ -1069,7 +1167,22 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                         </tbody>
                       </table>
                     </div>
+                  </div>
 
+                  <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase mt-8">
+                    <div>Confidential - Advisory Work Product</div>
+                    <div>Page 5 of {totalPages}</div>
+                  </div>
+                </div>
+
+                {/* PAGE 6: DETAILED KPIS BLUEPRINT */}
+                <div className={`${previewPageNum === 6 ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
+                  <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
+                    <div>3. Detailed KPIs Blueprint</div>
+                    <div>Technical Data Mapping Document</div>
+                  </div>
+                  
+                  <div className="flex-grow space-y-12">
                     <div className="space-y-4">
                       <h2 className="text-xl font-bold text-gray-900 border-b border-gray-200 pb-2">3. Detailed KPIs Blueprint</h2>
                       <div className="space-y-6">
@@ -1080,10 +1193,10 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                               <div key={item.id} className="border border-gray-300 p-4 rounded bg-gray-50 page-break-inside-avoid">
                                 <h4 className="font-bold text-md text-gray-900 mb-2">{index + 1}. {item.kpi_name}</h4>
                                 <div className="grid grid-cols-2 gap-4 text-xs">
-                                  <div><span className="font-semibold text-gray-700">Type:</span> {item.type_of_kpi}</div>
-                                  <div><span className="font-semibold text-gray-700">Priority:</span> {item.priority}</div>
-                                  <div className="col-span-2"><span className="font-semibold text-gray-700">Metric Description:</span> {item.description}</div>
-                                  <div className="col-span-2"><span className="font-semibold text-gray-700">Formula:</span> <code className="bg-gray-200 px-1 py-0.5 rounded">{item.logic_calculation}</code></div>
+                                  <div className="col-span-2"><span className="font-semibold text-gray-700">Technical Details:</span> {item.technical_details || "N/A"}</div>
+                                  <div><span className="font-semibold text-gray-700">Data Type:</span> {item.data_type || "N/A"}</div>
+                                  <div><span className="font-semibold text-gray-700">Action Direction:</span> {item.action || "N/A"}</div>
+                                  <div className="col-span-2"><span className="font-semibold text-gray-700">SQL Formula / Logic:</span> <code className="bg-gray-200 px-1 py-0.5 rounded text-[10px] break-all">{item.sql_formula || "N/A"}</code></div>
                                 </div>
                               </div>
                             ))}
@@ -1091,7 +1204,22 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                         ))}
                       </div>
                     </div>
+                  </div>
 
+                  <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase mt-8">
+                    <div>Confidential - Advisory Work Product</div>
+                    <div>Page 6 of {totalPages}</div>
+                  </div>
+                </div>
+
+                {/* PAGE 7: CONSOLIDATED DIMENSION LIST */}
+                <div className={`${previewPageNum === 7 ? 'block' : 'hidden print:block'} bg-white text-gray-900 border border-gray-200 p-12 md:p-16 rounded-sm shadow-2xl relative font-sans w-full min-h-[10.5in] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 page-break-after-always`}>
+                  <div className="border-b-2 border-gray-900 pb-2 flex justify-between items-center text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-6">
+                    <div>4. Consolidated Dimension List</div>
+                    <div>Technical Data Mapping Document</div>
+                  </div>
+                  
+                  <div className="flex-grow space-y-12">
                     <div className="space-y-4">
                       <h2 className="text-xl font-bold text-gray-900 border-b border-gray-200 pb-2">4. Consolidated Dimension List</h2>
                       <table className="min-w-full text-left border-collapse border border-gray-300">
@@ -1121,7 +1249,7 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
 
                   <div className="border-t border-gray-200 pt-4 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase mt-8">
                     <div>Confidential - Advisory Work Product</div>
-                    <div>Page 4 of {totalPages}</div>
+                    <div>Page 7 of {totalPages}</div>
                   </div>
                 </div>
               </div>

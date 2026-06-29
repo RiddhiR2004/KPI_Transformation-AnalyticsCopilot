@@ -2746,14 +2746,181 @@ def generate_docx_tdm(path: Path, mapping: Any, context: BusinessContext) -> Non
 
 def generate_pdf_tdm(path: Path, mapping: Any, context: BusinessContext, doc_name: str | None = None) -> None:
     """Generates a technical data mapping PDF Document."""
+    import datetime
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, KeepTogether
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.units import inch
+    
+    if isinstance(mapping, list):
+        items = mapping
+        exec_summary = "Consolidated Executive Summary"
+        updated_at_str = datetime.date.today().strftime("%B %d, %Y")
+    else:
+        items = getattr(mapping, "items", [])
+        exec_summary = getattr(mapping, "executive_summary", "") or "No executive summary provided."
+        updated_at = getattr(mapping, "updated_at", None)
+        updated_at_str = updated_at.strftime("%B %d, %Y") if updated_at else datetime.date.today().strftime("%B %d, %Y")
+
     story = []
     styles = getSampleStyleSheet()
     
-    title_style = ParagraphStyle('MainTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=22, leading=26, textColor=colors.HexColor("#1B1B1B"))
-    story.append(Paragraph("Technical Data Mapping Document", title_style))
+    title_style = ParagraphStyle('MainTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=22, leading=26, textColor=colors.HexColor("#1B1B1B"), alignment=0)
+    sub_title_style = ParagraphStyle('SubTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=12, leading=16, textColor=colors.HexColor("#B49600"))
+    h1_style = ParagraphStyle('Heading1', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=16, leading=20, textColor=colors.HexColor("#1B1B1B"), spaceBefore=12, spaceAfter=12)
+    h2_style = ParagraphStyle('Heading2', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=13, leading=16, textColor=colors.HexColor("#1B1B1B"), spaceBefore=10, spaceAfter=8)
+    body_style = ParagraphStyle('BodyText', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=14, textColor=colors.HexColor("#333333"), spaceAfter=8)
+    tbl_label_style = ParagraphStyle('TblLabel', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor("#000000"))
+    tbl_value_style = ParagraphStyle('TblValue', parent=styles['Normal'], fontName='Helvetica', fontSize=9, textColor=colors.HexColor("#333333"))
+
+    # Cover Page
+    story.append(Paragraph("KPI Advisory & Analytics", sub_title_style))
+    story.append(Paragraph(doc_name or "Technical Data Mapping Document", title_style))
     story.append(Spacer(1, 20))
-    story.append(Paragraph("A detailed blueprint translating functional metric specifications into engineering requirements, calculations, and data source mappings.", styles['Normal']))
+    story.append(Paragraph("A detailed blueprint translating functional metric specifications into engineering requirements, calculations, and data source mappings.", body_style))
+    story.append(Spacer(1, 40))
     
+    # Metadata Table
+    story.append(Paragraph("Document Control & Metadata", h2_style))
+    meta_data = [
+        [Paragraph("Document Version", tbl_label_style), Paragraph("1.0", tbl_value_style)],
+        [Paragraph("Generated Date", tbl_label_style), Paragraph(updated_at_str, tbl_value_style)],
+        [Paragraph("Number of KPIs", tbl_label_style), Paragraph(f"{len(items)} Technical Mappings", tbl_value_style)],
+    ]
+    meta_table = Table(meta_data, colWidths=[2.2 * inch, 4.3 * inch])
+    meta_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor("#F0F0F0")),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor("#333333")),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#E0E0E0")),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+    ]))
+    story.append(meta_table)
+    story.append(PageBreak())
+
+    # Table of Contents
+    story.append(Paragraph("Table of Contents", h1_style))
+    story.append(Paragraph("1. Executive Summary", body_style))
+    story.append(Paragraph("2. KPI Synopsis", body_style))
+    story.append(Paragraph("3. Detailed KPIs Blueprint", body_style))
+    story.append(Paragraph("4. Consolidated Dimension List", body_style))
+    story.append(PageBreak())
+
+    # 1. Executive Summary
+    story.append(Paragraph("1. Executive Summary", h1_style))
+    story.append(Paragraph(exec_summary, body_style))
+    story.append(PageBreak())
+
+    # 2. KPI Synopsis
+    story.append(Paragraph("2. KPI Synopsis", h1_style))
+    
+    grouped_kpis = {}
+    for item in items:
+        area = getattr(item, "type_of_kpi", "Uncategorized")
+        if not area: area = "Uncategorized"
+        if area not in grouped_kpis:
+            grouped_kpis[area] = {"L1": 0, "L2": 0, "L3": 0, "total": 0}
+        
+        p = getattr(item, "priority", "")
+        if p in ["L1", "L2", "L3"]:
+            grouped_kpis[area][p] += 1
+        grouped_kpis[area]["total"] += 1
+        
+    synopsis_data = [
+        [Paragraph("Functional Area", tbl_label_style), Paragraph("L1", tbl_label_style), Paragraph("L2", tbl_label_style), Paragraph("L3", tbl_label_style), Paragraph("Total", tbl_label_style)]
+    ]
+    for area, counts in grouped_kpis.items():
+        synopsis_data.append([
+            Paragraph(area, tbl_value_style),
+            Paragraph(str(counts["L1"]), tbl_value_style),
+            Paragraph(str(counts["L2"]), tbl_value_style),
+            Paragraph(str(counts["L3"]), tbl_value_style),
+            Paragraph(str(counts["total"]), tbl_label_style)
+        ])
+        
+    synopsis_table = Table(synopsis_data, colWidths=[2.5 * inch, 0.8 * inch, 0.8 * inch, 0.8 * inch, 0.8 * inch])
+    synopsis_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#F0F0F0")),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor("#333333")),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#E0E0E0")),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    story.append(synopsis_table)
+    story.append(PageBreak())
+
+    # 3. Detailed KPIs Blueprint
+    story.append(Paragraph("3. Detailed KPIs Blueprint", h1_style))
+    
+    for idx, item in enumerate(items, start=1):
+        kpi_elements = []
+        kpi_elements.append(Paragraph(f"{idx:02d}. {item.kpi_name}", h2_style))
+        
+        details_data = [
+            [Paragraph("Technical Details", tbl_label_style), Paragraph(clean_or_fallback(getattr(item, "technical_details", ""), "N/A"), tbl_value_style)],
+            [Paragraph("Data Type", tbl_label_style), Paragraph(clean_or_fallback(getattr(item, "data_type", ""), "N/A"), tbl_value_style)],
+            [Paragraph("Action Direction", tbl_label_style), Paragraph(clean_or_fallback(getattr(item, "action", ""), "N/A"), tbl_value_style)],
+            [Paragraph("SQL Formula / Logic", tbl_label_style), Paragraph(clean_or_fallback(getattr(item, "sql_formula", ""), "N/A"), tbl_value_style)]
+        ]
+        
+        t1 = Table(details_data, colWidths=[2.0 * inch, 4.5 * inch])
+        t1.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor("#F9F9F9")),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor("#333333")),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#E0E0E0")),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        kpi_elements.append(t1)
+        kpi_elements.append(Spacer(1, 15))
+        story.append(KeepTogether(kpi_elements))
+
+    story.append(PageBreak())
+
+    # 4. Consolidated Dimension List
+    story.append(Paragraph("4. Consolidated Dimension List", h1_style))
+    
+    dim_data = [
+        [Paragraph("KPI Name", tbl_label_style), Paragraph("Type", tbl_label_style), Paragraph("Dimension", tbl_label_style), Paragraph("Requirement", tbl_label_style)]
+    ]
+    
+    has_dimensions = False
+    for item in items:
+        dimensions = getattr(item, "dimension_list", [])
+        for dim in dimensions:
+            has_dimensions = True
+            dim_data.append([
+                Paragraph(getattr(item, "kpi_name", "Unknown"), tbl_value_style),
+                Paragraph(clean_or_fallback(getattr(dim, "dimension_type", ""), "-"), tbl_value_style),
+                Paragraph(clean_or_fallback(getattr(dim, "dimension", ""), "-"), tbl_value_style),
+                Paragraph(clean_or_fallback(getattr(dim, "dimension_requirement", ""), "-"), tbl_value_style)
+            ])
+            
+    if has_dimensions:
+        dim_table = Table(dim_data, colWidths=[1.5 * inch, 1.0 * inch, 1.5 * inch, 2.5 * inch])
+        dim_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1B1B1B")),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor("#FFFFFF")),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#E0E0E0")),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        story.append(dim_table)
+    else:
+        story.append(Paragraph("No dimensions found across any approved KPIs.", body_style))
+
     doc = SimpleDocTemplate(
         str(path),
         pagesize=letter,

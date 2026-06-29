@@ -957,6 +957,7 @@ def list_engagements(client_id: int | None = FastQuery(default=None)):
         Prompt as DBPrompt,
         KPILibrary as DBKPILibrary,
         FunctionalSpecification as DBFunctionalSpecification,
+        TechnicalDataMappingDB,
     )
     with SessionLocal() as session:
         q = session.query(Engagement)
@@ -985,12 +986,18 @@ def list_engagements(client_id: int | None = FastQuery(default=None)):
                     spec = bool(json.loads(spec_row.items or "[]"))
                 except Exception:
                     pass
+
+            tdm_row = session.scalar(select(TechnicalDataMappingDB).filter_by(engagement_id=r.id).limit(1))
+            tdm = False
+            if tdm_row:
+                tdm = tdm_row.status == "approved"
             
             wf_status = WorkflowStatus(
                 business_context=context,
                 prompt_generation=prompt,
                 kpi_library=library,
                 functional_specification=spec,
+                technical_mapping=tdm,
             )
             records.append(
                 EngagementRecord(
