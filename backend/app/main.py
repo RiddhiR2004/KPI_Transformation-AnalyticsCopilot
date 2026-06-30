@@ -1676,6 +1676,100 @@ def get_kpi_library() -> dict[str, Any]:
     return read_json(FILES["kpi_library"], {})
 
 
+@app.post("/kpi-library/upload")
+async def upload_kpi_library(request: Request, file: UploadFile = File(...)) -> KPILibrary:
+    import csv
+    import codecs
+    import uuid
+    from app.services.kpi_engine import quality_check, recommendations
+    import openpyxl
+    
+    context = current_context()
+    library = current_library()
+    
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
+
+    rows = []
+    if file.filename.lower().endswith('.csv'):
+        reader = csv.DictReader(codecs.iterdecode(file.file, 'utf-8-sig'))
+        rows = list(reader)
+    elif file.filename.lower().endswith('.xlsx') or file.filename.lower().endswith('.xls'):
+        wb = openpyxl.load_workbook(file.file, data_only=True)
+        sheet = wb.active
+        headers = [str(cell.value) if cell.value is not None else "" for cell in sheet[1]]
+        for row_cells in sheet.iter_rows(min_row=2, values_only=True):
+            if any(row_cells): # skip empty rows
+                row_dict = {headers[i]: val for i, val in enumerate(row_cells) if i < len(headers)}
+                rows.append(row_dict)
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported file format. Please upload CSV or Excel.")
+
+    new_items = []
+    for row in rows:
+        kpi_dict = {}
+        # normalize keys
+        normalized_row = {k.strip().lower().replace(" ", "_"): v for k, v in row.items() if k}
+        
+        # map to KPI model
+        for key, value in normalized_row.items():
+            if value is None:
+                continue
+            if key == "description":
+                key = "kpi_description"
+            if key in KPI.model_fields:
+                kpi_dict[key] = str(value).strip()
+                
+        # set defaults for mandatory fields
+        if not kpi_dict.get("id"):
+            kpi_dict["id"] = f"KPI-UPL-{uuid.uuid4().hex[:6].upper()}"
+        if not kpi_dict.get("kpi_name"):
+            kpi_dict["kpi_name"] = "Unnamed KPI"
+        if not kpi_dict.get("functional_area"):
+            kpi_dict["functional_area"] = "Unknown"
+        if not kpi_dict.get("kra"):
+            kpi_dict["kra"] = "Unknown"
+        if not kpi_dict.get("kpi_description"):
+            kpi_dict["kpi_description"] = "No description provided."
+        if not kpi_dict.get("formula"):
+            kpi_dict["formula"] = "TBD"
+        if not kpi_dict.get("source_system"):
+            kpi_dict["source_system"] = "TBD"
+        if not kpi_dict.get("refresh_cadence"):
+            kpi_dict["refresh_cadence"] = "TBD"
+            
+        kpi_dict["status"] = KPIStatus.draft
+        
+        try:
+            kpi = KPI(**kpi_dict)
+            new_items.append(kpi)
+        except Exception as e:
+            logger.error(f"Failed to parse KPI row {row}: {e}")
+            continue
+
+    library.items = new_items
+
+    # Update quality and recommendations
+    library.quality = quality_check(library.items, context)
+    library.recommendations = recommendations(library.items, context)
+    
+    # Save back to database (json file)
+    write_json(FILES["kpi_library"], library.model_dump(mode="json"))
+    
+    # Log the action
+    log_activity("KPI Template Uploaded", f"{len(rows)} KPIs parsed from {file.filename}")
+    log_audit(
+        request=request,
+        action="Upload",
+        module="KPI Library",
+        entity_type="KPI Template",
+        entity_name=file.filename,
+        new_value=f"Imported {len(rows)} KPIs"
+    )
+    
+    return library
+
+
 @app.post("/approve-kpis")
 def approve_kpis(request: Request, approval_req: KPIApprovalRequest) -> KPILibrary:
     context = current_context()

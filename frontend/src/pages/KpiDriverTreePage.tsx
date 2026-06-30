@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { 
   Building2, Search, Plus, Trash2, Check, X, Download, 
   ZoomIn, ZoomOut, Maximize, ArrowRight, Eye, Edit3, Loader2, Info, Zap, FileText,
@@ -23,6 +24,7 @@ type SelectedNodeInfo = {
 };
 
 export function KpiDriverTreePage({ onChange }: { onChange: () => void }) {
+  const navigate = useNavigate();
   const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null);
   const [businessContext, setBusinessContext] = useState<BusinessContext | null>(null);
   const [treeRecord, setTreeRecord] = useState<KpiTreeRecord | null>(null);
@@ -2061,24 +2063,47 @@ export function KpiDriverTreePage({ onChange }: { onChange: () => void }) {
             Business Impact Summary
           </h4>
           <div className="flex flex-wrap items-center gap-6">
-            <div className="flex items-center gap-2 bg-[#111111] px-4 py-2 border border-[#303030] rounded-sm min-w-[160px]">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
+            <button 
+              onClick={() => setSelectedFilter(selectedFilter === "Critical to Revenue" ? "All KPIs" : "Critical to Revenue")}
+              className={`flex items-center gap-2 px-4 py-2 border rounded-sm min-w-[160px] text-left transition-all ${
+                selectedFilter === "Critical to Revenue" 
+                  ? "bg-emerald-950/20 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.1)]" 
+                  : "bg-[#111111] border-[#303030] hover:border-emerald-500/30"
+              }`}
+            >
+              <span className={`w-2.5 h-2.5 rounded-full bg-emerald-500 ${selectedFilter === "Critical to Revenue" ? "shadow-[0_0_8px_rgba(16,185,129,0.8)]" : "shadow-[0_0_6px_rgba(16,185,129,0.5)]"}`} />
               <div className="text-xs font-semibold text-[#F5F5F5]">
                 Critical to Revenue: <span className="font-bold text-emerald-400">{summaryCounts.revenue} KPIs</span>
               </div>
-            </div>
-            <div className="flex items-center gap-2 bg-[#111111] px-4 py-2 border border-[#303030] rounded-sm min-w-[160px]">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.5)]" />
+            </button>
+            
+            <button 
+              onClick={() => setSelectedFilter(selectedFilter === "Critical to Cost" ? "All KPIs" : "Critical to Cost")}
+              className={`flex items-center gap-2 px-4 py-2 border rounded-sm min-w-[160px] text-left transition-all ${
+                selectedFilter === "Critical to Cost" 
+                  ? "bg-rose-950/20 border-rose-500/50 shadow-[0_0_10px_rgba(244,63,94,0.1)]" 
+                  : "bg-[#111111] border-[#303030] hover:border-rose-500/30"
+              }`}
+            >
+              <span className={`w-2.5 h-2.5 rounded-full bg-rose-500 ${selectedFilter === "Critical to Cost" ? "shadow-[0_0_8px_rgba(244,63,94,0.8)]" : "shadow-[0_0_6px_rgba(244,63,94,0.5)]"}`} />
               <div className="text-xs font-semibold text-[#F5F5F5]">
                 Critical to Cost: <span className="font-bold text-rose-400">{summaryCounts.cost} KPIs</span>
               </div>
-            </div>
-            <div className="flex items-center gap-2 bg-[#111111] px-4 py-2 border border-[#303030] rounded-sm min-w-[160px]">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_6px_rgba(59,130,246,0.5)]" />
+            </button>
+
+            <button 
+              onClick={() => setSelectedFilter(selectedFilter === "Critical to Progress" ? "All KPIs" : "Critical to Progress")}
+              className={`flex items-center gap-2 px-4 py-2 border rounded-sm min-w-[160px] text-left transition-all ${
+                selectedFilter === "Critical to Progress" 
+                  ? "bg-blue-950/20 border-blue-500/50 shadow-[0_0_10px_rgba(59,130,246,0.1)]" 
+                  : "bg-[#111111] border-[#303030] hover:border-blue-500/30"
+              }`}
+            >
+              <span className={`w-2.5 h-2.5 rounded-full bg-blue-500 ${selectedFilter === "Critical to Progress" ? "shadow-[0_0_8px_rgba(59,130,246,0.8)]" : "shadow-[0_0_6px_rgba(59,130,246,0.5)]"}`} />
               <div className="text-xs font-semibold text-[#F5F5F5]">
                 Critical to Progress: <span className="font-bold text-blue-400">{summaryCounts.progress} KPIs</span>
               </div>
-            </div>
+            </button>
           </div>
         </div>
       )}
@@ -2200,6 +2225,13 @@ export function KpiDriverTreePage({ onChange }: { onChange: () => void }) {
                       <Download size={13} />
                       Export PDF
                     </a>
+                    <button
+                      onClick={() => navigate("/step-4")}
+                      className="button-yellow flex items-center gap-2 px-4 py-1.5 text-xs font-bold transition-colors shadow-sm"
+                    >
+                      <span>Proceed to Functional Specifications</span>
+                      <ArrowRight size={13} />
+                    </button>
                   </>
                 )}
               </div>

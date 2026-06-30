@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { Check, CheckCircle, ChevronRight, Download, Loader2, Play, Printer, RefreshCw, Edit3, Save } from "lucide-react";
+import { AlertCircle, Check, CheckCircle, ChevronRight, Download, Loader2, Play, Printer, RefreshCw, Edit3, Save } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api, exportUrl } from "../lib/api";
 import {
@@ -221,7 +221,7 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
   return (
     <div className="space-y-6">
       <section className="border-l-8 border-[#ffe600] bg-[#1B1B1B] p-7 border border-[#303030] mb-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#FFE600]">Step 04</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#FFE600]">Step 05</p>
         <h2 className="mt-2 text-4xl font-semibold tracking-tight text-[#F5F5F5]">Technical Data Mapping Studio</h2>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-[#B0B0B0]">
           Generate and validate the technical implementation blueprints for approved KPIs.
@@ -230,10 +230,8 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
 
       <div className="space-y-6">
         {error && !error.includes("RESOURCE_EXHAUSTED") && !error.includes("Quota exceeded") && !error.includes("429") && (
-          <div className="mb-6 p-4 bg-red-50 text-red-700 border border-red-200 rounded-md flex items-start">
-            <svg className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+          <div className="border border-red-900 bg-red-950/30 p-4 text-xs text-red-400 flex items-start gap-3 mb-6">
+            <AlertCircle className="flex-shrink-0 mt-0.5" size={16} />
             <span>{error}</span>
           </div>
         )}
