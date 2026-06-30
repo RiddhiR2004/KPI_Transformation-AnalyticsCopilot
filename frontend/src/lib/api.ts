@@ -75,6 +75,14 @@ export const api = {
     request<KPILibrary>("/kpi-library/update", { method: "POST", headers: jsonHeaders, body: JSON.stringify({ id, patch }) }),
   addKpi: (item: Partial<KPI>) =>
     request<KPILibrary>("/kpi-library/add", { method: "POST", headers: jsonHeaders, body: JSON.stringify({ item }) }),
+  uploadKpiTemplate: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request<KPILibrary>("/kpi-library/upload", {
+      method: "POST",
+      body: formData,
+    });
+  },
   getFunctionalSpec: () => request<FunctionalSpecification>("/functional-spec"),
   saveFunctionalSpec: (spec: FunctionalSpecification) =>
     request<FunctionalSpecification>("/functional-spec", {

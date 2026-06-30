@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Building2 } from "lucide-react";
 import { KpiLibrary } from "../components/KpiLibrary";
 import { PromptStudio } from "../components/PromptStudio";
+import { KpiTemplateUpload } from "../components/KpiTemplateUpload";
 import type { ExportItem, ClientProfile } from "../types/api";
 import { api } from "../lib/api";
 
@@ -38,6 +39,8 @@ export function KpiLibraryPage({ onChange, exports }: { onChange: () => void; ex
         )}
       </section>
       
+      <KpiTemplateUpload onChange={onChange} />
+
       <PromptStudio onChange={onChange} />
       
       <KpiLibrary onChange={onChange} exports={exports} />
