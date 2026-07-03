@@ -137,64 +137,84 @@ class LangChainProvider(BaseLLMProvider):
         total_tokens = None
         payload = {}
 
+        max_retries = 3
+        base_delay = 2.0
+
         try:
-            from langchain_core.messages import SystemMessage, HumanMessage
+            for attempt in range(max_retries):
+                try:
+                    from langchain_core.messages import SystemMessage, HumanMessage
 
-            if images:
-                # Construct messages manually with multimodal inputs
-                content = [{"type": "text", "text": user_prompt}]
-                for img in images:
-                    content.append({
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:{img['mime_type']};base64,{img['data']}"
-                        }
-                    })
-                formatted_messages = [
-                    SystemMessage(content=system_prompt),
-                    HumanMessage(content=content)
-                ]
-            else:
-                chat_template = ChatPromptTemplate.from_messages([
-                    ("system", "{system_instruction}"),
-                    ("user", "{user_instruction}")
-                ])
-                formatted_messages = chat_template.format_messages(
-                    system_instruction=system_prompt,
-                    user_instruction=user_prompt
-                )
-            
-            response = await self._chat_model.ainvoke(formatted_messages)
-            
-            # Extract token details if available
-            if hasattr(response, "usage_metadata") and response.usage_metadata:
-                prompt_tokens = response.usage_metadata.get("input_tokens")
-                completion_tokens = response.usage_metadata.get("output_tokens")
-                total_tokens = response.usage_metadata.get("total_tokens")
-            elif "token_usage" in response.response_metadata:
-                usage = response.response_metadata["token_usage"]
-                if isinstance(usage, dict):
-                    prompt_tokens = usage.get("prompt_tokens")
-                    completion_tokens = usage.get("completion_tokens")
-                    total_tokens = usage.get("total_tokens")
+                    if images:
+                        # Construct messages manually with multimodal inputs
+                        content = [{"type": "text", "text": user_prompt}]
+                        for img in images:
+                            content.append({
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:{img['mime_type']};base64,{img['data']}"
+                                }
+                            })
+                        formatted_messages = [
+                            SystemMessage(content=system_prompt),
+                            HumanMessage(content=content)
+                        ]
+                    else:
+                        chat_template = ChatPromptTemplate.from_messages([
+                            ("system", "{system_instruction}"),
+                            ("user", "{user_instruction}")
+                        ])
+                        formatted_messages = chat_template.format_messages(
+                            system_instruction=system_prompt,
+                            user_instruction=user_prompt
+                        )
+                    
+                    response = await self._chat_model.ainvoke(formatted_messages)
+                    
+                    # Extract token details if available
+                    if hasattr(response, "usage_metadata") and response.usage_metadata:
+                        prompt_tokens = response.usage_metadata.get("input_tokens")
+                        completion_tokens = response.usage_metadata.get("output_tokens")
+                        total_tokens = response.usage_metadata.get("total_tokens")
+                    elif "token_usage" in response.response_metadata:
+                        usage = response.response_metadata["token_usage"]
+                        if isinstance(usage, dict):
+                            prompt_tokens = usage.get("prompt_tokens")
+                            completion_tokens = usage.get("completion_tokens")
+                            total_tokens = usage.get("total_tokens")
 
-            # Parse JSON
-            raw_text = response.content
-            if not isinstance(raw_text, str):
-                raw_text = str(raw_text)
+                    # Parse JSON
+                    raw_text = response.content
+                    if not isinstance(raw_text, str):
+                        raw_text = str(raw_text)
 
-            try:
-                payload = clean_and_parse_json(raw_text)
-                success = True
-            except Exception as parse_exc:
-                parse_err_msg = str(parse_exc)
-                logger.error(f"JSON parsing error for step {step_name}: {parse_err_msg}")
-                raise parse_exc
+                    payload = clean_and_parse_json(raw_text)
+                    success = True
+                    error_msg = None
+                    parse_err_msg = None
+                    break
 
-        except Exception as exc:
-            error_msg = str(exc)
-            logger.error(f"LLM generate_json failed for step {step_name}: {error_msg}")
-            raise exc
+                except json.JSONDecodeError as parse_exc:
+                    parse_err_msg = str(parse_exc)
+                    logger.warning(f"JSON parsing error for step {step_name} (Attempt {attempt + 1}/{max_retries}): {parse_err_msg}")
+                    if attempt == max_retries - 1:
+                        logger.error(f"Failed to parse JSON after {max_retries} attempts.")
+                        raise parse_exc
+                except ValueError as val_exc:
+                    parse_err_msg = str(val_exc)
+                    logger.warning(f"JSON extraction error for step {step_name} (Attempt {attempt + 1}/{max_retries}): {parse_err_msg}")
+                    if attempt == max_retries - 1:
+                        logger.error(f"Failed to extract JSON after {max_retries} attempts.")
+                        raise val_exc
+                except Exception as exc:
+                    error_msg = str(exc)
+                    logger.warning(f"LLM generate_json failed for step {step_name} (Attempt {attempt + 1}/{max_retries}): {error_msg}")
+                    if attempt == max_retries - 1:
+                        logger.error(f"LLM request failed after {max_retries} attempts.")
+                        raise exc
+                
+                # Wait before retrying
+                await asyncio.sleep(base_delay * (2 ** attempt))
         finally:
             duration = time.time() - start_time
             # Construct and log metrics

@@ -2681,10 +2681,8 @@ def generate_docx_tdm(path: Path, mapping: Any, context: BusinessContext) -> Non
     import datetime
     doc = Document()
     
-    items = mapping.items
-    spec_status = (mapping.status or "DRAFT").upper()
-    exec_summary = mapping.executive_summary or ""
-    updated_at_str = mapping.updated_at.strftime("%B %d, %Y") if hasattr(mapping, "updated_at") and mapping.updated_at else datetime.date.today().strftime("%B %d, %Y")
+    updated_at = getattr(mapping, "updated_at", None)
+    updated_at_str = updated_at.strftime("%B %d, %Y") if updated_at else datetime.date.today().strftime("%B %d, %Y")
 
     for section in doc.sections:
         section.top_margin = Inches(0.75)
@@ -2744,15 +2742,14 @@ def generate_docx_tdm(path: Path, mapping: Any, context: BusinessContext) -> Non
     meta_title_run.font.bold = True
     meta_title_run.font.color.rgb = RGBColor(27, 27, 27)
 
-    meta_table = doc.add_table(rows=6, cols=2)
+    meta_table = doc.add_table(rows=5, cols=2)
     meta_table.style = 'Table Grid'
     meta_fields = [
         ("Document Version", "1.0"),
         ("Generated Date", updated_at_str),
         ("Industry", clean_or_fallback(context.industry, "Not Specified")),
         ("Organizational Level", clean_or_fallback(context.organization_level, "Not Specified")),
-        ("Number of Technical Mappings", f"{len(items)} Metrics"),
-        ("Approval Status", spec_status)
+        ("Approval Status", getattr(mapping, "status", "DRAFT").upper())
     ]
     for i, (label, val) in enumerate(meta_fields):
         row = meta_table.rows[i]
@@ -2772,148 +2769,59 @@ def generate_docx_tdm(path: Path, mapping: Any, context: BusinessContext) -> Non
 
     doc.add_page_break()
 
-    # Exec Summary
-    exec_title = doc.add_paragraph()
-    exec_title.paragraph_format.space_before = Pt(12)
-    exec_title.paragraph_format.space_after = Pt(12)
-    exec_title_run = exec_title.add_run("1. Executive Summary")
-    exec_title_run.font.size = Pt(16)
-    exec_title_run.font.bold = True
-    exec_title_run.font.color.rgb = RGBColor(27, 27, 27)
+    def add_h1(text):
+        p = doc.add_paragraph()
+        p.paragraph_format.space_before = Pt(16)
+        p.paragraph_format.space_after = Pt(8)
+        run = p.add_run(text)
+        run.font.size = Pt(16)
+        run.font.bold = True
+        run.font.color.rgb = RGBColor(27, 27, 27)
 
-    exec_p = doc.add_paragraph()
-    exec_p.paragraph_format.space_after = Pt(18)
-    exec_p.paragraph_format.line_spacing = 1.15
-    exec_p.add_run(exec_summary or "This document outlines the technical data mappings for the approved performance metrics.")
+    def add_h2(text):
+        p = doc.add_paragraph()
+        p.paragraph_format.space_before = Pt(12)
+        p.paragraph_format.space_after = Pt(4)
+        run = p.add_run(text)
+        run.font.size = Pt(13)
+        run.font.bold = True
+        run.font.color.rgb = RGBColor(27, 27, 27)
 
-    doc.add_page_break()
+    def add_p(text):
+        p = doc.add_paragraph()
+        p.paragraph_format.space_after = Pt(8)
+        p.add_run(str(text))
 
-    # KPIs
-    kpi_sec_title = doc.add_paragraph()
-    kpi_sec_title.paragraph_format.space_before = Pt(12)
-    kpi_sec_title.paragraph_format.space_after = Pt(8)
-    kpi_sec_title_run = kpi_sec_title.add_run("2. Individual Technical Mappings")
-    kpi_sec_title_run.font.size = Pt(16)
-    kpi_sec_title_run.font.bold = True
-    kpi_sec_title_run.font.color.rgb = RGBColor(27, 27, 27)
+    add_h1("1. Document Organization - Log")
+    add_p(getattr(mapping.document_organization, "document_log", "N/A"))
+    add_h1("1. Document Organization - Related Ref")
+    add_p(getattr(mapping.document_organization, "related_document_reference", "N/A"))
 
-    for index, item in enumerate(items, start=1):
-        kpi_p = doc.add_paragraph()
-        kpi_p.paragraph_format.space_before = Pt(16)
-        kpi_p.paragraph_format.space_after = Pt(8)
-        kpi_p.paragraph_format.keep_with_next = True
-        
-        num_run = kpi_p.add_run(f"Metric {index:02d}: ")
-        num_run.font.size = Pt(13)
-        num_run.font.bold = True
-        num_run.font.color.rgb = RGBColor(180, 150, 0)
-        
-        name_run = kpi_p.add_run(item.kpi_name)
-        name_run.font.size = Pt(13)
-        name_run.font.bold = True
-        name_run.font.color.rgb = RGBColor(27, 27, 27)
+    add_h1("2. Object Summary")
+    add_p(getattr(mapping, "object_summary", "N/A"))
 
-        # Meta
-        kpi_meta_tbl = doc.add_table(rows=2, cols=4)
-        kpi_meta_tbl.style = 'Table Grid'
-        
-        kpi_meta_fields = [
-            ("Priority", clean_or_fallback(item.priority, "L2")),
-            ("Critical to Measure", clean_or_fallback(item.critical_to_measure, "Not Specified")),
-            ("Type of KPI", clean_or_fallback(item.type_of_kpi, "Operations")),
-            ("Action", clean_or_fallback(item.action, "Improve"))
-        ]
-        
-        row_lbls = kpi_meta_tbl.rows[0]
-        row_vals = kpi_meta_tbl.rows[1]
-        
-        for col_idx, (lbl, val) in enumerate(kpi_meta_fields):
-            c_lbl = row_lbls.cells[col_idx]
-            c_lbl.text = lbl
-            set_cell_shading(c_lbl, "F0F0F0")
-            set_cell_margins(c_lbl, top=40, bottom=40, left=60, right=60)
-            c_lbl.paragraphs[0].runs[0].font.bold = True
-            c_lbl.paragraphs[0].runs[0].font.size = Pt(8.5)
-            
-            c_val = row_vals.cells[col_idx]
-            c_val.text = val
-            set_cell_margins(c_val, top=40, bottom=40, left=60, right=60)
-            c_val.paragraphs[0].runs[0].font.size = Pt(8.5)
+    add_h1("3. Technical Specifications")
+    tech_specs = getattr(mapping, "technical_specifications", None)
+    if tech_specs:
+        add_h2("3.1 Data Flow")
+        add_p(getattr(tech_specs, "data_flow", "N/A"))
+        add_h2("3.2 Data Models")
+        add_p(getattr(tech_specs, "data_models", "N/A"))
+        add_h2("3.3 Technical Details")
+        add_p(getattr(tech_specs, "technical_details", "N/A"))
+        add_h2("3.4 Currency Translation")
+        add_p(getattr(tech_specs, "currency_translation", "N/A"))
+        add_h2("3.5 Row Level Security")
+        add_p(getattr(tech_specs, "row_level_security", "N/A"))
 
-        doc.add_paragraph().paragraph_format.space_after = Pt(4)
+    add_h1("4. Data Load Frequency")
+    add_p(getattr(mapping, "data_load_frequency", "N/A"))
 
-        # Tech Details
-        calc_fields = [
-            ("Description", clean_or_fallback(item.description, "Description not provided.")),
-            ("Logic / Calculation", clean_or_fallback(item.logic_calculation, "Logic not provided.")),
-            ("Dimensions", clean_or_fallback(item.dimensions, "")),
-            ("Measures", clean_or_fallback(item.measures, "")),
-            ("UoM", clean_or_fallback(item.uom, "")),
-            ("Technical Details", clean_or_fallback(item.technical_details, "")),
-        ]
-        
-        calc_tbl = doc.add_table(rows=len(calc_fields), cols=2)
-        calc_tbl.style = 'Table Grid'
-        for r_idx, (lbl, val) in enumerate(calc_fields):
-            row = calc_tbl.rows[r_idx]
-            c_lbl = row.cells[0]
-            c_lbl.text = lbl
-            set_cell_shading(c_lbl, "F9F9F9")
-            set_cell_margins(c_lbl, top=40, bottom=40, left=80, right=80)
-            c_lbl.paragraphs[0].runs[0].font.bold = True
-            c_lbl.paragraphs[0].runs[0].font.size = Pt(9)
-            c_lbl.width = Inches(2.0)
-            
-            c_val = row.cells[1]
-            c_val.text = val
-            set_cell_margins(c_val, top=40, bottom=40, left=80, right=80)
-            c_val.paragraphs[0].runs[0].font.size = Pt(9)
-            c_val.width = Inches(5.0)
+    add_h1("5. Unit Test Results")
+    add_p(getattr(mapping, "unit_test_results", "N/A"))
 
-        # Dimensions
-        if hasattr(item, 'dimension_list') and item.dimension_list:
-            dim_title_p = doc.add_paragraph()
-            dim_title_p.paragraph_format.space_before = Pt(8)
-            dim_title_p.paragraph_format.space_after = Pt(4)
-            dim_title_run = dim_title_p.add_run("Dimension List")
-            dim_title_run.font.bold = True
-            dim_title_run.font.size = Pt(10)
-            
-            dim_tbl = doc.add_table(rows=1 + len(item.dimension_list), cols=4)
-            dim_tbl.style = 'Table Grid'
-            dim_headers = ["Dimension Type", "Dimension", "Requirement", "Source/Table"]
-            for col_idx, text in enumerate(dim_headers):
-                cell = dim_tbl.cell(0, col_idx)
-                cell.text = text
-                set_cell_shading(cell, "1B1B1B")
-                set_cell_margins(cell, top=40, bottom=40, left=60, right=60)
-                cell.paragraphs[0].runs[0].font.bold = True
-                cell.paragraphs[0].runs[0].font.size = Pt(8.5)
-                cell.paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 255, 255)
-
-            for d_idx, d_item in enumerate(item.dimension_list, start=1):
-                row = dim_tbl.rows[d_idx]
-                c0 = row.cells[0]
-                c0.text = d_item.dimension_type
-                set_cell_margins(c0, top=40, bottom=40, left=60, right=60)
-                c0.paragraphs[0].runs[0].font.size = Pt(8.5)
-                
-                c1 = row.cells[1]
-                c1.text = d_item.dimension
-                set_cell_margins(c1, top=40, bottom=40, left=60, right=60)
-                c1.paragraphs[0].runs[0].font.size = Pt(8.5)
-                
-                c2 = row.cells[2]
-                c2.text = d_item.dimension_requirement
-                set_cell_margins(c2, top=40, bottom=40, left=60, right=60)
-                c2.paragraphs[0].runs[0].font.size = Pt(8.5)
-                
-                c3 = row.cells[3]
-                c3.text = d_item.source_logic_table_field
-                set_cell_margins(c3, top=40, bottom=40, left=60, right=60)
-                c3.paragraphs[0].runs[0].font.size = Pt(8.5)
-                
-        doc.add_page_break()
+    add_h1("6. Glossary")
+    add_p(getattr(mapping, "glossary", "N/A"))
 
     doc.save(path)
 
@@ -2935,15 +2843,8 @@ def generate_pdf_tdm(path: Path, mapping: Any, context: BusinessContext, doc_nam
         title_temp = title_temp.replace('_', ' ')
         pdf_title = title_temp.strip()
     
-    if isinstance(mapping, list):
-        items = mapping
-        exec_summary = "Consolidated Executive Summary"
-        updated_at_str = datetime.date.today().strftime("%B %d, %Y")
-    else:
-        items = getattr(mapping, "items", [])
-        exec_summary = getattr(mapping, "executive_summary", "") or "No executive summary provided."
-        updated_at = getattr(mapping, "updated_at", None)
-        updated_at_str = updated_at.strftime("%B %d, %Y") if updated_at else datetime.date.today().strftime("%B %d, %Y")
+    updated_at = getattr(mapping, "updated_at", None)
+    updated_at_str = updated_at.strftime("%B %d, %Y") if updated_at else datetime.date.today().strftime("%B %d, %Y")
 
     story = []
     styles = getSampleStyleSheet()
@@ -2968,7 +2869,7 @@ def generate_pdf_tdm(path: Path, mapping: Any, context: BusinessContext, doc_nam
     meta_data = [
         [Paragraph("Document Version", tbl_label_style), Paragraph("1.0", tbl_value_style)],
         [Paragraph("Generated Date", tbl_label_style), Paragraph(updated_at_str, tbl_value_style)],
-        [Paragraph("Number of KPIs", tbl_label_style), Paragraph(f"{len(items)} Technical Mappings", tbl_value_style)],
+        [Paragraph("Status", tbl_label_style), Paragraph((getattr(mapping, "status", "DRAFT") or "DRAFT").upper(), tbl_value_style)],
     ]
     meta_table = Table(meta_data, colWidths=[2.2 * inch, 4.3 * inch])
     meta_table.setStyle(TableStyle([
@@ -2985,123 +2886,36 @@ def generate_pdf_tdm(path: Path, mapping: Any, context: BusinessContext, doc_nam
     story.append(meta_table)
     story.append(PageBreak())
 
-    # Table of Contents
-    story.append(Paragraph("Table of Contents", h1_style))
-    story.append(Paragraph("1. Executive Summary", body_style))
-    story.append(Paragraph("2. KPI Synopsis", body_style))
-    story.append(Paragraph("3. Detailed KPIs Blueprint", body_style))
-    story.append(Paragraph("4. Consolidated Dimension List", body_style))
-    story.append(PageBreak())
+    def add_section(title, content):
+        story.append(Paragraph(title, h1_style))
+        if content:
+            story.append(Paragraph(str(content).replace("\n", "<br/>"), body_style))
+        else:
+            story.append(Paragraph("N/A", body_style))
+        story.append(Spacer(1, 15))
 
-    # 1. Executive Summary
-    story.append(Paragraph("1. Executive Summary", h1_style))
-    story.append(Paragraph(exec_summary, body_style))
-    story.append(PageBreak())
-
-    # 2. KPI Synopsis
-    story.append(Paragraph("2. KPI Synopsis", h1_style))
+    add_section("1. Document Organization - Log", getattr(mapping.document_organization, "document_log", ""))
+    add_section("1. Document Organization - Related Ref", getattr(mapping.document_organization, "related_document_reference", ""))
+    add_section("2. Object Summary", getattr(mapping, "object_summary", ""))
     
-    grouped_kpis = {}
-    for item in items:
-        area = getattr(item, "type_of_kpi", "Uncategorized")
-        if not area: area = "Uncategorized"
-        if area not in grouped_kpis:
-            grouped_kpis[area] = {"L1": 0, "L2": 0, "L3": 0, "total": 0}
-        
-        p = getattr(item, "priority", "")
-        if p in ["L1", "L2", "L3"]:
-            grouped_kpis[area][p] += 1
-        grouped_kpis[area]["total"] += 1
-        
-    synopsis_data = [
-        [Paragraph("Functional Area", tbl_label_style), Paragraph("L1", tbl_label_style), Paragraph("L2", tbl_label_style), Paragraph("L3", tbl_label_style), Paragraph("Total", tbl_label_style)]
-    ]
-    for area, counts in grouped_kpis.items():
-        synopsis_data.append([
-            Paragraph(area, tbl_value_style),
-            Paragraph(str(counts["L1"]), tbl_value_style),
-            Paragraph(str(counts["L2"]), tbl_value_style),
-            Paragraph(str(counts["L3"]), tbl_value_style),
-            Paragraph(str(counts["total"]), tbl_label_style)
-        ])
-        
-    synopsis_table = Table(synopsis_data, colWidths=[2.5 * inch, 0.8 * inch, 0.8 * inch, 0.8 * inch, 0.8 * inch])
-    synopsis_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#F0F0F0")),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor("#333333")),
-        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-        ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#E0E0E0")),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-    ]))
-    story.append(synopsis_table)
-    story.append(PageBreak())
-
-    # 3. Detailed KPIs Blueprint
-    story.append(Paragraph("3. Detailed KPIs Blueprint", h1_style))
+    story.append(Paragraph("3. Technical Specifications", h1_style))
+    tech_specs = getattr(mapping, "technical_specifications", None)
+    if tech_specs:
+        story.append(Paragraph("3.1 Data Flow", h2_style))
+        story.append(Paragraph(str(getattr(tech_specs, "data_flow", "")).replace("\n", "<br/>"), body_style))
+        story.append(Paragraph("3.2 Data Models", h2_style))
+        story.append(Paragraph(str(getattr(tech_specs, "data_models", "")).replace("\n", "<br/>"), body_style))
+        story.append(Paragraph("3.3 Technical Details", h2_style))
+        story.append(Paragraph(str(getattr(tech_specs, "technical_details", "")).replace("\n", "<br/>"), body_style))
+        story.append(Paragraph("3.4 Currency Translation", h2_style))
+        story.append(Paragraph(str(getattr(tech_specs, "currency_translation", "")).replace("\n", "<br/>"), body_style))
+        story.append(Paragraph("3.5 Row Level Security", h2_style))
+        story.append(Paragraph(str(getattr(tech_specs, "row_level_security", "")).replace("\n", "<br/>"), body_style))
+    story.append(Spacer(1, 15))
     
-    for idx, item in enumerate(items, start=1):
-        kpi_elements = []
-        kpi_elements.append(Paragraph(f"{idx:02d}. {item.kpi_name}", h2_style))
-        
-        details_data = [
-            [Paragraph("Technical Details", tbl_label_style), Paragraph(clean_or_fallback(getattr(item, "technical_details", ""), "N/A"), tbl_value_style)],
-            [Paragraph("Data Type", tbl_label_style), Paragraph(clean_or_fallback(getattr(item, "data_type", ""), "N/A"), tbl_value_style)],
-            [Paragraph("Action Direction", tbl_label_style), Paragraph(clean_or_fallback(getattr(item, "action", ""), "N/A"), tbl_value_style)],
-            [Paragraph("SQL Formula / Logic", tbl_label_style), Paragraph(clean_or_fallback(getattr(item, "sql_formula", ""), "N/A"), tbl_value_style)]
-        ]
-        
-        t1 = Table(details_data, colWidths=[2.0 * inch, 4.5 * inch])
-        t1.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor("#F9F9F9")),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor("#333333")),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#E0E0E0")),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ]))
-        kpi_elements.append(t1)
-        kpi_elements.append(Spacer(1, 15))
-        story.append(KeepTogether(kpi_elements))
-
-    story.append(PageBreak())
-
-    # 4. Consolidated Dimension List
-    story.append(Paragraph("4. Consolidated Dimension List", h1_style))
-    
-    dim_data = [
-        [Paragraph("KPI Name", tbl_label_style), Paragraph("Type", tbl_label_style), Paragraph("Dimension", tbl_label_style), Paragraph("Requirement", tbl_label_style)]
-    ]
-    
-    has_dimensions = False
-    for item in items:
-        dimensions = getattr(item, "dimension_list", [])
-        for dim in dimensions:
-            has_dimensions = True
-            dim_data.append([
-                Paragraph(getattr(item, "kpi_name", "Unknown"), tbl_value_style),
-                Paragraph(clean_or_fallback(getattr(dim, "dimension_type", ""), "-"), tbl_value_style),
-                Paragraph(clean_or_fallback(getattr(dim, "dimension", ""), "-"), tbl_value_style),
-                Paragraph(clean_or_fallback(getattr(dim, "dimension_requirement", ""), "-"), tbl_value_style)
-            ])
-            
-    if has_dimensions:
-        dim_table = Table(dim_data, colWidths=[1.5 * inch, 1.0 * inch, 1.5 * inch, 2.5 * inch])
-        dim_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1B1B1B")),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor("#FFFFFF")),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#E0E0E0")),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ]))
-        story.append(dim_table)
-    else:
-        story.append(Paragraph("No dimensions found across any approved KPIs.", body_style))
+    add_section("4. Data Load Frequency", getattr(mapping, "data_load_frequency", ""))
+    add_section("5. Unit Test Results", getattr(mapping, "unit_test_results", ""))
+    add_section("6. Glossary", getattr(mapping, "glossary", ""))
 
     doc = SimpleDocTemplate(
         str(path),

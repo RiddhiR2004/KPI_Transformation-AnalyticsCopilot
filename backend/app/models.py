@@ -208,40 +208,26 @@ class FunctionalSpecification(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.now)
 
 
-class TechnicalDimensionItem(BaseModel):
-    dimension_type: str = ""
-    dimension: str = ""
-    dimension_requirement: str = ""
-    example: str = ""
-    source_logic_table_field: str = ""
-    is_further_input_required: str = "No"
-    source_sap: str = ""
-    table_field_sap: str = ""
-    owner_if_manual: str = ""
-    comments: str = ""
+class TDMDocumentOrganization(BaseModel):
+    document_log: str = ""
+    related_document_reference: str = ""
 
 
-class TechnicalDataMappingItem(BaseModel):
-    id: str
-    kpi_name: str
-    priority: str = "L2"  # L1, L2, L3
-    critical_to_measure: str = ""  # Revenue, Cost, Process, Quality
-    type_of_kpi: str = ""  # Functional area grouping
-    description: str = ""
-    logic_calculation: str = ""
-    dimensions: str = ""
-    measures: str = ""
-    uom: str = ""  # Unit of Measure
+class TDMTechnicalSpecifications(BaseModel):
+    data_flow: str = ""
+    data_models: str = ""
     technical_details: str = ""
-    signed_off_by: str = ""
-    requirement_from: str = ""
-    action: str = ""  # Increase / Grow / Improve / Reduce / Maintain
-    dimension_list: list[TechnicalDimensionItem] = Field(default_factory=list)
+    currency_translation: str = ""
+    row_level_security: str = ""
 
 
 class TechnicalDataMapping(BaseModel):
-    items: list[TechnicalDataMappingItem] = Field(default_factory=list)
-    executive_summary: str = ""
+    document_organization: TDMDocumentOrganization = Field(default_factory=TDMDocumentOrganization)
+    object_summary: str = ""
+    technical_specifications: TDMTechnicalSpecifications = Field(default_factory=TDMTechnicalSpecifications)
+    data_load_frequency: str = ""
+    unit_test_results: str = ""
+    glossary: str = ""
     status: str = "draft"  # "draft" or "approved"
     updated_at: datetime = Field(default_factory=datetime.now)
 
