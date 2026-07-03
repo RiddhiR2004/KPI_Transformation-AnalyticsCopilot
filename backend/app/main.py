@@ -3026,7 +3026,7 @@ async def generate_technical_mapping(request: Request) -> dict[str, Any]:
         module="Technical Data Mapping",
         entity_type="TDM",
         entity_name="Technical Data Mapping",
-        new_value=f"Generated mapping for {len(mapping.items)} KPIs"
+        new_value=f"Generated mapping for {len(approved_kpis)} KPIs"
     )
     
     return mapping.model_dump(mode="json")
@@ -3035,7 +3035,7 @@ async def generate_technical_mapping(request: Request) -> dict[str, Any]:
 @app.post("/approve-technical-mapping")
 def approve_technical_mapping(request: Request) -> dict[str, Any]:
     mapping_data = read_json(FILES["technical_mapping"], {})
-    if not mapping_data or not mapping_data.get("items"):
+    if not mapping_data or not mapping_data.get("object_summary"):
         raise HTTPException(status_code=400, detail="Technical Data Mapping has not been generated yet.")
         
     with SessionLocal() as session:
