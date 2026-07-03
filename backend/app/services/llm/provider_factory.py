@@ -30,16 +30,11 @@ def create_provider() -> BaseLLMProvider:
             model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
             
         try:
-            from langchain_google_genai import ChatGoogleGenerativeAI
-            chat_model = ChatGoogleGenerativeAI(
-                model=model_name,
-                google_api_key=api_key,
-                temperature=0.2
-            )
-            logger.info(f"Initialized ChatGoogleGenerativeAI with model: {model_name}")
-            return LangChainProvider(chat_model, provider_name="google", model_name=model_name)
+            from app.services.llm.langchain_provider import GeminiSDKProvider
+            logger.info(f"Initialized GeminiSDKProvider with model: {model_name}")
+            return GeminiSDKProvider(model_name=model_name, api_key=api_key)
         except Exception as exc:
-            logger.error(f"Failed to initialize ChatGoogleGenerativeAI: {exc}. Using DemoProvider.")
+            logger.error(f"Failed to initialize GeminiSDKProvider: {exc}. Using DemoProvider.")
             return DemoProvider()
 
     elif provider_type == "openai":

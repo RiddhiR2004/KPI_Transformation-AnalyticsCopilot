@@ -2889,7 +2889,7 @@ async def generate_spec(request: Request) -> dict[str, Any]:
 # TECHNICAL DATA MAPPING ENDPOINTS (Step 4)
 # -----------------------------------------------------------------------------------------
 
-from app.models import TechnicalDataMapping, TechnicalDataMappingItem, TechnicalDimensionItem
+from app.models import TechnicalDataMapping
 from app.database import TechnicalDataMappingDB
 
 @app.get("/technical-mapping")
@@ -2913,8 +2913,8 @@ def save_technical_mapping(request: Request, mapping: TechnicalDataMapping) -> T
             db_mapping = TechnicalDataMappingDB(engagement_id=eng_id)
             session.add(db_mapping)
             
-        db_mapping.items = json.dumps([item.model_dump(mode="json") for item in mapping.items])
-        db_mapping.executive_summary = mapping.executive_summary
+        db_mapping.items = "[]"
+        db_mapping.executive_summary = mapping.object_summary
         db_mapping.status = mapping.status
         db_mapping.updated_at = mapping.updated_at
         session.commit()
@@ -2945,51 +2945,22 @@ async def generate_technical_mapping(request: Request) -> dict[str, Any]:
     
     if isinstance(provider, DemoProvider):
         # Demo generation
-        mapping_items = []
-        for idx, k in enumerate(approved_kpis):
-            priority = "L1" if idx % 3 == 0 else ("L2" if idx % 3 == 1 else "L3")
-            mapping_item = TechnicalDataMappingItem(
-                id=k.id,
-                kpi_name=k.kpi_name,
-                priority=priority,
-                critical_to_measure="Process",
-                type_of_kpi=k.functional_area or "Operations",
-                description=k.kpi_description or "Technical description not provided.",
-                logic_calculation=k.formula or "Source / Target",
-                dimensions="Time, Region, Plant, Product",
-                measures="Count, Sum",
-                uom="Percentage",
-                technical_details="Daily snapshot required.",
-                signed_off_by="Process Owner",
-                requirement_from="Business User",
-                action="Improve"
-            )
-            # Add some demo dimensions
-            mapping_item.dimension_list = [
-                TechnicalDimensionItem(
-                    dimension_type="Standard",
-                    dimension="Plant",
-                    dimension_requirement="Identify location",
-                    example="1000",
-                    source_logic_table_field="Plant Master",
-                    is_further_input_required="No",
-                    source_sap="MM"
-                ),
-                TechnicalDimensionItem(
-                    dimension_type="Standard",
-                    dimension="Date",
-                    dimension_requirement="Time analysis",
-                    example="2023-10-01",
-                    source_logic_table_field="Posting Date",
-                    is_further_input_required="No",
-                    source_sap="FI"
-                )
-            ]
-            mapping_items.append(mapping_item)
-            
         mapping = TechnicalDataMapping(
-            items=mapping_items,
-            executive_summary="Generated Technical Data Mapping for all approved KPIs. Ready for engineering review."
+            document_organization=TDMDocumentOrganization(
+                document_log="| Version | Date | Author | Description |\n|---|---|---|---|\n| 1.0 | Today | System | Initial Draft |",
+                related_document_reference="Refer to Functional Specification Document."
+            ),
+            object_summary="This document outlines the technical dataflow for the approved KPIs.",
+            technical_specifications=TDMTechnicalSpecifications(
+                data_flow="Data flows from SAP ECC to SAP BW to SAP Analytics Cloud.",
+                data_models="Master Data Models and Transaction Data Models...",
+                technical_details="Daily snapshot required. Incremental load logic applied.",
+                currency_translation="All local currencies translated to USD.",
+                row_level_security="Secured by Region and Company Code."
+            ),
+            data_load_frequency="Daily batch loads at 2:00 AM UTC.",
+            unit_test_results="| Scenario | Expected | Status |\n|---|---|---|\n| Revenue load | Matches FI | Pending |",
+            glossary="| Term | Definition |\n|---|---|\n| KPI | Key Performance Indicator |"
         )
     else:
         # LLM Generation
@@ -3041,13 +3012,13 @@ async def generate_technical_mapping(request: Request) -> dict[str, Any]:
             db_mapping = TechnicalDataMappingDB(engagement_id=eng_id)
             session.add(db_mapping)
             
-        db_mapping.items = json.dumps([item.model_dump(mode="json") for item in mapping.items])
-        db_mapping.executive_summary = mapping.executive_summary
+        db_mapping.items = "[]"
+        db_mapping.executive_summary = mapping.object_summary
         db_mapping.status = mapping.status
         db_mapping.updated_at = mapping.updated_at
         session.commit()
         
-    log_activity("Technical Data Mapping Generated", f"AI generated mapping for {len(mapping.items)} KPIs.")
+    log_activity("Technical Data Mapping Generated", f"AI generated mapping for {len(approved_kpis)} KPIs.")
     
     log_audit(
         request=request,
@@ -3055,7 +3026,7 @@ async def generate_technical_mapping(request: Request) -> dict[str, Any]:
         module="Technical Data Mapping",
         entity_type="TDM",
         entity_name="Technical Data Mapping",
-        new_value=f"Generated mapping for {len(mapping.items)} KPIs"
+        new_value=f"Generated mapping for {len(approved_kpis)} KPIs"
     )
     
     return mapping.model_dump(mode="json")
@@ -3064,7 +3035,7 @@ async def generate_technical_mapping(request: Request) -> dict[str, Any]:
 @app.post("/approve-technical-mapping")
 def approve_technical_mapping(request: Request) -> dict[str, Any]:
     mapping_data = read_json(FILES["technical_mapping"], {})
-    if not mapping_data or not mapping_data.get("items"):
+    if not mapping_data or not mapping_data.get("object_summary"):
         raise HTTPException(status_code=400, detail="Technical Data Mapping has not been generated yet.")
         
     with SessionLocal() as session:
@@ -3212,7 +3183,7 @@ def download_export(request: Request, export_id: str, fmt: str, doc_name: str | 
                 raise HTTPException(status_code=400, detail=f"Unsupported format for KPI Driver Tree: {fmt}")
     elif export_id == "technical_mapping":
         mapping_data = read_json(FILES["technical_mapping"], {})
-        if not mapping_data or not mapping_data.get("items"):
+        if not mapping_data or not mapping_data.get("document_organization"):
             raise HTTPException(status_code=400, detail="Technical Data Mapping has not been generated.")
         
         mapping = TechnicalDataMapping(**mapping_data)

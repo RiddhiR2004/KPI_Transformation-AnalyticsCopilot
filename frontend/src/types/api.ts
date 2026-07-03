@@ -254,42 +254,26 @@ export type FunctionalSpecification = {
   updated_at?: string;
 };
 
-export type TechnicalDimensionItem = {
-  dimension_type: string;
-  dimension: string;
-  dimension_requirement: string;
-  example: string;
-  source_logic_table_field: string;
-  is_further_input_required: string;
-  source_sap: string;
-  table_field_sap: string;
-  owner_if_manual: string;
-  comments: string;
+export type TDMDocumentOrganization = {
+  document_log: string;
+  related_document_reference: string;
 };
 
-export type TechnicalDataMappingItem = {
-  id: string;
-  kpi_name: string;
-  priority: string;
-  critical_to_measure: string;
-  type_of_kpi: string;
-  description: string;
-  logic_calculation: string;
-  dimensions: string;
-  measures: string;
-  uom: string;
+export type TDMTechnicalSpecifications = {
+  data_flow: string;
+  data_models: string;
   technical_details: string;
-  signed_off_by: string;
-  requirement_from: string;
-  action: string;
-  dimension_list: TechnicalDimensionItem[];
-  data_type?: string;
-  sql_formula?: string;
+  currency_translation: string;
+  row_level_security: string;
 };
 
 export type TechnicalDataMapping = {
-  items: TechnicalDataMappingItem[];
-  executive_summary?: string;
+  document_organization: TDMDocumentOrganization;
+  object_summary: string;
+  technical_specifications: TDMTechnicalSpecifications;
+  data_load_frequency: string;
+  unit_test_results: string;
+  glossary: string;
   status?: string;
   updated_at?: string;
 };

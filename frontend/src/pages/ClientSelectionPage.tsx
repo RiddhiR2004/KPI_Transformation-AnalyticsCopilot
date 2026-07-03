@@ -8,6 +8,7 @@ export function ClientSelectionPage() {
   const navigate = useNavigate();
   const [clients, setClients] = useState<ClientProfileWithCount[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -18,14 +19,25 @@ export function ClientSelectionPage() {
     localStorage.removeItem("active_client_id");
     localStorage.removeItem("active_client_name");
 
-    const loadClients = async () => {
-      try {
-        const data = await api.getClients();
-        setClients(data);
-      } catch (e) {
-        console.error("Failed to load clients:", e);
-      } finally {
-        setLoading(false);
+    const loadClients = async (retries = 3) => {
+      setLoading(true);
+      setError(null);
+      for (let i = 0; i < retries; i++) {
+        try {
+          const data = await api.getClients();
+          setClients(data);
+          setLoading(false);
+          return;
+        } catch (e: any) {
+          console.warn(`Attempt ${i + 1} failed to load clients:`, e);
+          if (i === retries - 1) {
+            setError(e.message || "Failed to load clients.");
+            setLoading(false);
+          } else {
+            // Wait 1 second before retrying
+            await new Promise(res => setTimeout(res, 1000));
+          }
+        }
       }
     };
     void loadClients();
@@ -112,7 +124,20 @@ export function ClientSelectionPage() {
       </div>
 
       {/* Client Grid */}
-      {clients.length === 0 ? (
+      {error ? (
+        <section className="border border-red-500/30 bg-red-500/10 p-12 rounded-sm text-center space-y-4">
+          <h3 className="text-lg font-semibold text-red-400">Connection Error</h3>
+          <p className="text-sm text-red-300 max-w-md mx-auto leading-relaxed">
+            Could not connect to the server. The backend might still be starting up.
+          </p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-200 rounded-sm text-sm font-semibold transition-colors"
+          >
+            Try Again
+          </button>
+        </section>
+      ) : clients.length === 0 ? (
         <section className="border border-[#303030] bg-[#1B1B1B] p-12 rounded-sm text-center space-y-4">
           <h3 className="text-lg font-semibold text-[#F5F5F5]">No Clients Found</h3>
           <p className="text-xs text-[#888] max-w-md mx-auto leading-relaxed">

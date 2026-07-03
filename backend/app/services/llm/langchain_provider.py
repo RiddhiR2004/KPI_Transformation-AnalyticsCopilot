@@ -19,6 +19,48 @@ if not logger.handlers:
     logger.addHandler(handler)
 
 
+def extract_first_json_block(text: str) -> str:
+    obj_start = text.find('{')
+    arr_start = text.find('[')
+    
+    if obj_start == -1 and arr_start == -1:
+        return text
+        
+    start_char = '{'
+    end_char = '}'
+    start_idx = obj_start
+    
+    if obj_start == -1 or (arr_start != -1 and arr_start < obj_start):
+        start_char = '['
+        end_char = ']'
+        start_idx = arr_start
+        
+    brace_count = 0
+    in_string = False
+    escape_next = False
+    
+    for i in range(start_idx, len(text)):
+        char = text[i]
+        if escape_next:
+            escape_next = False
+            continue
+        if char == '\\':
+            escape_next = True
+            continue
+        if char == '"':
+            in_string = not in_string
+            continue
+        if not in_string:
+            if char == start_char:
+                brace_count += 1
+            elif char == end_char:
+                brace_count -= 1
+                if brace_count == 0:
+                    return text[start_idx:i+1]
+                    
+    return text[start_idx:]
+
+
 def clean_and_parse_json(text: str) -> dict[str, Any]:
     text_clean = text.strip()
     
@@ -32,28 +74,23 @@ def clean_and_parse_json(text: str) -> dict[str, Any]:
 
     # 2. Try parsing directly
     try:
-        return json.loads(text_clean)
+        return json.loads(text_clean, strict=False)
     except json.JSONDecodeError:
         pass
 
-    # 3. Attempt extraction of JSON object using Regex (finding matched '{' ... '}' or '[' ... ']')
-    match = re.search(r"(\{.*\}|\[.*\])", text_clean, re.DOTALL)
-    if match:
-        extracted = match.group(1)
+    # 3. Extract the first valid JSON block by balancing braces
+    extracted = extract_first_json_block(text_clean)
+    try:
+        return json.loads(extracted, strict=False)
+    except json.JSONDecodeError:
+        repaired = extracted
+        # Remove trailing commas from objects/arrays
+        repaired = re.sub(r",\s*([\}\]])", r"\1", repaired)
         try:
-            return json.loads(extracted)
-        except json.JSONDecodeError:
-            repaired = extracted
-            # Remove trailing commas from objects/arrays
-            repaired = re.sub(r",\s*([\}\]])", r"\1", repaired)
-            try:
-                return json.loads(repaired)
-            except json.JSONDecodeError as exc:
-                logger.error(f"Failed to parse cleaned JSON block. Extracted text:\n{extracted}\nError: {exc}")
-                raise exc
-    else:
-        logger.error(f"No JSON structure found in raw output. Raw text:\n{text}")
-        raise ValueError("No JSON object could be extracted from response")
+            return json.loads(repaired, strict=False)
+        except json.JSONDecodeError as exc:
+            logger.error(f"Failed to parse cleaned JSON block. Extracted text:\n{extracted}\nError: {exc}")
+            raise exc
 
 
 def save_usage_log(
@@ -137,64 +174,84 @@ class LangChainProvider(BaseLLMProvider):
         total_tokens = None
         payload = {}
 
+        max_retries = 3
+        base_delay = 2.0
+
         try:
-            from langchain_core.messages import SystemMessage, HumanMessage
+            for attempt in range(max_retries):
+                try:
+                    from langchain_core.messages import SystemMessage, HumanMessage
 
-            if images:
-                # Construct messages manually with multimodal inputs
-                content = [{"type": "text", "text": user_prompt}]
-                for img in images:
-                    content.append({
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:{img['mime_type']};base64,{img['data']}"
-                        }
-                    })
-                formatted_messages = [
-                    SystemMessage(content=system_prompt),
-                    HumanMessage(content=content)
-                ]
-            else:
-                chat_template = ChatPromptTemplate.from_messages([
-                    ("system", "{system_instruction}"),
-                    ("user", "{user_instruction}")
-                ])
-                formatted_messages = chat_template.format_messages(
-                    system_instruction=system_prompt,
-                    user_instruction=user_prompt
-                )
-            
-            response = await self._chat_model.ainvoke(formatted_messages)
-            
-            # Extract token details if available
-            if hasattr(response, "usage_metadata") and response.usage_metadata:
-                prompt_tokens = response.usage_metadata.get("input_tokens")
-                completion_tokens = response.usage_metadata.get("output_tokens")
-                total_tokens = response.usage_metadata.get("total_tokens")
-            elif "token_usage" in response.response_metadata:
-                usage = response.response_metadata["token_usage"]
-                if isinstance(usage, dict):
-                    prompt_tokens = usage.get("prompt_tokens")
-                    completion_tokens = usage.get("completion_tokens")
-                    total_tokens = usage.get("total_tokens")
+                    if images:
+                        # Construct messages manually with multimodal inputs
+                        content = [{"type": "text", "text": user_prompt}]
+                        for img in images:
+                            content.append({
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:{img['mime_type']};base64,{img['data']}"
+                                }
+                            })
+                        formatted_messages = [
+                            SystemMessage(content=system_prompt),
+                            HumanMessage(content=content)
+                        ]
+                    else:
+                        chat_template = ChatPromptTemplate.from_messages([
+                            ("system", "{system_instruction}"),
+                            ("user", "{user_instruction}")
+                        ])
+                        formatted_messages = chat_template.format_messages(
+                            system_instruction=system_prompt,
+                            user_instruction=user_prompt
+                        )
+                    
+                    response = await asyncio.to_thread(self._chat_model.invoke, formatted_messages)
+                    
+                    # Extract token details if available
+                    if hasattr(response, "usage_metadata") and response.usage_metadata:
+                        prompt_tokens = response.usage_metadata.get("input_tokens")
+                        completion_tokens = response.usage_metadata.get("output_tokens")
+                        total_tokens = response.usage_metadata.get("total_tokens")
+                    elif "token_usage" in response.response_metadata:
+                        usage = response.response_metadata["token_usage"]
+                        if isinstance(usage, dict):
+                            prompt_tokens = usage.get("prompt_tokens")
+                            completion_tokens = usage.get("completion_tokens")
+                            total_tokens = usage.get("total_tokens")
 
-            # Parse JSON
-            raw_text = response.content
-            if not isinstance(raw_text, str):
-                raw_text = str(raw_text)
+                    # Parse JSON
+                    raw_text = response.content
+                    if not isinstance(raw_text, str):
+                        raw_text = str(raw_text)
 
-            try:
-                payload = clean_and_parse_json(raw_text)
-                success = True
-            except Exception as parse_exc:
-                parse_err_msg = str(parse_exc)
-                logger.error(f"JSON parsing error for step {step_name}: {parse_err_msg}")
-                raise parse_exc
+                    payload = clean_and_parse_json(raw_text)
+                    success = True
+                    error_msg = None
+                    parse_err_msg = None
+                    break
 
-        except Exception as exc:
-            error_msg = str(exc)
-            logger.error(f"LLM generate_json failed for step {step_name}: {error_msg}")
-            raise exc
+                except json.JSONDecodeError as parse_exc:
+                    parse_err_msg = str(parse_exc)
+                    logger.warning(f"JSON parsing error for step {step_name} (Attempt {attempt + 1}/{max_retries}): {parse_err_msg}")
+                    if attempt == max_retries - 1:
+                        logger.error(f"Failed to parse JSON after {max_retries} attempts.")
+                        raise parse_exc
+                except ValueError as val_exc:
+                    parse_err_msg = str(val_exc)
+                    logger.warning(f"JSON extraction error for step {step_name} (Attempt {attempt + 1}/{max_retries}): {parse_err_msg}")
+                    if attempt == max_retries - 1:
+                        logger.error(f"Failed to extract JSON after {max_retries} attempts.")
+                        raise val_exc
+                except Exception as exc:
+                    error_msg = str(exc)
+                    logger.warning(f"LLM generate_json failed for step {step_name} (Attempt {attempt + 1}/{max_retries}): {error_msg}")
+                    if attempt == max_retries - 1:
+                        logger.error(f"LLM request failed after {max_retries} attempts.")
+                        raise exc
+                
+                # Wait before retrying
+                await asyncio.sleep(base_delay * (2 ** attempt))
         finally:
             duration = time.time() - start_time
             # Construct and log metrics
@@ -312,3 +369,102 @@ class DemoProvider(BaseLLMProvider):
             logger.error(f"Error invoking save_usage_log in DemoProvider: {db_exc}")
 
         return payload
+
+
+class GeminiSDKProvider(BaseLLMProvider):
+    def __init__(self, model_name: str, api_key: str) -> None:
+        self._name = "google"
+        self._model = model_name
+        self._api_key = api_key
+        from google import genai
+        self._client = genai.Client(api_key=api_key)
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def model(self) -> str:
+        return self._model
+
+    @property
+    def is_demo(self) -> bool:
+        return False
+
+    async def generate_json(self, system_prompt: str, user_prompt: str, step_name: str = "generic", images: Optional[list[dict]] = None) -> dict[str, Any]:
+        start_time = time.time()
+        success = False
+        error_msg = None
+        parse_err_msg = None
+        prompt_tokens = None
+        completion_tokens = None
+        total_tokens = None
+        payload = {}
+
+        from google.genai import types
+
+        config_args = {
+            "temperature": 0.2,
+            "system_instruction": system_prompt,
+            "response_mime_type": "application/json"
+        }
+        config = types.GenerateContentConfig(**config_args)
+
+        max_retries = 3
+        base_delay = 2.0
+
+        for attempt in range(max_retries):
+            try:
+                def call_sdk():
+                    return self._client.models.generate_content(
+                        model=self.model,
+                        contents=user_prompt,
+                        config=config
+                    )
+                
+                response = await asyncio.to_thread(call_sdk)
+                
+                if response.usage_metadata:
+                    prompt_tokens = response.usage_metadata.prompt_token_count
+                    completion_tokens = response.usage_metadata.candidates_token_count
+                    total_tokens = response.usage_metadata.total_token_count
+
+                raw_text = response.text
+                if not isinstance(raw_text, str):
+                    raw_text = str(raw_text)
+
+                payload = clean_and_parse_json(raw_text)
+                success = True
+                error_msg = None
+                parse_err_msg = None
+                break
+
+            except Exception as exc:
+                error_msg = str(exc)
+                logger.warning(f"Gemini SDK generate_json failed for step {step_name} (Attempt {attempt + 1}/{max_retries}): {error_msg}")
+                if attempt == max_retries - 1:
+                    logger.error(f"Gemini SDK request failed after {max_retries} attempts.")
+                    raise exc
+                await asyncio.sleep(base_delay * (2 ** attempt))
+
+        duration = time.time() - start_time
+        duration_ms = int(duration * 1000)
+        
+        try:
+            await asyncio.to_thread(
+                save_usage_log,
+                provider=self.name,
+                model=self.model,
+                workflow_step=step_name,
+                input_tokens=prompt_tokens,
+                output_tokens=completion_tokens,
+                total_tokens=total_tokens,
+                duration_ms=duration_ms,
+                success=success,
+                error_message=error_msg or parse_err_msg
+            )
+        except Exception as db_exc:
+            logger.error(f"Error invoking save_usage_log in GeminiSDKProvider: {db_exc}")
+
+        return payload
+
