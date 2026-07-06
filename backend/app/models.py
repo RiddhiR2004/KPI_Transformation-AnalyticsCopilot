@@ -208,27 +208,250 @@ class FunctionalSpecification(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.now)
 
 
-class TDMDocumentOrganization(BaseModel):
-    document_log: str = ""
-    related_document_reference: str = ""
+class TDDDocumentOrganization(BaseModel):
+    document_version: str = "1.0"
+    status: str = "draft"
+    generated_date: str = ""
+    generated_by: str = ""
+    technical_designer: str = "AI Analytics Architect"
+    client_name: str = ""
+    engagement_name: str = ""
+    related_documents: str = ""
 
 
-class TDMTechnicalSpecifications(BaseModel):
-    data_flow: str = ""
-    data_models: str = ""
-    technical_details: str = ""
-    currency_translation: str = ""
+class TDDObjectSummaryItem(BaseModel):
+    object_name: str = ""
+    object_type: str = "Fact"  # Fact / Dimension / View
+    business_process: str = ""
+    purpose: str = ""
+    source_systems: str = ""
+    target_layer: str = "Gold"
+    database: str = "Snowflake"
+    schema_name: str = ""
+    primary_keys: str = ""
+    refresh_frequency: str = "Daily"
+    estimated_volume: str = ""
+    data_owner: str = ""
+    technical_owner: str = ""
+    complexity: str = "Medium"  # Low / Medium / High
+    status: str = "TBC"  # TBC / Confirmed
+    
+    # Backwards compatibility fields
+    short_description: str = ""
+    technology_stack: str = ""
+    primary_source_systems: str = ""
+
+
+class TDDTechnicalDataFlow(BaseModel):
+    diagram_mermaid: str = ""  # Mermaid JS diagram code
+    diagram_ascii: str = ""    # ASCII diagram for document/text rendering
+    description: str = ""
+
+
+class TDDDataModelField(BaseModel):
+    name: str = ""
+    purpose: str = ""
+    source: str = ""
+    type: str = ""  # Fact / Dimension
+    description: str = ""
+    grain: str = ""
+    primary_key: str = ""
+    foreign_keys: str = ""
+    measures: str = ""
+    dimensions: str = ""
+    estimated_record_volume: str = ""
+    partition_strategy: str = ""
+    natural_key: str = ""
+    surrogate_key: str = ""
+    scd_type: str = ""  # Slowly Changing Dimension Type
+    parent_dimension: str = ""
+    update_strategy: str = ""
+
+
+class TDDPhysicalColumn(BaseModel):
+    column_name: str = ""
+    data_type: str = ""
+    nullable: str = "YES"
+    primary_key: str = ""
+    foreign_key: str = ""
+    description: str = ""
+    source_field: str = ""
+
+
+class TDDPhysicalTable(BaseModel):
+    table_name: str = ""
+    columns: list[TDDPhysicalColumn] = Field(default_factory=list)
+
+
+class TDDFieldLevelMappingItem(BaseModel):
+    source_system: str = ""
+    source_table: str = ""
+    source_field: str = ""
+    target_table: str = ""
+    target_field: str = ""
+    transformation: str = ""
+
+
+class TDDTransformationStep(BaseModel):
+    step_number: int = 1
+    operation: str = ""
+    description: str = ""
+
+
+class TDDTransformationRuleItem(BaseModel):
+    object_name: str = ""
+    steps: list[TDDTransformationStep] = Field(default_factory=list)
+
+
+class TDDkpiSqlGuidance(BaseModel):
+    kpi_name: str = ""
+    sql_snippet: str = ""
+
+
+class TDDDatabaseRelationshipDiagram(BaseModel):
+    ascii_diagram: str = ""
+    description: str = ""
+
+
+class TDDDataLineageDiagram(BaseModel):
+    ascii_lineage: str = ""
+    description: str = ""
+
+
+class TDDTechnicalMappingItem(BaseModel):
+    s_no: int = 1
+    source_system: str = ""
+    source_database: str = ""
+    source_schema: str = ""
+    source_table: str = ""
+    target_database: str = ""
+    target_schema: str = ""
+    target_table: str = ""
+    join_keys: str = ""
+    partition_key: str = ""
+    incremental_key: str = ""
+    load_type: str = "Incremental"
+    output_dataset: str = ""
+    status: str = "TBC"  # TBC / Confirmed
+
+    # Backwards compatibility fields
+    view_or_table_name: str = ""
+    database: str = ""
+    schema_name: str = ""
+    model_type: str = ""
+    table_type: str = ""
+    functional_area: str = ""
+    required_fields: str = ""
+    relationships: str = ""
+    transformation_logic: str = ""
+
+
+class TDDSecurityRoleAccess(BaseModel):
+    role: str = ""
+    accessible_tables: str = ""
+    permission: str = "Read"
+    masking: str = "No"
+
+
+class TDDDataLoadStrategy(BaseModel):
+    load_frequency: str = ""
+    refresh_type: str = ""
+    estimated_volume: str = ""
+    dependencies: str = ""
+    scheduling_considerations: str = ""
+
+
+class TDDDataQualityRule(BaseModel):
+    validation_rule: str = ""
+    table_name: str = ""
+    severity: str = "Medium"  # Low / Medium / High / Critical
+    action: str = ""
+
+
+class TDDTestCase(BaseModel):
+    test_id: str = ""
+    scenario: str = ""
+    expected_result: str = ""
+    status: str = "Pending"
+    priority: str = "Medium"
+
+
+class TDDDataDictionaryItem(BaseModel):
+    field_name: str = ""
+    definition: str = ""
+    data_type: str = ""
+    business_meaning: str = ""
+    example_value: str = ""
+
+
+class TDDTraceabilityMatrixItem(BaseModel):
+    kpi: str = ""
+    fact_table: str = ""
+    dimension_tables: str = ""
+    source_systems: str = ""
+    dashboard: str = ""
+
+
+class TDDGlossaryItem(BaseModel):
+    term: str = ""
+    definition: str = ""
+
+
+class TDDDataTransformationRules(BaseModel):
+    aggregations: str = ""
+    derived_columns: str = ""
+    calculated_fields: str = ""
+    business_filters: str = ""
+    currency_conversion: str = ""
+    unit_conversion: str = ""
+
+
+class TDDSecurity(BaseModel):
     row_level_security: str = ""
+    object_level_security: str = ""
+    sensitive_fields: str = ""
+    access_roles: str = ""
+
+
+class TDDDataQualityValidation(BaseModel):
+    null_checks: str = ""
+    duplicate_checks: str = ""
+    mandatory_field_checks: str = ""
+    business_rule_validation: str = ""
+    kpi_validation_logic: str = ""
+
+
+class TDDTestingStrategy(BaseModel):
+    unit_test_scenarios: str = ""
+    integration_test_scenarios: str = ""
+    validation_criteria: str = ""
 
 
 class TechnicalDataMapping(BaseModel):
-    document_organization: TDMDocumentOrganization = Field(default_factory=TDMDocumentOrganization)
-    object_summary: str = ""
-    technical_specifications: TDMTechnicalSpecifications = Field(default_factory=TDMTechnicalSpecifications)
-    data_load_frequency: str = ""
-    unit_test_results: str = ""
-    glossary: str = ""
+    document_organization: TDDDocumentOrganization = Field(default_factory=TDDDocumentOrganization)
+    object_summary: list[TDDObjectSummaryItem] = Field(default_factory=list)
+    technical_data_flow: list[TDDTechnicalDataFlow] = Field(default_factory=list)
+    data_models: list[TDDDataModelField] = Field(default_factory=list)
+    physical_table_definitions: list[TDDPhysicalTable] = Field(default_factory=list)
+    field_level_mappings: list[TDDFieldLevelMappingItem] = Field(default_factory=list)
+    transformation_rules: TDDDataTransformationRules = Field(default_factory=TDDDataTransformationRules)
+    transformation_rules_list: list[TDDTransformationRuleItem] = Field(default_factory=list)
+    kpi_sql_guidance: list[TDDkpiSqlGuidance] = Field(default_factory=list)
+    db_relationship_diagrams: list[TDDDatabaseRelationshipDiagram] = Field(default_factory=list)
+    data_lineage_diagrams: list[TDDDataLineageDiagram] = Field(default_factory=list)
+    technical_mappings: list[TDDTechnicalMappingItem] = Field(default_factory=list)
+    security: TDDSecurity = Field(default_factory=TDDSecurity)
+    security_access_grid: list[TDDSecurityRoleAccess] = Field(default_factory=list)
+    data_load_strategy: TDDDataLoadStrategy = Field(default_factory=TDDDataLoadStrategy)
+    data_quality_validation: TDDDataQualityValidation = Field(default_factory=TDDDataQualityValidation)
+    data_quality_validation_matrix: list[TDDDataQualityRule] = Field(default_factory=list)
+    testing_strategy: TDDTestingStrategy = Field(default_factory=TDDTestingStrategy)
+    testing_strategy_matrix: list[TDDTestCase] = Field(default_factory=list)
+    data_dictionary: list[TDDDataDictionaryItem] = Field(default_factory=list)
+    traceability_matrix: list[TDDTraceabilityMatrixItem] = Field(default_factory=list)
+    glossary: list[TDDGlossaryItem] = Field(default_factory=list)
     status: str = "draft"  # "draft" or "approved"
+    version: int = 1
     updated_at: datetime = Field(default_factory=datetime.now)
 
 

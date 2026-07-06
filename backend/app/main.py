@@ -2886,7 +2886,7 @@ async def generate_spec(request: Request) -> dict[str, Any]:
 
 
 # -----------------------------------------------------------------------------------------
-# TECHNICAL DATA MAPPING ENDPOINTS (Step 4)
+# TECHNICAL DATA MAPPING ENDPOINTS (Step 5)
 # -----------------------------------------------------------------------------------------
 
 from app.models import TechnicalDataMapping
@@ -2894,7 +2894,45 @@ from app.database import TechnicalDataMappingDB
 
 @app.get("/technical-mapping")
 def get_technical_mapping() -> dict[str, Any]:
-    return read_json(FILES["technical_mapping"], {})
+    from app.database import TechnicalDataMappingDB
+    import json
+    with SessionLocal() as session:
+        eng_id = active_engagement_id_ctx.get()
+        if eng_id is not None:
+            db_mapping = session.scalar(select(TechnicalDataMappingDB).filter_by(engagement_id=eng_id))
+        else:
+            db_mapping = session.scalar(select(TechnicalDataMappingDB).filter_by(id=1))
+            
+        if not db_mapping:
+            default_tdd = TechnicalDataMapping()
+            db_mapping = TechnicalDataMappingDB(
+                engagement_id=eng_id,
+                draft_items=json.dumps(default_tdd.model_dump(mode="json")),
+                approved_items="{}",
+                status="draft",
+                version=1
+            )
+            session.add(db_mapping)
+            session.commit()
+            session.refresh(db_mapping)
+            
+        try:
+            draft_items_list = json.loads(db_mapping.draft_items or "{}")
+        except Exception:
+            draft_items_list = {}
+            
+        try:
+            approved_items_list = json.loads(db_mapping.approved_items or "{}")
+        except Exception:
+            approved_items_list = {}
+            
+        return {
+            "draft_items": draft_items_list,
+            "approved_items": approved_items_list,
+            "status": db_mapping.status or "draft",
+            "version": db_mapping.version or 1,
+            "updated_at": db_mapping.updated_at.isoformat() if db_mapping.updated_at else None
+        }
 
 
 @app.post("/technical-mapping")
@@ -2913,21 +2951,23 @@ def save_technical_mapping(request: Request, mapping: TechnicalDataMapping) -> T
             db_mapping = TechnicalDataMappingDB(engagement_id=eng_id)
             session.add(db_mapping)
             
-        db_mapping.items = "[]"
-        db_mapping.executive_summary = mapping.object_summary
-        db_mapping.status = mapping.status
+        db_mapping.draft_items = json.dumps(mapping.model_dump(mode="json"))
+        db_mapping.items = json.dumps(mapping.model_dump(mode="json").get("technical_mappings", []))
+        db_mapping.status = "draft"  # manual edits revert status to draft
+        db_mapping.version = mapping.version
         db_mapping.updated_at = mapping.updated_at
         session.commit()
 
-    log_activity("Technical Data Mapping Saved", f"Saved updates to Technical Data Mapping. Status: {mapping.status}")
+    log_activity("Technical Design Document Saved", f"Saved updates to Technical Design Document. Status: {mapping.status}")
     
     log_audit(
         request=request,
         action="Update",
-        module="Technical Data Mapping",
-        entity_type="TDM",
-        entity_name="Technical Data Mapping",
-        new_value=f"Status: {mapping.status}, Items: {len(mapping.items)}"
+        module="Technical Design Document",
+        entity_type="TDD",
+        entity_name="Technical Design Document",
+        new_value=f"Status: {mapping.status}, Version: {mapping.version}",
+        db_session=session
     )
     return mapping
 
@@ -2942,62 +2982,246 @@ async def generate_technical_mapping(request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="No approved KPIs in library. Please approve KPIs in Step 2 first.")
     
     provider = get_provider()
+    client_profile_dict = get_client_profile()
+    business_context_dict = read_json(FILES["business_context"], {})
+    
+    # We also need the FSD definitions if they exist to provide better context
+    fsd_data = read_json(FILES["functional_spec"], {})
+    fsd_items = fsd_data.get("items", [])
     
     if isinstance(provider, DemoProvider):
         # Demo generation
         mapping = TechnicalDataMapping(
-            document_organization=TDMDocumentOrganization(
-                document_log="| Version | Date | Author | Description |\n|---|---|---|---|\n| 1.0 | Today | System | Initial Draft |",
-                related_document_reference="Refer to Functional Specification Document."
+            document_organization=TDDDocumentOrganization(
+                document_version="1.0",
+                status="draft",
+                generated_date=datetime.now().strftime("%Y-%m-%d"),
+                generated_by="Analytics Transformation Copilot",
+                technical_designer="AI Analytics Architect",
+                client_name=client_profile_dict.get("client_name", "Demo Client"),
+                engagement_name=context.get("engagement_name", "Demo Engagement"),
+                related_documents="Functional Specification Document, Business Context Blueprint"
             ),
-            object_summary="This document outlines the technical dataflow for the approved KPIs.",
-            technical_specifications=TDMTechnicalSpecifications(
-                data_flow="Data flows from SAP ECC to SAP BW to SAP Analytics Cloud.",
-                data_models="Master Data Models and Transaction Data Models...",
-                technical_details="Daily snapshot required. Incremental load logic applied.",
-                currency_translation="All local currencies translated to USD.",
-                row_level_security="Secured by Region and Company Code."
+            object_summary=[
+                TDDObjectSummaryItem(
+                    object_name="Fact_GL_Transactions",
+                    object_type="Fact",
+                    business_process="Record to Report",
+                    purpose="Stores general ledger journal entry details.",
+                    source_systems="SAP S/4HANA (FI)",
+                    target_layer="Gold",
+                    database="Snowflake",
+                    schema_name="Core_Schema",
+                    primary_keys="TRANSACTION_KEY",
+                    refresh_frequency="Daily Batch",
+                    estimated_volume="~150k rows/day",
+                    data_owner="VP of Finance",
+                    technical_owner="Lead Data Engineer",
+                    complexity="Medium",
+                    status="Confirmed"
+                )
+            ],
+            technical_data_flow=[
+                TDDTechnicalDataFlow(
+                    diagram_mermaid="graph TD\n  SAP[SAP S/4HANA] -->|ADF pipeline| Snowflake[Snowflake Staging]\n  Snowflake -->|SQL View| Fact[GL_Fact]\n  Fact -->|Direct Query| BI[Power BI Dashboard]",
+                    diagram_ascii="Source System -> replication -> Snowflake Staging -> core gold -> Power BI reports",
+                    description="Standard general ledger transaction extraction and loading flow."
+                )
+            ],
+            data_models=[
+                TDDDataModelField(
+                    name="Fact_GL_Transactions",
+                    purpose="Stores transaction level details for all accounts",
+                    source="SAP ACDOCA",
+                    type="Fact",
+                    description="Central journal entry transaction table.",
+                    grain="Transaction line item",
+                    primary_key="TRANSACTION_KEY",
+                    foreign_keys="ACCOUNT_KEY, CUSTOMER_KEY, DATE_KEY",
+                    measures="AMOUNT_USD, AMOUNT_LOC",
+                    dimensions="Dim_Account, Dim_Customer",
+                    estimated_record_volume="50M rows total",
+                    partition_strategy="Partitioned by Fiscal Year/Month"
+                )
+            ],
+            physical_table_definitions=[
+                TDDPhysicalTable(
+                    table_name="Fact_GL_Transactions",
+                    columns=[
+                        TDDPhysicalColumn(
+                            column_name="TRANSACTION_KEY",
+                            data_type="BIGINT",
+                            nullable="NO",
+                            primary_key="PRIMARY KEY",
+                            foreign_key="",
+                            description="Surrogate key for transaction",
+                            source_field="MD5(ACDOCA.BELNR || ACDOCA.BUZEI)"
+                        )
+                    ]
+                )
+            ],
+            field_level_mappings=[
+                TDDFieldLevelMappingItem(
+                    source_system="SAP S/4HANA",
+                    source_table="ACDOCA",
+                    source_field="BELNR",
+                    target_table="Fact_GL_Transactions",
+                    target_field="SalesDocumentID",
+                    transformation="Direct Mapping"
+                )
+            ],
+            transformation_rules=[
+                TDDTransformationRuleItem(
+                    object_name="Fact_GL_Transactions",
+                    steps=[
+                        TDDTransformationStep(
+                            step_number=1,
+                            operation="Extract",
+                            description="Read billing documents from SAP"
+                        )
+                    ]
+                )
+            ],
+            kpi_sql_guidance=[
+                TDDkpiSqlGuidance(
+                    kpi_name="Gross Profit Margin",
+                    sql_snippet="SELECT SUM(GROSS_PROFIT) / SUM(NET_REVENUE) FROM Fact_GL_Transactions;"
+                )
+            ],
+            db_relationship_diagrams=[
+                TDDDatabaseRelationshipDiagram(
+                    ascii_diagram="           Dim_Date\n               |\nDim_Product - Fact_Sales - Dim_Customer",
+                    description="Joins between Dimensions and Fact tables"
+                )
+            ],
+            data_lineage_diagrams=[
+                TDDDataLineageDiagram(
+                    ascii_lineage="SAP ACDOCA -> Fact_GL_Transactions -> Profit Margin KPI -> Finance Dashboard",
+                    description="End-to-end data lineage"
+                )
+            ],
+            technical_mappings=[
+                TDDTechnicalMappingItem(
+                    s_no=1,
+                    source_system="SAP S/4HANA",
+                    source_database="SAP_ERP",
+                    source_schema="SAP_ECC",
+                    source_table="ACDOCA",
+                    target_database="Snowflake_DWH",
+                    target_schema="Core_Schema",
+                    target_table="Fact_GL_Transactions",
+                    join_keys="ACCOUNT_KEY = Dim_Account.ACCOUNT_KEY",
+                    partition_key="FISCAL_YEAR",
+                    incremental_key="LAST_MODIFIED",
+                    load_type="Incremental",
+                    output_dataset="GL_Transactions",
+                    status="Confirmed"
+                )
+            ],
+            security_access_grid=[
+                TDDSecurityRoleAccess(
+                    role="BI Developer",
+                    accessible_tables="Fact_GL_Transactions, Dim_*",
+                    permission="Read Only",
+                    masking="Mask Customer Name"
+                )
+            ],
+            data_load_strategy=TDDDataLoadStrategy(
+                load_frequency="Daily batch load",
+                refresh_type="Incremental",
+                estimated_volume="~500k rows/day",
+                dependencies="SAP extraction pipeline",
+                scheduling_considerations="Run after daily close"
             ),
-            data_load_frequency="Daily batch loads at 2:00 AM UTC.",
-            unit_test_results="| Scenario | Expected | Status |\n|---|---|---|\n| Revenue load | Matches FI | Pending |",
-            glossary="| Term | Definition |\n|---|---|\n| KPI | Key Performance Indicator |"
+            data_quality_validation_matrix=[
+                TDDDataQualityRule(
+                    validation_rule="Null Primary Key",
+                    table_name="Fact_GL_Transactions",
+                    severity="Critical",
+                    action="Reject record"
+                )
+            ],
+            testing_strategy=[
+                TDDTestCase(
+                    test_id="TEST_001",
+                    scenario="Verify debits match credits",
+                    expected_result="Debits sum matches credits sum",
+                    status="Pending",
+                    priority="High"
+                )
+            ],
+            data_dictionary=[
+                TDDDataDictionaryItem(
+                    field_name="GrossRevenue",
+                    definition="Total sales amount before deductions",
+                    data_type="DECIMAL(18,2)",
+                    business_meaning="Gross sales",
+                    example_value="15000.00"
+                )
+            ],
+            traceability_matrix=[
+                TDDTraceabilityMatrixItem(
+                    kpi="Profit Margin",
+                    fact_table="Fact_GL_Transactions",
+                    dimension_tables="Dim_Account",
+                    source_systems="SAP S/4HANA",
+                    dashboard="Executive Finance Dashboard"
+                )
+            ],
+            glossary=[
+                TDDGlossaryItem(
+                    term="GL Account",
+                    definition="General Ledger Account identifier"
+                )
+            ]
         )
     else:
         # LLM Generation
-        from app.services.prompting import TDM_SYSTEM_PROMPT
-        
-        # We also need the FSD definitions if they exist to provide better context
-        fsd_data = read_json(FILES["functional_spec"], {})
-        fsd_items = fsd_data.get("items", [])
+        from app.services.prompting import TDD_SYSTEM_PROMPT
         
         # Build prompt inputs
+        client_profile_json = json.dumps(client_profile_dict, indent=2)
+        business_context_json = json.dumps(business_context_dict, indent=2)
         kpis_json = json.dumps([k.model_dump(mode="json") for k in approved_kpis], indent=2)
         fsd_json = json.dumps(fsd_items, indent=2) if fsd_items else "No functional specification generated yet."
         
         user_prompt = f"""
-        === APPROVED KPIs ===
+        === CLIENT SETUP (STEP 1) ===
+        {client_profile_json}
+        
+        === BUSINESS CONTEXT (STEP 2) ===
+        {business_context_json}
+        
+        === APPROVED KPIs (STEP 3) ===
         {kpis_json}
         
-        === EXISTING FUNCTIONAL SPECIFICATION (For Context) ===
+        === FUNCTIONAL SPECIFICATION (STEP 4) ===
         {fsd_json}
         
-        Please generate the Technical Data Mapping document for all these approved KPIs.
+        Please generate the Technical Design Document (TDD) for all these approved KPIs using the technology landscape, client setup, business context, and functional specifications.
         """
         
         try:
             payload = await provider.generate_json(
-                TDM_SYSTEM_PROMPT,
+                TDD_SYSTEM_PROMPT,
                 user_prompt,
                 step_name="generate_technical_mapping"
             )
             
             mapping = TechnicalDataMapping(**payload)
         except Exception as exc:
-            logger.error(f"Failed to generate Technical Data Mapping: {exc}", exc_info=True)
-            raise HTTPException(status_code=502, detail=f"Failed to generate Technical Data Mapping: {exc}")
+            logger.error(f"Failed to generate Technical Design Document: {exc}", exc_info=True)
+            raise HTTPException(status_code=502, detail=f"Failed to generate Technical Design Document: {exc}")
     
     mapping.status = "draft"
     mapping.updated_at = datetime.now()
+    
+    # Auto-fill defaults from context if empty
+    if not mapping.document_organization.client_name and client_profile_dict.get("client_name"):
+        mapping.document_organization.client_name = client_profile_dict.get("client_name")
+    if not mapping.document_organization.engagement_name and context.get("engagement_name"):
+        mapping.document_organization.engagement_name = context.get("engagement_name")
+    mapping.document_organization.generated_date = datetime.now().strftime("%Y-%m-%d")
     
     write_json(FILES["technical_mapping"], mapping.model_dump(mode="json"))
     
@@ -3012,21 +3236,24 @@ async def generate_technical_mapping(request: Request) -> dict[str, Any]:
             db_mapping = TechnicalDataMappingDB(engagement_id=eng_id)
             session.add(db_mapping)
             
-        db_mapping.items = "[]"
-        db_mapping.executive_summary = mapping.object_summary
-        db_mapping.status = mapping.status
-        db_mapping.updated_at = mapping.updated_at
+        db_mapping.draft_items = json.dumps(mapping.model_dump(mode="json"))
+        db_mapping.approved_items = "{}"
+        db_mapping.items = json.dumps(mapping.model_dump(mode="json").get("technical_mappings", []))
+        db_mapping.status = "draft"
+        db_mapping.version = 1
+        db_mapping.updated_at = datetime.now()
         session.commit()
         
-    log_activity("Technical Data Mapping Generated", f"AI generated mapping for {len(approved_kpis)} KPIs.")
+    log_activity("Technical Design Document Generated", f"AI generated Technical Design Document for {len(approved_kpis)} KPIs.")
     
     log_audit(
         request=request,
         action="Generate",
-        module="Technical Data Mapping",
-        entity_type="TDM",
-        entity_name="Technical Data Mapping",
-        new_value=f"Generated mapping for {len(approved_kpis)} KPIs"
+        module="Technical Design Document",
+        entity_type="TDD",
+        entity_name="Technical Design Document",
+        new_value=f"Generated TDD (v1) for {len(approved_kpis)} KPIs",
+        db_session=session
     )
     
     return mapping.model_dump(mode="json")
@@ -3036,7 +3263,7 @@ async def generate_technical_mapping(request: Request) -> dict[str, Any]:
 def approve_technical_mapping(request: Request) -> dict[str, Any]:
     mapping_data = read_json(FILES["technical_mapping"], {})
     if not mapping_data or not mapping_data.get("object_summary"):
-        raise HTTPException(status_code=400, detail="Technical Data Mapping has not been generated yet.")
+        raise HTTPException(status_code=400, detail="Technical Design Document has not been generated yet.")
         
     with SessionLocal() as session:
         eng_id = active_engagement_id_ctx.get()
@@ -3046,28 +3273,38 @@ def approve_technical_mapping(request: Request) -> dict[str, Any]:
             db_mapping = session.scalar(select(TechnicalDataMappingDB).filter_by(id=1))
             
         if not db_mapping:
-            raise HTTPException(status_code=404, detail="Technical Data Mapping record not found.")
+            raise HTTPException(status_code=404, detail="Technical Design Document record not found.")
             
+        try:
+            draft_mapping = json.loads(db_mapping.draft_items or "{}")
+        except Exception:
+            draft_mapping = mapping_data
+            
+        draft_mapping["status"] = "approved"
+        db_mapping.approved_items = json.dumps(draft_mapping)
+        db_mapping.draft_items = json.dumps(draft_mapping)
         db_mapping.status = "approved"
         db_mapping.updated_at = datetime.now()
         session.commit()
-        session.refresh(db_mapping)
+        
+        # Sync with JSON file
+        write_json(FILES["technical_mapping"], draft_mapping)
         
         log_audit(
             request=request,
             action="Approve",
-            module="Technical Data Mapping",
-            entity_type="TDM",
-            entity_name="Technical Data Mapping",
-            new_value="Approved Technical Data Mapping",
+            module="Technical Design Document",
+            entity_type="TDD",
+            entity_name="Technical Design Document",
+            new_value="Approved Technical Design Document",
             db_session=session
         )
         updated_at_str = db_mapping.updated_at.isoformat()
         
-    log_activity("Technical Data Mapping Approved", "The technical data mapping document was signed off.")
+    log_activity("Technical Design Document Approved", "The Technical Design Document was signed off.")
     return {
         "status": "success",
-        "message": "Technical data mapping approved",
+        "message": "Technical Design Document approved",
         "updated_at": updated_at_str
     }
 
@@ -3093,7 +3330,7 @@ def exports() -> list[ExportItem]:
         ExportItem(id="prompt", label="Export Prompt", description="KPI generation prompt from Prompt Studio", formats=["DOCX", "JSON"], available=has_prompt),
         ExportItem(id="kpi_library", label="Export KPI Library", description="Approved and draft KPI library", formats=["XLSX", "CSV", "JSON"], available=has_kpis),
         ExportItem(id="functional_document", label="Functional Specification", description="Governed business functional specification document", formats=["DOCX", "PDF", "JSON"], available=has_spec),
-        ExportItem(id="technical_mapping", label="Technical Data Mapping", description="Technical data blueprint for engineering teams", formats=["DOCX", "PDF", "JSON"], available=True),
+        ExportItem(id="technical_mapping", label="Technical Data Mapping", description="Technical data blueprint for engineering teams", formats=["PDF"], available=True),
         ExportItem(id="kpi_driver_tree", label="KPI Driver Tree", description="Approved strategy-to-KPI driver tree specification", formats=["PDF", "JSON"], available=has_tree),
         ExportItem(id="json_bundle", label="Export JSON Bundle", description="Complete session data for audit or migration", formats=["JSON"], available=True),
     ]
@@ -3183,10 +3420,19 @@ def download_export(request: Request, export_id: str, fmt: str, doc_name: str | 
                 raise HTTPException(status_code=400, detail=f"Unsupported format for KPI Driver Tree: {fmt}")
     elif export_id == "technical_mapping":
         mapping_data = read_json(FILES["technical_mapping"], {})
-        if not mapping_data or not mapping_data.get("document_organization"):
-            raise HTTPException(status_code=400, detail="Technical Data Mapping has not been generated.")
+        tdd_content = None
+        if mapping_data:
+            if mapping_data.get("status") == "approved" and mapping_data.get("approved_items") and isinstance(mapping_data.get("approved_items"), dict) and mapping_data.get("approved_items").get("document_organization"):
+                tdd_content = mapping_data.get("approved_items")
+            else:
+                tdd_content = mapping_data.get("draft_items")
+            if (not tdd_content or not isinstance(tdd_content, dict) or not tdd_content.get("document_organization")) and mapping_data.get("document_organization"):
+                tdd_content = mapping_data
+
+        if not tdd_content or not isinstance(tdd_content, dict) or not tdd_content.get("document_organization"):
+            raise HTTPException(status_code=400, detail="Technical Design Document has not been generated yet.")
         
-        mapping = TechnicalDataMapping(**mapping_data)
+        mapping = TechnicalDataMapping(**tdd_content)
         context_data = read_json(FILES["business_context"], {})
         context = BusinessContext(**context_data) if context_data else BusinessContext()
         

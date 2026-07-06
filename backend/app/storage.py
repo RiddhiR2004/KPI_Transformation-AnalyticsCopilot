@@ -174,10 +174,19 @@ def read_json(path: Path, default: Any) -> Any:
                 row = session.scalar(select(TechnicalDataMappingDB).filter_by(id=1))
             if not row:
                 return default
+            try:
+                draft_data = json.loads(row.draft_items or "{}")
+            except Exception:
+                draft_data = {}
+            try:
+                approved_data = json.loads(row.approved_items or "{}")
+            except Exception:
+                approved_data = {}
             return {
-                "items": json.loads(row.items),
-                "executive_summary": row.executive_summary or "",
+                "draft_items": draft_data,
+                "approved_items": approved_data,
                 "status": row.status or "draft",
+                "version": row.version or 1,
                 "updated_at": row.updated_at.isoformat() if row.updated_at else now_iso(),
             }
             
@@ -340,9 +349,13 @@ def write_json(path: Path, data: Any) -> None:
                 if not row:
                     row = TechnicalDataMappingDB(id=1)
                     session.add(row)
-            row.items = json.dumps(data.get("items", []))
-            row.executive_summary = data.get("executive_summary", "")
-            row.status = data.get("status", "draft")
+            if isinstance(data, dict) and ("draft_items" in data or "approved_items" in data):
+                row.draft_items = json.dumps(data.get("draft_items", {}))
+                row.approved_items = json.dumps(data.get("approved_items", {}))
+            else:
+                row.draft_items = json.dumps(data)
+            row.status = data.get("status", row.status or "draft") if isinstance(data, dict) else (row.status or "draft")
+            row.version = data.get("version", row.version or 1) if isinstance(data, dict) else (row.version or 1)
             row.updated_at = datetime.now()
             session.commit()
 

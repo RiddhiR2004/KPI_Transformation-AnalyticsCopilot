@@ -254,27 +254,256 @@ export type FunctionalSpecification = {
   updated_at?: string;
 };
 
-export type TDMDocumentOrganization = {
-  document_log: string;
-  related_document_reference: string;
+export type TDDDocumentOrganization = {
+  document_version: string;
+  status: string;
+  generated_date: string;
+  generated_by: string;
+  technical_designer: string;
+  client_name: string;
+  engagement_name: string;
+  related_documents: string;
 };
 
-export type TDMTechnicalSpecifications = {
-  data_flow: string;
-  data_models: string;
-  technical_details: string;
-  currency_translation: string;
+export type TDDObjectSummaryItem = {
+  object_name: string;
+  object_type?: string;
+  business_process?: string;
+  purpose?: string;
+  source_systems?: string;
+  target_layer?: string;
+  database?: string;
+  schema_name?: string;
+  primary_keys?: string;
+  refresh_frequency?: string;
+  estimated_volume?: string;
+  data_owner?: string;
+  technical_owner?: string;
+  complexity?: string;
+  status?: string;
+  // Compatibility fields
+  short_description?: string;
+  technology_stack?: string;
+  primary_source_systems?: string;
+};
+
+export type TDDTechnicalDataFlow = {
+  diagram_mermaid: string;
+  diagram_ascii: string;
+  description: string;
+};
+
+export type TDDDataModelField = {
+  name: string;
+  purpose: string;
+  source: string;
+  type: string;
+  description: string;
+  grain?: string;
+  primary_key?: string;
+  foreign_keys?: string;
+  measures?: string;
+  dimensions?: string;
+  estimated_record_volume?: string;
+  partition_strategy?: string;
+  natural_key?: string;
+  surrogate_key?: string;
+  scd_type?: string;
+  parent_dimension?: string;
+  update_strategy?: string;
+};
+
+export type TDDPhysicalColumn = {
+  column_name: string;
+  data_type: string;
+  nullable: string;
+  primary_key: string;
+  foreign_key: string;
+  description: string;
+  source_field: string;
+};
+
+export type TDDPhysicalTable = {
+  table_name: string;
+  columns: TDDPhysicalColumn[];
+};
+
+export type TDDFieldLevelMappingItem = {
+  source_system: string;
+  source_table: string;
+  source_field: string;
+  target_table: string;
+  target_field: string;
+  transformation: string;
+};
+
+export type TDDTransformationStep = {
+  step_number: number;
+  operation: string;
+  description: string;
+};
+
+export type TDDTransformationRuleItem = {
+  object_name: string;
+  steps: TDDTransformationStep[];
+};
+
+export type TDDkpiSqlGuidance = {
+  kpi_name: string;
+  sql_snippet: string;
+};
+
+export type TDDDatabaseRelationshipDiagram = {
+  ascii_diagram: string;
+  description: string;
+};
+
+export type TDDDataLineageDiagram = {
+  ascii_lineage: string;
+  description: string;
+};
+
+export type TDDTechnicalMappingItem = {
+  s_no: number;
+  source_system?: string;
+  source_database?: string;
+  source_schema?: string;
+  source_table?: string;
+  target_database?: string;
+  target_schema?: string;
+  target_table?: string;
+  join_keys?: string;
+  partition_key?: string;
+  incremental_key?: string;
+  load_type?: string;
+  output_dataset?: string;
+  status?: string;
+  // Compatibility fields
+  view_or_table_name?: string;
+  database?: string;
+  schema_name?: string;
+  model_type?: string;
+  table_type?: string;
+  functional_area?: string;
+  required_fields?: string;
+  relationships?: string;
+  transformation_logic?: string;
+};
+
+export type TDDSecurityRoleAccess = {
+  role: string;
+  accessible_tables: string;
+  permission: string;
+  masking: string;
+};
+
+export type TDDDataLoadStrategy = {
+  load_frequency: string;
+  refresh_type: string;
+  estimated_volume: string;
+  dependencies: string;
+  scheduling_considerations: string;
+};
+
+export type TDDDataQualityRule = {
+  validation_rule: string;
+  table_name: string;
+  severity: string;
+  action: string;
+};
+
+export type TDDTestCase = {
+  test_id: string;
+  scenario: string;
+  expected_result: string;
+  status: string;
+  priority: string;
+};
+
+export type TDDDataDictionaryItem = {
+  field_name: string;
+  definition: string;
+  data_type: string;
+  business_meaning: string;
+  example_value: string;
+};
+
+export type TDDTraceabilityMatrixItem = {
+  kpi: string;
+  fact_table: string;
+  dimension_tables: string;
+  source_systems: string;
+  dashboard: string;
+};
+
+export type TDDGlossaryItem = {
+  term: string;
+  definition: string;
+};
+
+export type TDDDataTransformationRules = {
+  aggregations: string;
+  derived_columns: string;
+  calculated_fields: string;
+  business_filters: string;
+  currency_conversion: string;
+  unit_conversion: string;
+};
+
+export type TDDSecurity = {
   row_level_security: string;
+  object_level_security: string;
+  sensitive_fields: string;
+  access_roles: string;
+};
+
+export type TDDDataQualityValidation = {
+  null_checks: string;
+  duplicate_checks: string;
+  mandatory_field_checks: string;
+  business_rule_validation: string;
+  kpi_validation_logic: string;
+};
+
+export type TDDTestingStrategy = {
+  unit_test_scenarios: string;
+  integration_test_scenarios: string;
+  validation_criteria: string;
 };
 
 export type TechnicalDataMapping = {
-  document_organization: TDMDocumentOrganization;
-  object_summary: string;
-  technical_specifications: TDMTechnicalSpecifications;
-  data_load_frequency: string;
-  unit_test_results: string;
-  glossary: string;
-  status?: string;
+  document_organization: TDDDocumentOrganization;
+  object_summary: TDDObjectSummaryItem[];
+  technical_data_flow: TDDTechnicalDataFlow[];
+  data_models: TDDDataModelField[];
+  physical_table_definitions?: TDDPhysicalTable[];
+  field_level_mappings?: TDDFieldLevelMappingItem[];
+  transformation_rules: TDDDataTransformationRules;
+  transformation_rules_list?: TDDTransformationRuleItem[];
+  kpi_sql_guidance?: TDDkpiSqlGuidance[];
+  db_relationship_diagrams?: TDDDatabaseRelationshipDiagram[];
+  data_lineage_diagrams?: TDDDataLineageDiagram[];
+  technical_mappings: TDDTechnicalMappingItem[];
+  security: TDDSecurity;
+  security_access_grid?: TDDSecurityRoleAccess[];
+  data_load_strategy: TDDDataLoadStrategy;
+  data_quality_validation: TDDDataQualityValidation;
+  data_quality_validation_matrix?: TDDDataQualityRule[];
+  testing_strategy: TDDTestingStrategy;
+  testing_strategy_matrix?: TDDTestCase[];
+  data_dictionary?: TDDDataDictionaryItem[];
+  traceability_matrix?: TDDTraceabilityMatrixItem[];
+  glossary: TDDGlossaryItem[];
+  status: string;
+  version: number;
+  updated_at?: string;
+};
+
+export type TechnicalMappingResponse = {
+  draft_items: TechnicalDataMapping;
+  approved_items: TechnicalDataMapping;
+  status: string;
+  version: number;
   updated_at?: string;
 };
 
