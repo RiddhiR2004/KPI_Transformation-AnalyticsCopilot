@@ -20,6 +20,7 @@ import type {
   KpiTreeRecord,
   TechnicalDataMapping,
   FunctionalSpecItem,
+  TechnicalMappingResponse,
 } from "../types/api";
 
 const jsonHeaders = { "Content-Type": "application/json" };
@@ -100,7 +101,7 @@ export const api = {
     }),
 
   // Technical Data Mapping
-  getTechnicalMapping: () => request<TechnicalDataMapping>("/technical-mapping"),
+  getTechnicalMapping: () => request<TechnicalMappingResponse>("/technical-mapping"),
   saveTechnicalMapping: (mapping: TechnicalDataMapping) =>
     request<TechnicalDataMapping>("/technical-mapping", {
       method: "POST",

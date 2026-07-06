@@ -2677,13 +2677,11 @@ def generate_pdf_driver_tree(path: Path, tree_data: dict, context: BusinessConte
 
 
 def generate_docx_tdm(path: Path, mapping: Any, context: BusinessContext) -> None:
-    """Generates a technical data mapping Word Document."""
+    """Generates a technical design document (TDD) Word Document."""
     import datetime
     doc = Document()
     
-    updated_at = getattr(mapping, "updated_at", None)
-    updated_at_str = updated_at.strftime("%B %d, %Y") if updated_at else datetime.date.today().strftime("%B %d, %Y")
-
+    # Page setup
     for section in doc.sections:
         section.top_margin = Inches(0.75)
         section.bottom_margin = Inches(0.75)
@@ -2701,15 +2699,15 @@ def generate_docx_tdm(path: Path, mapping: Any, context: BusinessContext) -> Non
     title_p = doc.add_paragraph()
     title_p.paragraph_format.space_before = Pt(24)
     title_p.paragraph_format.space_after = Pt(4)
-    title_run = title_p.add_run("KPI Advisory & Analytics")
+    title_run = title_p.add_run("KPI Transformation & Analytics")
     title_run.font.name = 'Calibri'
     title_run.font.size = Pt(12)
     title_run.font.bold = True
-    title_run.font.color.rgb = RGBColor(180, 150, 0)
+    title_run.font.color.rgb = RGBColor(180, 150, 0) # EY Gold
 
     main_title_p = doc.add_paragraph()
     main_title_p.paragraph_format.space_after = Pt(12)
-    main_title_run = main_title_p.add_run("Technical Data Mapping Document")
+    main_title_run = main_title_p.add_run("Technical Design Document (TDD)")
     main_title_run.font.name = 'Calibri'
     main_title_run.font.size = Pt(22)
     main_title_run.font.bold = True
@@ -2719,13 +2717,13 @@ def generate_docx_tdm(path: Path, mapping: Any, context: BusinessContext) -> Non
     accent_table.autofit = False
     accent_table.columns[0].width = Inches(7.0)
     accent_cell = accent_table.cell(0, 0)
-    set_cell_shading(accent_cell, "FFE600")
+    set_cell_shading(accent_cell, "FFE600") # EY Yellow
     set_cell_margins(accent_cell, top=15, bottom=15, left=0, right=0)
     
     desc_p = doc.add_paragraph()
     desc_p.paragraph_format.space_before = Pt(12)
     desc_p.paragraph_format.space_after = Pt(24)
-    desc_run = desc_p.add_run("A detailed blueprint translating functional metric specifications into engineering requirements, calculations, and data source mappings.")
+    desc_run = desc_p.add_run("Consulting-grade technical implementation blueprint, database mappings, transformation rules, and data architectures.")
     desc_run.font.name = 'Calibri'
     desc_run.font.size = Pt(10.5)
     desc_run.font.italic = True
@@ -2733,48 +2731,14 @@ def generate_docx_tdm(path: Path, mapping: Any, context: BusinessContext) -> Non
 
     doc.add_page_break()
 
-    # Meta
-    meta_title = doc.add_paragraph()
-    meta_title.paragraph_format.space_before = Pt(12)
-    meta_title.paragraph_format.space_after = Pt(8)
-    meta_title_run = meta_title.add_run("Document Control & Metadata")
-    meta_title_run.font.size = Pt(13)
-    meta_title_run.font.bold = True
-    meta_title_run.font.color.rgb = RGBColor(27, 27, 27)
-
-    meta_table = doc.add_table(rows=5, cols=2)
-    meta_table.style = 'Table Grid'
-    meta_fields = [
-        ("Document Version", "1.0"),
-        ("Generated Date", updated_at_str),
-        ("Industry", clean_or_fallback(context.industry, "Not Specified")),
-        ("Organizational Level", clean_or_fallback(context.organization_level, "Not Specified")),
-        ("Approval Status", getattr(mapping, "status", "DRAFT").upper())
-    ]
-    for i, (label, val) in enumerate(meta_fields):
-        row = meta_table.rows[i]
-        cell_lbl = row.cells[0]
-        cell_lbl.text = label
-        set_cell_shading(cell_lbl, "F0F0F0")
-        set_cell_margins(cell_lbl, top=40, bottom=40, left=80, right=80)
-        cell_lbl.paragraphs[0].runs[0].font.bold = True
-        cell_lbl.paragraphs[0].runs[0].font.size = Pt(8.5)
-        cell_lbl.width = Inches(2.2)
-
-        cell_val = row.cells[1]
-        cell_val.text = str(val)
-        set_cell_margins(cell_val, top=40, bottom=40, left=80, right=80)
-        cell_val.paragraphs[0].runs[0].font.size = Pt(8.5)
-        cell_val.width = Inches(4.8)
-
-    doc.add_page_break()
-
+    # Section helper functions
     def add_h1(text):
         p = doc.add_paragraph()
         p.paragraph_format.space_before = Pt(16)
         p.paragraph_format.space_after = Pt(8)
+        p.paragraph_format.keep_with_next = True
         run = p.add_run(text)
-        run.font.size = Pt(16)
+        run.font.size = Pt(14)
         run.font.bold = True
         run.font.color.rgb = RGBColor(27, 27, 27)
 
@@ -2782,8 +2746,9 @@ def generate_docx_tdm(path: Path, mapping: Any, context: BusinessContext) -> Non
         p = doc.add_paragraph()
         p.paragraph_format.space_before = Pt(12)
         p.paragraph_format.space_after = Pt(4)
+        p.paragraph_format.keep_with_next = True
         run = p.add_run(text)
-        run.font.size = Pt(13)
+        run.font.size = Pt(12)
         run.font.bold = True
         run.font.color.rgb = RGBColor(27, 27, 27)
 
@@ -2792,42 +2757,249 @@ def generate_docx_tdm(path: Path, mapping: Any, context: BusinessContext) -> Non
         p.paragraph_format.space_after = Pt(8)
         p.add_run(str(text))
 
-    add_h1("1. Document Organization - Log")
-    add_p(getattr(mapping.document_organization, "document_log", "N/A"))
-    add_h1("1. Document Organization - Related Ref")
-    add_p(getattr(mapping.document_organization, "related_document_reference", "N/A"))
+    def format_cell_header(cell, text):
+        cell.text = text
+        set_cell_shading(cell, "1B1B1B") # Dark header
+        p = cell.paragraphs[0]
+        p.alignment = 0
+        p.runs[0].font.bold = True
+        p.runs[0].font.size = Pt(9.5)
+        p.runs[0].font.color.rgb = RGBColor(255, 255, 255)
+        set_cell_margins(cell, top=80, bottom=80, left=100, right=100)
 
+    def format_cell_value(cell, text):
+        cell.text = str(text or "")
+        p = cell.paragraphs[0]
+        p.runs[0].font.size = Pt(9)
+        set_cell_margins(cell, top=60, bottom=60, left=100, right=100)
+
+    # 1. Document Control Table
+    add_h1("1. Document Control & Organization")
+    doc_org = getattr(mapping, "document_organization", None)
+    
+    org_fields = [
+        ("Document Version", getattr(doc_org, "document_version", "1.0")),
+        ("Generated Date", getattr(doc_org, "generated_date", "")),
+        ("Status", getattr(doc_org, "status", "draft").upper()),
+        ("Generated By", getattr(doc_org, "generated_by", "Analytics Transformation Copilot")),
+        ("Technical Designer", getattr(doc_org, "technical_designer", "AI Analytics Architect")),
+        ("Client Name", getattr(doc_org, "client_name", "")),
+        ("Engagement Name", getattr(doc_org, "engagement_name", "")),
+        ("Related Documents", getattr(doc_org, "related_documents", ""))
+    ]
+    
+    org_table = doc.add_table(rows=len(org_fields), cols=2)
+    org_table.style = 'Table Grid'
+    for idx, (label, val) in enumerate(org_fields):
+        row = org_table.rows[idx]
+        cell_lbl = row.cells[0]
+        cell_lbl.text = label
+        set_cell_shading(cell_lbl, "F0F0F0")
+        set_cell_margins(cell_lbl, top=40, bottom=40, left=80, right=80)
+        cell_lbl.paragraphs[0].runs[0].font.bold = True
+        cell_lbl.paragraphs[0].runs[0].font.size = Pt(9)
+        cell_lbl.width = Inches(2.2)
+
+        cell_val = row.cells[1]
+        cell_val.text = str(val)
+        set_cell_margins(cell_val, top=40, bottom=40, left=80, right=80)
+        cell_val.paragraphs[0].runs[0].font.size = Pt(9)
+        cell_val.width = Inches(4.8)
+
+    doc.add_page_break()
+    # 2. Object Summary
     add_h1("2. Object Summary")
-    add_p(getattr(mapping, "object_summary", "N/A"))
+    obj_summary_list = getattr(mapping, "object_summary", [])
+    if obj_summary_list:
+        obj_table = doc.add_table(rows=1, cols=6)
+        obj_table.style = 'Table Grid'
+        hdr_cells = obj_table.rows[0].cells
+        format_cell_header(hdr_cells[0], "Object Name")
+        format_cell_header(hdr_cells[1], "Short Description")
+        format_cell_header(hdr_cells[2], "Complexity")
+        format_cell_header(hdr_cells[3], "Business Process")
+        format_cell_header(hdr_cells[4], "Technology Stack")
+        format_cell_header(hdr_cells[5], "Primary Sources")
 
+        for item in obj_summary_list:
+            row_cells = obj_table.add_row().cells
+            format_cell_value(row_cells[0], getattr(item, "object_name", ""))
+            format_cell_value(row_cells[1], getattr(item, "short_description", ""))
+            format_cell_value(row_cells[2], getattr(item, "complexity", ""))
+            format_cell_value(row_cells[3], getattr(item, "business_process", ""))
+            format_cell_value(row_cells[4], getattr(item, "technology_stack", ""))
+            format_cell_value(row_cells[5], getattr(item, "primary_source_systems", ""))
+    else:
+        add_p("No object summaries defined.")
+
+    doc.add_page_break()
+    # 3. Technical Specifications
     add_h1("3. Technical Specifications")
-    tech_specs = getattr(mapping, "technical_specifications", None)
-    if tech_specs:
-        add_h2("3.1 Data Flow")
-        add_p(getattr(tech_specs, "data_flow", "N/A"))
-        add_h2("3.2 Data Models")
-        add_p(getattr(tech_specs, "data_models", "N/A"))
-        add_h2("3.3 Technical Details")
-        add_p(getattr(tech_specs, "technical_details", "N/A"))
-        add_h2("3.4 Currency Translation")
-        add_p(getattr(tech_specs, "currency_translation", "N/A"))
-        add_h2("3.5 Row Level Security")
-        add_p(getattr(tech_specs, "row_level_security", "N/A"))
 
-    add_h1("4. Data Load Frequency")
-    add_p(getattr(mapping, "data_load_frequency", "N/A"))
+    # 3.1 Technical Data Flow
+    add_h2("3.1 Technical Data Flow")
+    data_flows = getattr(mapping, "technical_data_flow", [])
+    if data_flows:
+        for flow in data_flows:
+            add_p(f"Description: {getattr(flow, 'description', '')}")
+            if getattr(flow, "diagram_mermaid", ""):
+                add_p("Flowchart Representation (Mermaid JS):")
+                add_p(getattr(flow, "diagram_mermaid", ""))
+    else:
+        add_p("No technical data flows defined.")
 
-    add_h1("5. Unit Test Results")
-    add_p(getattr(mapping, "unit_test_results", "N/A"))
+    doc.add_page_break()
+    # 3.2 Data Models
+    add_h2("3.2 Data Models")
+    models_list = getattr(mapping, "data_models", [])
+    if models_list:
+        models_table = doc.add_table(rows=1, cols=5)
+        models_table.style = 'Table Grid'
+        hdr_cells = models_table.rows[0].cells
+        format_cell_header(hdr_cells[0], "Model Name")
+        format_cell_header(hdr_cells[1], "Purpose")
+        format_cell_header(hdr_cells[2], "Source Tables")
+        format_cell_header(hdr_cells[3], "Type")
+        format_cell_header(hdr_cells[4], "Description")
 
-    add_h1("6. Glossary")
-    add_p(getattr(mapping, "glossary", "N/A"))
+        for m in models_list:
+            row_cells = models_table.add_row().cells
+            format_cell_value(row_cells[0], getattr(m, "name", ""))
+            format_cell_value(row_cells[1], getattr(m, "purpose", ""))
+            format_cell_value(row_cells[2], getattr(m, "source", ""))
+            format_cell_value(row_cells[3], getattr(m, "type", ""))
+            format_cell_value(row_cells[4], getattr(m, "description", ""))
+    else:
+        add_p("No data models defined.")
+
+    doc.add_page_break()
+    # 3.3 Technical Details & Mapping
+    add_h2("3.3 Technical Details & Mapping")
+    mappings_list = getattr(mapping, "technical_mappings", [])
+    if mappings_list:
+        mapping_table = doc.add_table(rows=1, cols=14)
+        mapping_table.style = 'Table Grid'
+        hdr_cells = mapping_table.rows[0].cells
+        format_cell_header(hdr_cells[0], "S.No.")
+        format_cell_header(hdr_cells[1], "View / Table")
+        format_cell_header(hdr_cells[2], "Source System")
+        format_cell_header(hdr_cells[3], "Database")
+        format_cell_header(hdr_cells[4], "Schema")
+        format_cell_header(hdr_cells[5], "Model Type")
+        format_cell_header(hdr_cells[6], "Table Type")
+        format_cell_header(hdr_cells[7], "Functional Area")
+        format_cell_header(hdr_cells[8], "Fields")
+        format_cell_header(hdr_cells[9], "Join Keys")
+        format_cell_header(hdr_cells[10], "Relationships")
+        format_cell_header(hdr_cells[11], "Transformation Logic")
+        format_cell_header(hdr_cells[12], "Output Dataset")
+        format_cell_header(hdr_cells[13], "Status")
+
+        for idx, item in enumerate(mappings_list):
+            row_cells = mapping_table.add_row().cells
+            format_cell_value(row_cells[0], getattr(item, "s_no", idx + 1))
+            format_cell_value(row_cells[1], getattr(item, "view_or_table_name", ""))
+            format_cell_value(row_cells[2], getattr(item, "source_system", ""))
+            format_cell_value(row_cells[3], getattr(item, "database", ""))
+            format_cell_value(row_cells[4], getattr(item, "schema_name", ""))
+            format_cell_value(row_cells[5], getattr(item, "model_type", ""))
+            format_cell_value(row_cells[6], getattr(item, "table_type", ""))
+            format_cell_value(row_cells[7], getattr(item, "functional_area", ""))
+            format_cell_value(row_cells[8], getattr(item, "required_fields", ""))
+            format_cell_value(row_cells[9], getattr(item, "join_keys", ""))
+            format_cell_value(row_cells[10], getattr(item, "relationships", ""))
+            format_cell_value(row_cells[11], getattr(item, "transformation_logic", ""))
+            format_cell_value(row_cells[12], getattr(item, "output_dataset", ""))
+            format_cell_value(row_cells[13], getattr(item, "status", ""))
+    else:
+        add_p("No technical mappings defined.")
+
+    doc.add_page_break()
+    # 3.4 Data Transformation Rules
+    add_h2("3.4 Data Transformation Rules")
+    t_rules = getattr(mapping, "transformation_rules", None)
+    if t_rules:
+        add_p(f"Aggregations: {getattr(t_rules, 'aggregations', 'N/A')}")
+        add_p(f"Derived Columns: {getattr(t_rules, 'derived_columns', 'N/A')}")
+        add_p(f"Calculated Fields: {getattr(t_rules, 'calculated_fields', 'N/A')}")
+        add_p(f"Business Filters: {getattr(t_rules, 'business_filters', 'N/A')}")
+        add_p(f"Currency Conversion: {getattr(t_rules, 'currency_conversion', 'N/A')}")
+        add_p(f"Unit Conversion: {getattr(t_rules, 'unit_conversion', 'N/A')}")
+    else:
+        add_p("No transformation rules defined.")
+
+    doc.add_page_break()
+    # 3.5 Security
+    add_h2("3.5 Security Recommendations")
+    sec = getattr(mapping, "security", None)
+    if sec:
+        add_p(f"Row-Level Security: {getattr(sec, 'row_level_security', 'N/A')}")
+        add_p(f"Object-Level Security: {getattr(sec, 'object_level_security', 'N/A')}")
+        add_p(f"Sensitive Fields & Masking: {getattr(sec, 'sensitive_fields', 'N/A')}")
+        add_p(f"Access Roles: {getattr(sec, 'access_roles', 'N/A')}")
+    else:
+        add_p("No security specifications defined.")
+
+    doc.add_page_break()
+    # 4. Data Load Strategy
+    add_h1("4. Data Load Strategy")
+    load_strategy = getattr(mapping, "data_load_strategy", None)
+    if load_strategy:
+        add_p(f"Load Frequency: {getattr(load_strategy, 'load_frequency', 'N/A')}")
+        add_p(f"Refresh Type: {getattr(load_strategy, 'refresh_type', 'N/A')}")
+        add_p(f"Estimated Volume: {getattr(load_strategy, 'estimated_volume', 'N/A')}")
+        add_p(f"Dependencies: {getattr(load_strategy, 'dependencies', 'N/A')}")
+        add_p(f"Scheduling Considerations: {getattr(load_strategy, 'scheduling_considerations', 'N/A')}")
+    else:
+        add_p("No data load strategy defined.")
+
+    doc.add_page_break()
+    # 5. Data Quality & Validation
+    add_h1("5. Data Quality & Validation")
+    dq = getattr(mapping, "data_quality_validation", None)
+    if dq:
+        add_p(f"Null Checks: {getattr(dq, 'null_checks', 'N/A')}")
+        add_p(f"Duplicate Checks: {getattr(dq, 'duplicate_checks', 'N/A')}")
+        add_p(f"Mandatory Field Checks: {getattr(dq, 'mandatory_field_checks', 'N/A')}")
+        add_p(f"Business Rule Validation: {getattr(dq, 'business_rule_validation', 'N/A')}")
+        add_p(f"KPI Validation Logic: {getattr(dq, 'kpi_validation_logic', 'N/A')}")
+    else:
+        add_p("No data quality specifications defined.")
+
+    doc.add_page_break()
+    # 6. Testing Strategy
+    add_h1("6. Testing Strategy")
+    ts = getattr(mapping, "testing_strategy", None)
+    if ts:
+        add_p(f"Unit Test Scenarios: {getattr(ts, 'unit_test_scenarios', 'N/A')}")
+        add_p(f"Integration Test Scenarios: {getattr(ts, 'integration_test_scenarios', 'N/A')}")
+        add_p(f"Validation Criteria: {getattr(ts, 'validation_criteria', 'N/A')}")
+    else:
+        add_p("No testing strategy defined.")
+
+    doc.add_page_break()
+    # 7. Glossary
+    add_h1("7. Glossary")
+    glossary_list = getattr(mapping, "glossary", [])
+    if glossary_list:
+        glossary_table = doc.add_table(rows=1, cols=2)
+        glossary_table.style = 'Table Grid'
+        hdr_cells = glossary_table.rows[0].cells
+        format_cell_header(hdr_cells[0], "Term")
+        format_cell_header(hdr_cells[1], "Definition")
+
+        for item in glossary_list:
+            row_cells = glossary_table.add_row().cells
+            format_cell_value(row_cells[0], getattr(item, "term", ""))
+            format_cell_value(row_cells[1], getattr(item, "definition", ""))
+    else:
+        add_p("No glossary items defined.")
 
     doc.save(path)
 
 
 def generate_pdf_tdm(path: Path, mapping: Any, context: BusinessContext, doc_name: str | None = None) -> None:
-    """Generates a technical data mapping PDF Document."""
+    """Generates a technical design document (TDD) PDF Document."""
     import datetime
     import re
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, KeepTogether
@@ -2836,7 +3008,7 @@ def generate_pdf_tdm(path: Path, mapping: Any, context: BusinessContext, doc_nam
     from reportlab.lib.pagesizes import letter
     from reportlab.lib.units import inch
     
-    pdf_title = "Technical Data Flow Mapping - v1.0"
+    pdf_title = "Technical Design Document (TDD)"
     if doc_name:
         title_temp = re.sub(r'\.pdf$', '', doc_name, flags=re.IGNORECASE)
         title_temp = re.sub(r'_v(\d+(\.\d+)*)', r' - v\1', title_temp)
@@ -2851,71 +3023,566 @@ def generate_pdf_tdm(path: Path, mapping: Any, context: BusinessContext, doc_nam
     
     title_style = ParagraphStyle('MainTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=22, leading=26, textColor=colors.HexColor("#1B1B1B"), alignment=0)
     sub_title_style = ParagraphStyle('SubTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=12, leading=16, textColor=colors.HexColor("#B49600"))
-    h1_style = ParagraphStyle('Heading1', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=16, leading=20, textColor=colors.HexColor("#1B1B1B"), spaceBefore=12, spaceAfter=12)
-    h2_style = ParagraphStyle('Heading2', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=13, leading=16, textColor=colors.HexColor("#1B1B1B"), spaceBefore=10, spaceAfter=8)
-    body_style = ParagraphStyle('BodyText', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=14, textColor=colors.HexColor("#333333"), spaceAfter=8)
-    tbl_label_style = ParagraphStyle('TblLabel', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor("#000000"))
-    tbl_value_style = ParagraphStyle('TblValue', parent=styles['Normal'], fontName='Helvetica', fontSize=9, textColor=colors.HexColor("#333333"))
+    h1_style = ParagraphStyle('Heading1', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=14, leading=18, textColor=colors.HexColor("#1B1B1B"), spaceBefore=14, spaceAfter=8, keepWithNext=True)
+    h2_style = ParagraphStyle('Heading2', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=colors.HexColor("#333333"), spaceBefore=10, spaceAfter=6, keepWithNext=True)
+    body_style = ParagraphStyle('BodyText', parent=styles['Normal'], fontName='Helvetica', fontSize=9.5, leading=13.5, textColor=colors.HexColor("#333333"), spaceAfter=6)
+    bold_body_style = ParagraphStyle('BoldBodyText', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9.5, leading=13.5, textColor=colors.HexColor("#1B1B1B"), spaceAfter=6)
+    
+    tbl_hdr_style = ParagraphStyle('TblHdr', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.HexColor("#FFFFFF"))
+    tbl_cell_style = ParagraphStyle('TblCell', parent=styles['Normal'], fontName='Helvetica', fontSize=7.5, leading=9.5, textColor=colors.HexColor("#333333"))
+    tbl_cell_bold = ParagraphStyle('TblCellBold', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=7.5, leading=9.5, textColor=colors.HexColor("#1B1B1B"))
 
     # Cover Page
-    story.append(Paragraph("KPI Advisory & Analytics", sub_title_style))
+    story.append(Paragraph("KPI Transformation & Analytics", sub_title_style))
     story.append(Paragraph(pdf_title, title_style))
     story.append(Spacer(1, 20))
-    story.append(Paragraph("A detailed blueprint translating functional metric specifications into engineering requirements, calculations, and data source mappings.", body_style))
+    story.append(Paragraph("A comprehensive technical design blueprint translating functional specifications, logical data mappings, schemas, security policies, and integrations into developer guidelines.", body_style))
     story.append(Spacer(1, 40))
     
-    # Metadata Table
-    story.append(Paragraph("Document Control & Metadata", h2_style))
+    # Document Control Table
+    story.append(Paragraph("Document Control & Organization", h2_style))
+    doc_org = getattr(mapping, "document_organization", None)
     meta_data = [
-        [Paragraph("Document Version", tbl_label_style), Paragraph("1.0", tbl_value_style)],
-        [Paragraph("Generated Date", tbl_label_style), Paragraph(updated_at_str, tbl_value_style)],
-        [Paragraph("Status", tbl_label_style), Paragraph((getattr(mapping, "status", "DRAFT") or "DRAFT").upper(), tbl_value_style)],
+        [Paragraph("Document Version", tbl_cell_bold), Paragraph(getattr(doc_org, "document_version", "1.0"), tbl_cell_style)],
+        [Paragraph("Generated Date", tbl_cell_bold), Paragraph(getattr(doc_org, "generated_date", updated_at_str), tbl_cell_style)],
+        [Paragraph("Status", tbl_cell_bold), Paragraph((getattr(doc_org, "status", "draft") or "draft").upper(), tbl_cell_style)],
+        [Paragraph("Generated By", tbl_cell_bold), Paragraph(getattr(doc_org, "generated_by", "Analytics Transformation Copilot"), tbl_cell_style)],
+        [Paragraph("Technical Designer", tbl_cell_bold), Paragraph(getattr(doc_org, "technical_designer", "AI Analytics Architect"), tbl_cell_style)],
+        [Paragraph("Client Name", tbl_cell_bold), Paragraph(getattr(doc_org, "client_name", ""), tbl_cell_style)],
+        [Paragraph("Engagement Name", tbl_cell_bold), Paragraph(getattr(doc_org, "engagement_name", ""), tbl_cell_style)],
+        [Paragraph("Related Documents", tbl_cell_bold), Paragraph(getattr(doc_org, "related_documents", ""), tbl_cell_style)],
     ]
     meta_table = Table(meta_data, colWidths=[2.2 * inch, 4.3 * inch])
     meta_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (0, -1), colors.HexColor("#F0F0F0")),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor("#333333")),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#E0E0E0")),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
         ('LEFTPADDING', (0, 0), (-1, -1), 8),
         ('RIGHTPADDING', (0, 0), (-1, -1), 8),
     ]))
     story.append(meta_table)
     story.append(PageBreak())
 
-    def add_section(title, content):
+    # Section helper
+    def add_section_p(title, content):
         story.append(Paragraph(title, h1_style))
-        if content:
-            story.append(Paragraph(str(content).replace("\n", "<br/>"), body_style))
-        else:
-            story.append(Paragraph("N/A", body_style))
+        story.append(Paragraph(str(content or "N/A"), body_style))
+        story.append(Spacer(1, 10))
+
+    code_style = ParagraphStyle('CodeBlock', parent=styles['Normal'], fontName='Courier', fontSize=7.5, leading=10, textColor=colors.HexColor("#FFE600"), backColor=colors.HexColor("#1A1A1A"), borderPadding=6, borderWidth=0.5, borderColor=colors.HexColor("#333333"), spaceAfter=10)
+
+    # 2. Object Summary
+    story.append(PageBreak())
+    story.append(Paragraph("2. Object Summary", h1_style))
+    story.append(Paragraph("Implementation inventory of target facts, dimensions, and reporting views:", body_style))
+    story.append(Spacer(1, 4))
+    obj_list = getattr(mapping, "object_summary", [])
+    if obj_list:
+        hdr = [
+            Paragraph("Object Name", tbl_hdr_style),
+            Paragraph("Type", tbl_hdr_style),
+            Paragraph("Process", tbl_hdr_style),
+            Paragraph("Target Layer", tbl_hdr_style),
+            Paragraph("Database", tbl_hdr_style),
+            Paragraph("Complexity", tbl_hdr_style),
+            Paragraph("Status", tbl_hdr_style)
+        ]
+        rows = [hdr]
+        for obj in obj_list:
+            rows.append([
+                Paragraph(getattr(obj, "object_name", ""), tbl_cell_bold),
+                Paragraph(getattr(obj, "object_type", "Fact"), tbl_cell_style),
+                Paragraph(getattr(obj, "business_process", "N/A"), tbl_cell_style),
+                Paragraph(getattr(obj, "target_layer", "Gold"), tbl_cell_style),
+                Paragraph(getattr(obj, "database", "Snowflake"), tbl_cell_style),
+                Paragraph(getattr(obj, "complexity", "Medium"), tbl_cell_style),
+                Paragraph(getattr(obj, "status", "TBC"), tbl_cell_style)
+            ])
+        obj_table = Table(rows, colWidths=[1.6 * inch, 0.7 * inch, 1.1 * inch, 0.8 * inch, 0.9 * inch, 0.8 * inch, 0.6 * inch])
+        obj_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1B1B1B")),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ]))
+        story.append(obj_table)
+    else:
+        story.append(Paragraph("No object summaries defined.", body_style))
+    story.append(Spacer(1, 15))
+
+    # 3. Technical Specifications
+    story.append(PageBreak())
+    story.append(Paragraph("3. Technical Specifications", h1_style))
+
+    # 3.1 Technical Data Flow
+    story.append(Paragraph("3.1 Technical Data Flow", h2_style))
+    data_flows = getattr(mapping, "technical_data_flow", [])
+    if data_flows:
+        for flow in data_flows:
+            story.append(Paragraph(getattr(flow, "description", ""), body_style))
+            diagram_ascii = getattr(flow, "diagram_ascii", "")
+            if diagram_ascii:
+                story.append(Paragraph("Architecture Pipeline Flow:", bold_body_style))
+                story.append(Paragraph(diagram_ascii.replace("\n", "<br/>"), code_style))
+            elif getattr(flow, "diagram_mermaid", ""):
+                story.append(Paragraph("Pipeline Mermaid Definition:", bold_body_style))
+                story.append(Paragraph(getattr(flow, "diagram_mermaid", "").replace("\n", "<br/>"), code_style))
+    else:
+        story.append(Paragraph("No technical data flows defined.", body_style))
+    story.append(Spacer(1, 10))
+
+    # 3.2 Data Models
+    story.append(PageBreak())
+    story.append(Paragraph("3.2 Data Models Specification", h2_style))
+    models_list = getattr(mapping, "data_models", [])
+    if models_list:
+        hdr = [
+            Paragraph("Model Name", tbl_hdr_style),
+            Paragraph("Type", tbl_hdr_style),
+            Paragraph("Grain / PK", tbl_hdr_style),
+            Paragraph("Measures / Dims", tbl_hdr_style),
+            Paragraph("Partition / SCD", tbl_hdr_style)
+        ]
+        rows = [hdr]
+        for m in models_list:
+            rows.append([
+                Paragraph(f"<b>{getattr(m, 'name', '')}</b><br/>{getattr(m, 'purpose', '')}", tbl_cell_style),
+                Paragraph(getattr(m, "type", "Fact"), tbl_cell_style),
+                Paragraph(f"Grain: {getattr(m, 'grain', 'N/A')}<br/>PK: {getattr(m, 'primary_key', 'N/A')}", tbl_cell_style),
+                Paragraph(f"Meas: {getattr(m, 'measures', 'N/A')}<br/>Dims: {getattr(m, 'dimensions', 'N/A')}", tbl_cell_style),
+                Paragraph(f"Part: {getattr(m, 'partition_strategy', 'N/A')}<br/>SCD: {getattr(m, 'scd_type', 'N/A')}", tbl_cell_style)
+            ])
+        models_table = Table(rows, colWidths=[1.6 * inch, 0.8 * inch, 1.4 * inch, 1.4 * inch, 1.3 * inch])
+        models_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1B1B1B")),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ]))
+        story.append(models_table)
+    else:
+        story.append(Paragraph("No data models defined.", body_style))
+    story.append(Spacer(1, 15))
+
+    # 3.3 Physical Table Definitions
+    physical_tables = getattr(mapping, "physical_table_definitions", [])
+    if physical_tables:
+        story.append(PageBreak())
+        story.append(Paragraph("3.3 Physical Table Definitions", h2_style))
+        for tbl in physical_tables:
+            tbl_name = getattr(tbl, "table_name", "")
+            story.append(Paragraph(f"<b>Table Schema:</b> {tbl_name}", bold_body_style))
+            hdr = [
+                Paragraph("Column Name", tbl_hdr_style),
+                Paragraph("Data Type", tbl_hdr_style),
+                Paragraph("Null", tbl_hdr_style),
+                Paragraph("PK", tbl_hdr_style),
+                Paragraph("FK", tbl_hdr_style),
+                Paragraph("Description", tbl_hdr_style),
+                Paragraph("Source Field", tbl_hdr_style)
+            ]
+            rows = [hdr]
+            for col in getattr(tbl, "columns", []):
+                rows.append([
+                    Paragraph(getattr(col, "column_name", ""), tbl_cell_bold),
+                    Paragraph(getattr(col, "data_type", ""), tbl_cell_style),
+                    Paragraph(getattr(col, "nullable", "YES"), tbl_cell_style),
+                    Paragraph("Yes" if getattr(col, "primary_key", "") else "", tbl_cell_style),
+                    Paragraph("Yes" if getattr(col, "foreign_key", "") else "", tbl_cell_style),
+                    Paragraph(getattr(col, "description", ""), tbl_cell_style),
+                    Paragraph(getattr(col, "source_field", ""), tbl_cell_style)
+                ])
+            tbl_table = Table(rows, colWidths=[1.1 * inch, 0.8 * inch, 0.4 * inch, 0.3 * inch, 0.3 * inch, 2.0 * inch, 1.6 * inch])
+            tbl_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1B1B1B")),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ]))
+            story.append(tbl_table)
+            story.append(Spacer(1, 10))
+
+    # 3.4 Field-Level Source Mappings
+    field_mappings = getattr(mapping, "field_level_mappings", [])
+    if field_mappings:
+        story.append(PageBreak())
+        story.append(Paragraph("3.4 Field-Level Source Mappings", h2_style))
+        hdr = [
+            Paragraph("Source System", tbl_hdr_style),
+            Paragraph("Source Table", tbl_hdr_style),
+            Paragraph("Source Field", tbl_hdr_style),
+            Paragraph("Target Table", tbl_hdr_style),
+            Paragraph("Target Field", tbl_hdr_style),
+            Paragraph("Transformation", tbl_hdr_style)
+        ]
+        rows = [hdr]
+        for flm in field_mappings:
+            rows.append([
+                Paragraph(getattr(flm, "source_system", ""), tbl_cell_style),
+                Paragraph(getattr(flm, "source_table", ""), tbl_cell_style),
+                Paragraph(getattr(flm, "source_field", ""), tbl_cell_style),
+                Paragraph(getattr(flm, "target_table", ""), tbl_cell_bold),
+                Paragraph(getattr(flm, "target_field", ""), tbl_cell_bold),
+                Paragraph(getattr(flm, "transformation", ""), tbl_cell_style)
+            ])
+        flm_table = Table(rows, colWidths=[1.0 * inch, 0.9 * inch, 0.9 * inch, 1.1 * inch, 1.1 * inch, 1.5 * inch])
+        flm_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1B1B1B")),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        story.append(flm_table)
         story.append(Spacer(1, 15))
 
-    add_section("1. Document Organization - Log", getattr(mapping.document_organization, "document_log", ""))
-    add_section("1. Document Organization - Related Ref", getattr(mapping.document_organization, "related_document_reference", ""))
-    add_section("2. Object Summary", getattr(mapping, "object_summary", ""))
-    
-    story.append(Paragraph("3. Technical Specifications", h1_style))
-    tech_specs = getattr(mapping, "technical_specifications", None)
-    if tech_specs:
-        story.append(Paragraph("3.1 Data Flow", h2_style))
-        story.append(Paragraph(str(getattr(tech_specs, "data_flow", "")).replace("\n", "<br/>"), body_style))
-        story.append(Paragraph("3.2 Data Models", h2_style))
-        story.append(Paragraph(str(getattr(tech_specs, "data_models", "")).replace("\n", "<br/>"), body_style))
-        story.append(Paragraph("3.3 Technical Details", h2_style))
-        story.append(Paragraph(str(getattr(tech_specs, "technical_details", "")).replace("\n", "<br/>"), body_style))
-        story.append(Paragraph("3.4 Currency Translation", h2_style))
-        story.append(Paragraph(str(getattr(tech_specs, "currency_translation", "")).replace("\n", "<br/>"), body_style))
-        story.append(Paragraph("3.5 Row Level Security", h2_style))
-        story.append(Paragraph(str(getattr(tech_specs, "row_level_security", "")).replace("\n", "<br/>"), body_style))
+    # 3.5 Data Transformation Rules
+    story.append(PageBreak())
+    story.append(Paragraph("3.5 Data Transformation Rules", h2_style))
+    t_rules_list = getattr(mapping, "transformation_rules_list", [])
+    if t_rules_list:
+        for rule in t_rules_list:
+            obj_name = getattr(rule, "object_name", "")
+            story.append(Paragraph(f"<b>Pipeline Object:</b> {obj_name}", bold_body_style))
+            hdr = [
+                Paragraph("Step", tbl_hdr_style),
+                Paragraph("Operation", tbl_hdr_style),
+                Paragraph("Description", tbl_hdr_style)
+            ]
+            rows = [hdr]
+            for step in getattr(rule, "steps", []):
+                rows.append([
+                    Paragraph(str(getattr(step, "step_number", 1)), tbl_cell_style),
+                    Paragraph(getattr(step, "operation", ""), tbl_cell_bold),
+                    Paragraph(getattr(step, "description", ""), tbl_cell_style)
+                ])
+            step_table = Table(rows, colWidths=[0.5 * inch, 1.5 * inch, 4.5 * inch])
+            step_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1B1B1B")),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ]))
+            story.append(step_table)
+            story.append(Spacer(1, 10))
+    else:
+        t_rules = getattr(mapping, "transformation_rules", None)
+        if t_rules:
+            story.append(Paragraph(f"<b>Aggregations:</b> {getattr(t_rules, 'aggregations', 'N/A')}", body_style))
+            story.append(Paragraph(f"<b>Derived Columns:</b> {getattr(t_rules, 'derived_columns', 'N/A')}", body_style))
+            story.append(Paragraph(f"<b>Calculated Fields:</b> {getattr(t_rules, 'calculated_fields', 'N/A')}", body_style))
+            story.append(Paragraph(f"<b>Business Filters:</b> {getattr(t_rules, 'business_filters', 'N/A')}", body_style))
+            story.append(Paragraph(f"<b>Currency Conversion:</b> {getattr(t_rules, 'currency_conversion', 'N/A')}", body_style))
+            story.append(Paragraph(f"<b>Unit Conversion:</b> {getattr(t_rules, 'unit_conversion', 'N/A')}", body_style))
+        else:
+            story.append(Paragraph("No transformation rules defined.", body_style))
     story.append(Spacer(1, 15))
-    
-    add_section("4. Data Load Frequency", getattr(mapping, "data_load_frequency", ""))
-    add_section("5. Unit Test Results", getattr(mapping, "unit_test_results", ""))
-    add_section("6. Glossary", getattr(mapping, "glossary", ""))
+
+    # 3.6 SQL / Pseudo-SQL Guidance
+    kpi_sqls = getattr(mapping, "kpi_sql_guidance", [])
+    if kpi_sqls:
+        story.append(PageBreak())
+        story.append(Paragraph("3.6 SQL & Logic Snippet Guidance", h2_style))
+        for sql in kpi_sqls:
+            story.append(Paragraph(f"<b>KPI Target:</b> {getattr(sql, 'kpi_name', '')}", bold_body_style))
+            snippet = getattr(sql, "sql_snippet", "")
+            story.append(Paragraph(snippet.replace("\n", "<br/>").replace(" ", "&nbsp;"), code_style))
+            story.append(Spacer(1, 8))
+
+    # 3.7 Database Relationship Diagram
+    db_diags = getattr(mapping, "db_relationship_diagrams", [])
+    if db_diags:
+        story.append(PageBreak())
+        story.append(Paragraph("3.7 Database Entity-Relationship Diagram", h2_style))
+        for diag in db_diags:
+            ascii_diag = getattr(diag, "ascii_diagram", "")
+            story.append(Paragraph(ascii_diag.replace("\n", "<br/>").replace(" ", "&nbsp;"), code_style))
+            story.append(Paragraph(getattr(diag, "description", ""), body_style))
+            story.append(Spacer(1, 10))
+
+    # 3.8 Data Lineage Diagram
+    lin_diags = getattr(mapping, "data_lineage_diagrams", [])
+    if lin_diags:
+        story.append(PageBreak())
+        story.append(Paragraph("3.8 Source-to-KPI Data Lineage Diagram", h2_style))
+        for diag in lin_diags:
+            ascii_lin = getattr(diag, "ascii_lineage", "")
+            story.append(Paragraph(ascii_lin.replace("\n", "<br/>").replace(" ", "&nbsp;"), code_style))
+            story.append(Paragraph(getattr(diag, "description", ""), body_style))
+            story.append(Spacer(1, 10))
+
+    # 3.9 Technical Details & Mapping
+    story.append(PageBreak())
+    story.append(Paragraph("3.9 Technical Details & Mapping", h2_style))
+    mappings_list = getattr(mapping, "technical_mappings", [])
+    if mappings_list:
+        hdr = [
+            Paragraph("S.No.", tbl_hdr_style),
+            Paragraph("Src System/Table", tbl_hdr_style),
+            Paragraph("Target Table", tbl_hdr_style),
+            Paragraph("Join Keys", tbl_hdr_style),
+            Paragraph("Partition", tbl_hdr_style),
+            Paragraph("Load Type", tbl_hdr_style),
+            Paragraph("Output Dataset", tbl_hdr_style),
+            Paragraph("Status", tbl_hdr_style)
+        ]
+        rows = [hdr]
+        for idx, item in enumerate(mappings_list):
+            src_table = getattr(item, "source_table", getattr(item, "view_or_table_name", ""))
+            tgt_table = getattr(item, "target_table", getattr(item, "output_dataset", ""))
+            rows.append([
+                Paragraph(str(getattr(item, "s_no", idx + 1)), tbl_cell_style),
+                Paragraph(f"Sys: {getattr(item, 'source_system', '')}<br/>Tbl: {src_table}", tbl_cell_style),
+                Paragraph(tgt_table, tbl_cell_bold),
+                Paragraph(getattr(item, "join_keys", ""), tbl_cell_style),
+                Paragraph(getattr(item, "partition_key", "N/A"), tbl_cell_style),
+                Paragraph(getattr(item, "load_type", getattr(item, "model_type", "Incremental")), tbl_cell_style),
+                Paragraph(getattr(item, "output_dataset", ""), tbl_cell_style),
+                Paragraph(getattr(item, "status", ""), tbl_cell_style)
+            ])
+        mapping_table = Table(rows, colWidths=[0.3 * inch, 1.2 * inch, 1.2 * inch, 1.1 * inch, 0.7 * inch, 0.8 * inch, 0.7 * inch, 0.5 * inch])
+        mapping_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1B1B1B")),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        story.append(mapping_table)
+    else:
+        story.append(Paragraph("No technical mappings defined.", body_style))
+    story.append(Spacer(1, 15))
+
+    # 3.10 Security Section
+    story.append(PageBreak())
+    story.append(Paragraph("3.10 Security Access Grid", h2_style))
+    sec_access = getattr(mapping, "security_access_grid", [])
+    if sec_access:
+        hdr = [
+            Paragraph("Role", tbl_hdr_style),
+            Paragraph("Accessible Tables / Layers", tbl_hdr_style),
+            Paragraph("Permission", tbl_hdr_style),
+            Paragraph("Data Masking", tbl_hdr_style)
+        ]
+        rows = [hdr]
+        for sec in sec_access:
+            rows.append([
+                Paragraph(getattr(sec, "role", ""), tbl_cell_bold),
+                Paragraph(getattr(sec, "accessible_tables", ""), tbl_cell_style),
+                Paragraph(getattr(sec, "permission", ""), tbl_cell_style),
+                Paragraph(getattr(sec, "masking", ""), tbl_cell_style)
+            ])
+        sec_table = Table(rows, colWidths=[1.5 * inch, 2.5 * inch, 1.2 * inch, 1.3 * inch])
+        sec_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1B1B1B")),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ]))
+        story.append(sec_table)
+    else:
+        sec = getattr(mapping, "security", None)
+        if sec:
+            story.append(Paragraph(f"<b>Row-Level Security:</b> {getattr(sec, 'row_level_security', 'N/A')}", body_style))
+            story.append(Paragraph(f"<b>Object-Level Security:</b> {getattr(sec, 'object_level_security', 'N/A')}", body_style))
+            story.append(Paragraph(f"<b>Sensitive Fields:</b> {getattr(sec, 'sensitive_fields', 'N/A')}", body_style))
+            story.append(Paragraph(f"<b>Access Roles:</b> {getattr(sec, 'access_roles', 'N/A')}", body_style))
+        else:
+            story.append(Paragraph("No security specifications defined.", body_style))
+    story.append(Spacer(1, 15))
+
+    # 4. Data Load Strategy
+    story.append(PageBreak())
+    story.append(Paragraph("4. Data Load Strategy", h1_style))
+    load_strategy = getattr(mapping, "data_load_strategy", None)
+    if load_strategy:
+        story.append(Paragraph(f"<b>Load Frequency:</b> {getattr(load_strategy, 'load_frequency', 'N/A')}", body_style))
+        story.append(Paragraph(f"<b>Refresh Type:</b> {getattr(load_strategy, 'refresh_type', 'N/A')}", body_style))
+        story.append(Paragraph(f"<b>Estimated Volume:</b> {getattr(load_strategy, 'estimated_volume', 'N/A')}", body_style))
+        story.append(Paragraph(f"<b>Dependencies:</b> {getattr(load_strategy, 'dependencies', 'N/A')}", body_style))
+        story.append(Paragraph(f"<b>Scheduling Considerations:</b> {getattr(load_strategy, 'scheduling_considerations', 'N/A')}", body_style))
+    else:
+        story.append(Paragraph("No data load strategy defined.", body_style))
+    story.append(Spacer(1, 15))
+
+    # 5. Data Quality Validation Matrix
+    story.append(PageBreak())
+    story.append(Paragraph("5. Data Quality Validation Matrix", h1_style))
+    dq_matrix = getattr(mapping, "data_quality_validation_matrix", [])
+    if dq_matrix:
+        hdr = [
+            Paragraph("Validation Rule", tbl_hdr_style),
+            Paragraph("Table Name", tbl_hdr_style),
+            Paragraph("Severity", tbl_hdr_style),
+            Paragraph("Enforcement Action", tbl_hdr_style)
+        ]
+        rows = [hdr]
+        for dq in dq_matrix:
+            rows.append([
+                Paragraph(getattr(dq, "validation_rule", ""), tbl_cell_bold),
+                Paragraph(getattr(dq, "table_name", ""), tbl_cell_style),
+                Paragraph(getattr(dq, "severity", "Medium"), tbl_cell_style),
+                Paragraph(getattr(dq, "action", ""), tbl_cell_style)
+            ])
+        dq_table = Table(rows, colWidths=[1.8 * inch, 1.4 * inch, 0.8 * inch, 2.5 * inch])
+        dq_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1B1B1B")),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ]))
+        story.append(dq_table)
+    else:
+        dq = getattr(mapping, "data_quality_validation", None)
+        if dq:
+            story.append(Paragraph(f"<b>Null Checks:</b> {getattr(dq, 'null_checks', 'N/A')}", body_style))
+            story.append(Paragraph(f"<b>Duplicate Checks:</b> {getattr(dq, 'duplicate_checks', 'N/A')}", body_style))
+            story.append(Paragraph(f"<b>Mandatory Field Checks:</b> {getattr(dq, 'mandatory_field_checks', 'N/A')}", body_style))
+            story.append(Paragraph(f"<b>Business Rule Validation:</b> {getattr(dq, 'business_rule_validation', 'N/A')}", body_style))
+            story.append(Paragraph(f"<b>KPI Validation Logic:</b> {getattr(dq, 'kpi_validation_logic', 'N/A')}", body_style))
+        else:
+            story.append(Paragraph("No data quality specifications defined.", body_style))
+    story.append(Spacer(1, 15))
+
+    # 6. Testing Strategy
+    story.append(PageBreak())
+    story.append(Paragraph("6. Testing Strategy & Scenarios", h1_style))
+    tc_matrix = getattr(mapping, "testing_strategy_matrix", [])
+    if tc_matrix:
+        hdr = [
+            Paragraph("Test ID", tbl_hdr_style),
+            Paragraph("Scenario", tbl_hdr_style),
+            Paragraph("Expected Result", tbl_hdr_style),
+            Paragraph("Priority", tbl_hdr_style),
+            Paragraph("Status", tbl_hdr_style)
+        ]
+        rows = [hdr]
+        for tc in tc_matrix:
+            rows.append([
+                Paragraph(getattr(tc, "test_id", ""), tbl_cell_bold),
+                Paragraph(getattr(tc, "scenario", ""), tbl_cell_style),
+                Paragraph(getattr(tc, "expected_result", ""), tbl_cell_style),
+                Paragraph(getattr(tc, "priority", "Medium"), tbl_cell_style),
+                Paragraph(getattr(tc, "status", "Pending"), tbl_cell_style)
+            ])
+        tc_table = Table(rows, colWidths=[0.8 * inch, 2.0 * inch, 2.2 * inch, 0.8 * inch, 0.7 * inch])
+        tc_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1B1B1B")),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ]))
+        story.append(tc_table)
+    else:
+        ts = getattr(mapping, "testing_strategy", None)
+        if ts:
+            story.append(Paragraph(f"<b>Unit Test Scenarios:</b> {getattr(ts, 'unit_test_scenarios', 'N/A')}", body_style))
+            story.append(Paragraph(f"<b>Integration Test Scenarios:</b> {getattr(ts, 'integration_test_scenarios', 'N/A')}", body_style))
+            story.append(Paragraph(f"<b>Validation Criteria:</b> {getattr(ts, 'validation_criteria', 'N/A')}", body_style))
+        else:
+            story.append(Paragraph("No testing strategy defined.", body_style))
+    story.append(Spacer(1, 15))
+
+    # Data Dictionary
+    dict_list = getattr(mapping, "data_dictionary", [])
+    if dict_list:
+        story.append(PageBreak())
+        story.append(Paragraph("7. Data Dictionary", h1_style))
+        hdr = [
+            Paragraph("Field Name", tbl_hdr_style),
+            Paragraph("Definition", tbl_hdr_style),
+            Paragraph("Data Type", tbl_hdr_style),
+            Paragraph("Business Meaning", tbl_hdr_style),
+            Paragraph("Example Value", tbl_hdr_style)
+        ]
+        rows = [hdr]
+        for item in dict_list:
+            rows.append([
+                Paragraph(getattr(item, "field_name", ""), tbl_cell_bold),
+                Paragraph(getattr(item, "definition", ""), tbl_cell_style),
+                Paragraph(getattr(item, "data_type", ""), tbl_cell_style),
+                Paragraph(getattr(item, "business_meaning", ""), tbl_cell_style),
+                Paragraph(getattr(item, "example_value", ""), tbl_cell_style)
+            ])
+        dict_table = Table(rows, colWidths=[1.1 * inch, 1.8 * inch, 0.9 * inch, 1.7 * inch, 1.0 * inch])
+        dict_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1B1B1B")),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ]))
+        story.append(dict_table)
+        story.append(Spacer(1, 15))
+
+    # KPI Traceability Matrix
+    tm_list = getattr(mapping, "traceability_matrix", [])
+    if tm_list:
+        story.append(PageBreak())
+        story.append(Paragraph("8. KPI-to-Table Traceability Matrix", h1_style))
+        hdr = [
+            Paragraph("KPI", tbl_hdr_style),
+            Paragraph("Fact Table", tbl_hdr_style),
+            Paragraph("Dimension Tables", tbl_hdr_style),
+            Paragraph("Source Systems", tbl_hdr_style),
+            Paragraph("Dashboard", tbl_hdr_style)
+        ]
+        rows = [hdr]
+        for tm in tm_list:
+            rows.append([
+                Paragraph(getattr(tm, "kpi", ""), tbl_cell_bold),
+                Paragraph(getattr(tm, "fact_table", ""), tbl_cell_style),
+                Paragraph(getattr(tm, "dimension_tables", ""), tbl_cell_style),
+                Paragraph(getattr(tm, "source_systems", ""), tbl_cell_style),
+                Paragraph(getattr(tm, "dashboard", ""), tbl_cell_style)
+            ])
+        tm_table = Table(rows, colWidths=[1.3 * inch, 1.3 * inch, 1.5 * inch, 1.2 * inch, 1.2 * inch])
+        tm_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1B1B1B")),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ]))
+        story.append(tm_table)
+        story.append(Spacer(1, 15))
+
+    # 9. Glossary
+    story.append(PageBreak())
+    story.append(Paragraph("9. Glossary", h1_style))
+    glossary_list = getattr(mapping, "glossary", [])
+    if glossary_list:
+        hdr = [
+            Paragraph("Term", tbl_hdr_style),
+            Paragraph("Definition", tbl_hdr_style)
+        ]
+        rows = [hdr]
+        for gloss in glossary_list:
+            rows.append([
+                Paragraph(getattr(gloss, "term", ""), tbl_cell_bold),
+                Paragraph(getattr(gloss, "definition", ""), tbl_cell_style)
+            ])
+        gloss_table = Table(rows, colWidths=[2.0 * inch, 4.5 * inch])
+        gloss_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1B1B1B")),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        story.append(gloss_table)
+    else:
+        story.append(Paragraph("No glossary terms defined.", body_style))
 
     doc = SimpleDocTemplate(
         str(path),
@@ -2926,7 +3593,7 @@ def generate_pdf_tdm(path: Path, mapping: Any, context: BusinessContext, doc_nam
         bottomMargin=54,
         title=pdf_title,
         author="KPI Advisory & Analytics",
-        subject="Technical Data Flow Mapping Document",
+        subject="Technical Design Document (TDD)",
         creator="KPI Advisory & Analytics Copilot"
     )
     doc.build(story, canvasmaker=NumberedCanvas)

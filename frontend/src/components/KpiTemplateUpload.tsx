@@ -122,14 +122,14 @@ export function KpiTemplateUpload({ onChange }: { onChange: () => void }) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
         {/* Upload Zone */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="space-y-4 flex flex-col justify-between h-full">
           <div
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-sm p-8 flex flex-col items-center justify-center gap-3 transition-colors cursor-pointer relative ${
+            className={`border-2 border-dashed rounded-sm p-8 flex flex-col items-center justify-center gap-3 transition-colors cursor-pointer relative h-full min-h-[180px] ${
               isDragOver
                 ? "border-[#FFE600] bg-[#FFE600]/5"
                 : "border-[#303030] hover:border-[#555] bg-[#0d0d0d]"
@@ -189,7 +189,7 @@ export function KpiTemplateUpload({ onChange }: { onChange: () => void }) {
         </div>
 
         {/* Sidebar Controls */}
-        <div className="border border-[#303030] bg-[#141414] p-5 rounded-sm flex flex-col justify-between h-fit space-y-4">
+        <div className="border border-[#303030] bg-[#141414] p-5 rounded-sm flex flex-col justify-between h-full min-h-[180px] space-y-4">
           <div className="space-y-2">
             <h4 className="text-xs font-bold uppercase tracking-wider text-[#F5F5F5]">
               Bulk Upload Actions

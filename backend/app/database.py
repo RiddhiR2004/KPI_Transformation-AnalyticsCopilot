@@ -178,8 +178,11 @@ class TechnicalDataMappingDB(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     engagement_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    items: Mapped[str] = mapped_column(Text, default="[]")  # JSON string
+    items: Mapped[str] = mapped_column(Text, default="[]")  # JSON string representing backwards compatible view
     executive_summary: Mapped[str] = mapped_column(Text, default="")
+    draft_items: Mapped[str] = mapped_column(Text, default="{}")  # JSON string of draft TDD
+    approved_items: Mapped[str] = mapped_column(Text, default="{}")  # JSON string of approved TDD
+    version: Mapped[int] = mapped_column(Integer, default=1)
     status: Mapped[str] = mapped_column(String(50), default="draft")  # "draft" or "approved"
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
@@ -431,6 +434,18 @@ def init_db() -> None:
             for col_name, col_def in new_cols_fs:
                 if col_name not in existing_cols_fs:
                     conn.exec_driver_sql(f"ALTER TABLE functional_specification ADD COLUMN {col_name} {col_def}")
+
+            # technical_data_mapping migration
+            cursor_tdm = conn.exec_driver_sql("PRAGMA table_info(technical_data_mapping)")
+            existing_cols_tdm = [row[1] for row in cursor_tdm.fetchall()]
+            new_cols_tdm = [
+                ("draft_items", "TEXT DEFAULT '{}'"),
+                ("approved_items", "TEXT DEFAULT '{}'"),
+                ("version", "INTEGER DEFAULT 1")
+            ]
+            for col_name, col_def in new_cols_tdm:
+                if col_name not in existing_cols_tdm:
+                    conn.exec_driver_sql(f"ALTER TABLE technical_data_mapping ADD COLUMN {col_name} {col_def}")
             
             # engagements table migration — add table if it doesn't exist
             conn.exec_driver_sql(
