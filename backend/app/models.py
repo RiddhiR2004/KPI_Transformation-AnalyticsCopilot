@@ -135,6 +135,7 @@ class KPI(BaseModel):
     industry_tags: list[str] = Field(default_factory=list)
     recommendation_score: int = 100
     status: KPIStatus = KPIStatus.draft
+    source: str = "ai_generated"  # "ai_generated", "excel_import", "document_parsed", "manual"
     classification: str = "Critical to Progress"
     classification_confidence: float = 1.0
     classification_source: str = "AI"

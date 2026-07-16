@@ -76,3 +76,256 @@ select option {
   background-color: #111111;
 }
 
+/* ═══════════════════════════════════════════════════
+   SAP SAC Dashboard Styles
+   ═══════════════════════════════════════════════════ */
+
+/* Animated count-up number reveal */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Slide-in from right for insight panel */
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Fade in */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Subtle glow pulse for active indicators */
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 4px rgba(255, 230, 0, 0.2); }
+  50%      { box-shadow: 0 0 12px rgba(255, 230, 0, 0.5); }
+}
+
+/* Shimmer effect for loading states */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Gauge fill animation */
+@keyframes gaugeFill {
+  from { stroke-dashoffset: 283; }
+}
+
+.sac-count-up {
+  animation: countUp 0.6s ease-out both;
+}
+
+.sac-fade-in {
+  animation: fadeIn 0.4s ease-out both;
+}
+
+.sac-slide-in {
+  animation: slideInRight 0.35s ease-out both;
+}
+
+/* SAC Widget Panel */
+.sac-widget {
+  background: #1B1B1B;
+  border: 1px solid #303030;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.sac-widget:hover {
+  border-color: #444;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+}
+
+/* SAC Widget Header */
+.sac-widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #252525;
+  background: linear-gradient(180deg, #1f1f1f 0%, #1B1B1B 100%);
+}
+
+/* SAC Tooltip */
+.sac-tooltip {
+  position: absolute;
+  pointer-events: none;
+  z-index: 100;
+  background: rgba(20, 20, 20, 0.96);
+  border: 1px solid #404040;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: #F5F5F5;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+  animation: fadeIn 0.15s ease-out;
+}
+
+/* SAC Tab Bar */
+.sac-tab {
+  position: relative;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #888;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s;
+  letter-spacing: 0.02em;
+}
+.sac-tab:hover {
+  color: #F5F5F5;
+}
+.sac-tab.active {
+  color: #FFE600;
+}
+.sac-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #FFE600;
+  border-radius: 1px 1px 0 0;
+}
+
+/* Custom scrollbar for dashboard panels */
+.sac-scroll::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.sac-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sac-scroll::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 3px;
+}
+.sac-scroll::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* SAC Insight Card */
+.sac-insight-card {
+  background: linear-gradient(135deg, rgba(255,230,0,0.04) 0%, rgba(255,230,0,0.01) 100%);
+  border: 1px solid rgba(255,230,0,0.12);
+  border-radius: 4px;
+  padding: 12px;
+  transition: border-color 0.2s;
+}
+.sac-insight-card:hover {
+  border-color: rgba(255,230,0,0.3);
+}
+
+/* Planning mode editable cell */
+.sac-editable-cell {
+  background: rgba(255,230,0,0.05);
+  border: 1px dashed rgba(255,230,0,0.25);
+  border-radius: 2px;
+  padding: 4px 8px;
+  color: #FFE600;
+  font-weight: 600;
+  text-align: right;
+  outline: none;
+  transition: border-color 0.2s, background-color 0.2s;
+  width: 72px;
+  font-size: 12px;
+}
+.sac-editable-cell:focus {
+  border-color: #FFE600;
+  background: rgba(255,230,0,0.1);
+  box-shadow: 0 0 0 2px rgba(255,230,0,0.15);
+}
+
+/* Chart bar hover effect */
+.sac-bar-segment {
+  transition: opacity 0.2s, filter 0.2s;
+  cursor: pointer;
+}
+.sac-bar-segment:hover {
+  opacity: 0.85;
+  filter: brightness(1.15);
+}
+
+/* Heatmap cell */
+.sac-heatmap-cell {
+  transition: transform 0.15s, box-shadow 0.15s;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.sac-heatmap-cell:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 12px rgba(255,255,255,0.1);
+  z-index: 2;
+}
+
+/* Treemap rect */
+.sac-treemap-rect {
+  transition: opacity 0.2s;
+  cursor: pointer;
+}
+.sac-treemap-rect:hover {
+  opacity: 0.8;
+}
+
+/* ═══════════════════════════════════════════════════
+   SAP SSC Dashboard Styles (Fiori Style)
+   ═══════════════════════════════════════════════════ */
+
+/* SSC Tile (Fiori Style) */
+.ssc-tile {
+  background: #1B1B1B;
+  border: 1px solid #303030;
+  border-radius: 6px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.ssc-tile:hover {
+  background: #202020;
+  border-color: #444;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  transform: translateY(-2px);
+}
+.ssc-tile.active {
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 1px #0ea5e9, 0 4px 16px rgba(14, 165, 233, 0.15);
+}
+
+/* Fiori semantic colors */
+.ssc-semantic-error { color: #ef4444; }
+.ssc-semantic-warning { color: #f59e0b; }
+.ssc-semantic-success { color: #10b981; }
+.ssc-semantic-info { color: #0ea5e9; }
+
+/* SSC Worklist Row */
+.ssc-worklist-row {
+  border-bottom: 1px solid #252525;
+  transition: background-color 0.15s;
+}
+.ssc-worklist-row:hover {
+  background-color: #202020;
+}
+.ssc-worklist-row:last-child {
+  border-bottom: none;
+}
+
+/* SSC Alert Panel */
+.ssc-alert-panel {
+  background: rgba(239, 68, 68, 0.05);
+  border-left: 3px solid #ef4444;
+  padding: 12px 16px;
+  border-radius: 0 4px 4px 0;
+}

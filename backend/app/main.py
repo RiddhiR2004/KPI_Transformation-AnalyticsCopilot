@@ -1770,6 +1770,206 @@ async def upload_kpi_library(request: Request, file: UploadFile = File(...)) -> 
     return library
 
 
+@app.post("/kpi-library/upload-document")
+async def upload_kpi_document(request: Request, file: UploadFile = File(...)) -> KPILibrary:
+    """
+    Upload a business document (Excel, CSV, PDF, DOCX, TXT) to derive KPIs.
+    Unlike /kpi-library/upload which does direct column mapping, this endpoint
+    uses AI/heuristic analysis to identify and extract KPI definitions from
+    arbitrary business data and reports.
+    """
+    import codecs
+    from app.services.kpi_engine import (
+        derive_kpis_from_document_text,
+        derive_kpis_from_excel_columns,
+        quality_check,
+        recommendations,
+    )
+
+    context = current_context()
+    library = current_library()
+
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
+
+    filename_lower = file.filename.lower()
+    new_kpis: list[KPI] = []
+
+    try:
+        if filename_lower.endswith(".csv"):
+            # CSV: read and derive KPIs from column analysis
+            import csv as csv_mod
+            content = await file.read()
+            text = content.decode("utf-8-sig")
+            reader = csv_mod.DictReader(text.splitlines())
+            rows = list(reader)
+            headers = reader.fieldnames or []
+            new_kpis = derive_kpis_from_excel_columns(headers, rows, context)
+
+            # Also try to derive from full text content
+            text_kpis = derive_kpis_from_document_text(text, context, source="excel_import")
+            existing_names = {k.kpi_name.lower() for k in new_kpis}
+            for tk in text_kpis:
+                if tk.kpi_name.lower() not in existing_names:
+                    new_kpis.append(tk)
+                    existing_names.add(tk.kpi_name.lower())
+
+        elif filename_lower.endswith((".xlsx", ".xls")):
+            # Excel: parse sheets and derive KPIs from columns
+            import openpyxl
+            content = await file.read()
+            from io import BytesIO
+            wb = openpyxl.load_workbook(BytesIO(content), data_only=True)
+
+            all_headers: list[str] = []
+            all_rows: list[dict] = []
+            all_text_lines: list[str] = []
+
+            for sheet in wb.worksheets:
+                headers = [str(cell.value) if cell.value is not None else "" for cell in sheet[1]]
+                all_headers.extend(headers)
+                for row_cells in sheet.iter_rows(min_row=2, max_row=min(sheet.max_row or 2, 50), values_only=True):
+                    if any(row_cells):
+                        row_dict = {headers[i]: val for i, val in enumerate(row_cells) if i < len(headers)}
+                        all_rows.append(row_dict)
+                        # Also collect text lines
+                        line = " | ".join(str(v) for v in row_cells if v is not None)
+                        all_text_lines.append(line)
+
+            new_kpis = derive_kpis_from_excel_columns(all_headers, all_rows, context)
+
+            # Also try text-based extraction from cell content
+            full_text = "\n".join(all_text_lines)
+            if full_text.strip():
+                text_kpis = derive_kpis_from_document_text(full_text, context, source="excel_import")
+                existing_names = {k.kpi_name.lower() for k in new_kpis}
+                for tk in text_kpis:
+                    if tk.kpi_name.lower() not in existing_names:
+                        new_kpis.append(tk)
+                        existing_names.add(tk.kpi_name.lower())
+
+        elif filename_lower.endswith((".pdf", ".docx", ".doc", ".txt")):
+            # Business report: extract text and derive KPIs
+            content = await file.read()
+
+            if filename_lower.endswith(".txt"):
+                text = content.decode("utf-8", errors="replace")
+            else:
+                # Use asset_parser for PDF/DOCX
+                from app.services.asset_parser import extract_text_from_asset
+                text = extract_text_from_asset(file.filename, content)
+
+            if not text or len(text.strip()) < 20:
+                raise HTTPException(status_code=400, detail="Could not extract text from the document. The file may be empty or corrupted.")
+
+            # Try LLM-based extraction first
+            provider = get_provider()
+            if not isinstance(provider, DemoProvider):
+                try:
+                    extract_prompt = (
+                        f"Analyze the following business document and extract ALL KPIs, metrics, measures, and performance indicators mentioned.\n"
+                        f"For each KPI found, return a JSON array of objects with these fields:\n"
+                        f"- kpi_name: The name of the KPI/metric\n"
+                        f"- kpi_description: Brief description based on document context\n"
+                        f"- functional_area: Best matching area (Finance, HR, Supply Chain, Sales, Operations, Marketing, Quality, Customer Service, or General)\n"
+                        f"- formula: The calculation formula if mentioned, otherwise 'TBD'\n"
+                        f"- why_important: Why this metric matters based on document context\n\n"
+                        f"Document content:\n{text[:8000]}"
+                    )
+                    payload = await provider.generate_json(
+                        "Return a JSON object with key 'kpis' containing an array of KPI objects. Each object must have: kpi_name, kpi_description, functional_area, formula, why_important.",
+                        extract_prompt,
+                        step_name="extract_document_kpis",
+                    )
+                    raw_kpis = payload.get("kpis", []) if isinstance(payload, dict) else []
+                    import uuid
+                    for raw in raw_kpis:
+                        if not isinstance(raw, dict) or not raw.get("kpi_name"):
+                            continue
+                        kpi_id = f"KPI-DOC-{uuid.uuid4().hex[:6].upper()}"
+                        new_kpis.append(KPI(
+                            id=kpi_id,
+                            kpi_name=str(raw["kpi_name"]).strip(),
+                            functional_area=str(raw.get("functional_area", "General")).strip(),
+                            kra="To Be Defined",
+                            kpi_category="Operational",
+                            business_definition="",
+                            kpi_description=str(raw.get("kpi_description", "Extracted from document.")),
+                            why_important=str(raw.get("why_important", "Identified from client documentation.")),
+                            formula=str(raw.get("formula", "TBD")),
+                            numerator="",
+                            denominator="",
+                            source_system="TBD",
+                            sap_module="",
+                            business_owner="",
+                            data_owner="",
+                            refresh_cadence="TBD",
+                            recommended_target_range="",
+                            recommended_threshold_range="",
+                            strategic_focus_area="",
+                            standard_driver="",
+                            sector_driver="",
+                            value_drivers=[],
+                            industry_tags=[context.industry] if context.industry else [],
+                            recommendation_score=60,
+                            status=KPIStatus.draft,
+                            source="document_parsed",
+                            notes=f"AI-extracted from: {file.filename}",
+                        ))
+                except Exception as llm_err:
+                    logger.warning(f"LLM extraction failed, falling back to heuristic: {llm_err}")
+                    new_kpis = derive_kpis_from_document_text(text, context, source="document_parsed")
+            else:
+                # Demo mode: use heuristic extraction
+                new_kpis = derive_kpis_from_document_text(text, context, source="document_parsed")
+
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Unsupported file format. Please upload Excel (.xlsx, .xls), CSV, PDF, Word (.docx), or Text (.txt) files."
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing document {file.filename}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to process document: {str(e)}")
+
+    if not new_kpis:
+        raise HTTPException(
+            status_code=400,
+            detail="No KPIs could be derived from this document. The file may not contain identifiable metrics or KPI definitions."
+        )
+
+    # Append new KPIs to existing library (don't replace)
+    existing_names = {k.kpi_name.lower() for k in library.items}
+    added_count = 0
+    for kpi in new_kpis:
+        if kpi.kpi_name.lower() not in existing_names:
+            library.items.append(kpi)
+            existing_names.add(kpi.kpi_name.lower())
+            added_count += 1
+
+    # Update quality and recommendations
+    library.quality = quality_check(library.items, context)
+    library.recommendations = recommendations(library.items, context)
+
+    write_json(FILES["kpi_library"], library.model_dump(mode="json"))
+
+    source_type = "Excel/CSV" if filename_lower.endswith((".xlsx", ".xls", ".csv")) else "Business Report"
+    log_activity("Document KPIs Derived", f"{added_count} KPIs extracted from {source_type}: {file.filename}")
+    log_audit(
+        request=request,
+        action="Document Upload",
+        module="KPI Library",
+        entity_type="Document KPI Extraction",
+        entity_name=file.filename,
+        new_value=f"Derived {added_count} KPIs from {source_type}"
+    )
+
+    return library
+
+
 @app.post("/approve-kpis")
 def approve_kpis(request: Request, approval_req: KPIApprovalRequest) -> KPILibrary:
     context = current_context()
@@ -2453,17 +2653,20 @@ def workflow_status() -> WorkflowStatus:
     prompt = bool(read_json(FILES["prompts"], {}))
     library = bool(read_json(FILES["kpi_library"], {}).get("items"))
     spec = bool(read_json(FILES["functional_spec"], {}).get("items"))
-    tech_mapping = bool(read_json(FILES["technical_mapping"], {}).get("items"))
     
-    # Check if tree exists
+    # Check if tree exists and tech mapping is approved
     with SessionLocal() as session:
-        from app.database import KPITree as DBKPITree
+        from app.database import KPITree as DBKPITree, TechnicalDataMappingDB
         eng_id = active_engagement_id_ctx.get()
         if eng_id is not None:
             tree_row = session.scalar(select(DBKPITree).filter_by(engagement_id=eng_id))
+            tdm_row = session.scalar(select(TechnicalDataMappingDB).filter_by(engagement_id=eng_id))
         else:
             tree_row = session.scalar(select(DBKPITree).filter_by(id=1))
+            tdm_row = session.scalar(select(TechnicalDataMappingDB).filter_by(id=1))
+            
         has_tree = bool(tree_row and tree_row.tree_json and tree_row.tree_json != "{}")
+        tech_mapping = bool(tdm_row and tdm_row.status == "approved")
         
     return WorkflowStatus(
         business_context=context,
@@ -3262,7 +3465,8 @@ async def generate_technical_mapping(request: Request) -> dict[str, Any]:
 @app.post("/approve-technical-mapping")
 def approve_technical_mapping(request: Request) -> dict[str, Any]:
     mapping_data = read_json(FILES["technical_mapping"], {})
-    if not mapping_data or not mapping_data.get("object_summary"):
+    draft_data = mapping_data.get("draft_items", {}) if isinstance(mapping_data, dict) else {}
+    if not draft_data or not draft_data.get("object_summary"):
         raise HTTPException(status_code=400, detail="Technical Design Document has not been generated yet.")
         
     with SessionLocal() as session:

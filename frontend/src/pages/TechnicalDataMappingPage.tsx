@@ -21,10 +21,8 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
   const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null);
   const [activeTab, setActiveTab] = useState<"editor" | "preview">("editor");
   const [docName, setDocName] = useState("");
-  const [activeSection, setActiveSection] = useState<
-    "org" | "summary" | "flow" | "models" | "mappings" | "rules" | "security" | "load" | "quality" | "testing" | "glossary"
-  >("org");
   const [editingMapping, setEditingMapping] = useState<TechnicalDataMapping | null>(null);
+  const [previewPageNum, setPreviewPageNum] = useState(1);
 
   const tdmExport = exports.find((e) => e.id === "technical_mapping");
 
@@ -243,7 +241,7 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
   }
 
   const isApproved = mapping?.status === "approved";
-  const hasData = mapping && mapping.document_organization;
+  const hasData = mapping && mapping.object_summary && mapping.object_summary.length > 0;
 
   return (
     <div className="space-y-6">
@@ -279,21 +277,11 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
             {/* Action Bar */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-[#1B1B1B] border border-[#303030] p-4 rounded-sm gap-4 sticky top-0 z-40 shadow-lg">
               <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-[10px] font-bold tracking-widest text-[#FFE600] uppercase">TDD Status</span>
-                {isApproved ? (
-                  <span className="inline-flex items-center gap-1 border border-green-500/30 bg-green-500/10 text-green-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                    <Check size={10} /> Approved TDD v{mapping?.version || 1}
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 border border-yellow-500/30 bg-yellow-500/10 text-yellow-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                    Draft TDD v{mapping?.version || 1}
-                  </span>
-                )}
                 {saveStatus && <span className="text-xs text-[#FFE600] animate-pulse">{saveStatus}</span>}
 
-                <div className="flex bg-[#111111] p-1 rounded-sm border border-[#303030] sm:ml-4 shrink-0">
-                  <button type="button" className={`px-3 py-1 text-[11px] font-bold rounded-sm transition-all ${activeTab === "editor" ? "bg-[#FFE600] text-black" : "text-[#B0B0B0]"}`} onClick={() => setActiveTab("editor")}><Edit3 size={12} className="inline mr-1" />Editor</button>
-                  <button type="button" className={`px-3 py-1 text-[11px] font-bold rounded-sm transition-all ${activeTab === "preview" ? "bg-[#FFE600] text-black" : "text-[#B0B0B0]"}`} onClick={() => setActiveTab("preview")}><Eye size={12} className="inline mr-1" />Preview</button>
+                <div className="flex bg-[#111111] p-1 rounded-sm border border-[#303030] shrink-0">
+                  <button type="button" className={`px-3 py-1 text-[11px] font-bold rounded-sm transition-all ${activeTab === "editor" ? "bg-[#FFE600] text-black" : "text-[#B0B0B0]"}`} onClick={() => setActiveTab("editor")}><Edit3 size={12} className="inline mr-1" />Document Editor</button>
+                  <button type="button" className={`px-3 py-1 text-[11px] font-bold rounded-sm transition-all ${activeTab === "preview" ? "bg-[#FFE600] text-black" : "text-[#B0B0B0]"}`} onClick={() => setActiveTab("preview")}><Eye size={12} className="inline mr-1" />Document Preview</button>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-3 w-full md:w-auto md:justify-end">
@@ -340,37 +328,8 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
             </div>
 
             {activeTab === "editor" && editingMapping ? (
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-                {/* Sidebar Navigation */}
-                <div className="bg-[#1B1B1B] border border-[#303030] p-4 rounded-sm flex flex-col gap-1">
-                  <span className="text-[10px] font-bold text-[#FFE600] uppercase tracking-wider px-2 mb-2">TDD Sections</span>
-                  {[
-                    { id: "org", label: "1. Document Control" },
-                    { id: "summary", label: "2. Object Summary" },
-                    { id: "flow", label: "3.1 Data Flow Blueprint" },
-                    { id: "models", label: "3.2 Data Models" },
-                    { id: "mappings", label: "3.3 Technical Mappings" },
-                    { id: "rules", label: "3.4 Transformation Rules" },
-                    { id: "security", label: "3.5 Security Policies" },
-                    { id: "load", label: "4. Load Strategy" },
-                    { id: "quality", label: "5. Quality & Validation" },
-                    { id: "testing", label: "6. Testing Scenarios" },
-                    { id: "glossary", label: "7. Glossary terms" },
-                  ].map((sec) => (
-                    <button
-                      key={sec.id}
-                      onClick={() => setActiveSection(sec.id as any)}
-                      className={`text-left text-xs font-bold py-2 px-3 rounded-sm transition-all ${activeSection === sec.id ? "bg-[#FFE600] text-black" : "text-[#B0B0B0] hover:bg-[#252525]"}`}
-                    >
-                      {sec.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Section Editor Grid */}
-                <div className="lg:col-span-3 bg-[#1B1B1B] border border-[#303030] p-6 rounded-sm space-y-6">
-                  {activeSection === "org" && (
-                    <div className="space-y-4">
+              <div className="bg-[#1B1B1B] border border-[#303030] p-8 rounded-sm space-y-16">
+                <div className="space-y-4">
                       <h3 className="text-lg font-bold text-[#FFE600] border-b border-[#303030] pb-2 mb-4">1. Document Control & Organization</h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
@@ -392,13 +351,10 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                       </div>
                       <div>
                         <label className="text-[10px] font-bold text-[#B0B0B0] uppercase block mb-1">Related Document References</label>
-                        <textarea disabled={isApproved} rows={3} className="field w-full text-xs" value={editingMapping.document_organization.related_documents} onChange={e => setEditingMapping({...editingMapping, document_organization: {...editingMapping.document_organization, related_documents: e.target.value}})} />
-                      </div>
+                        <textarea disabled={isApproved} rows={6} className="field w-full text-xs" value={editingMapping.document_organization.related_documents} onChange={e => setEditingMapping({...editingMapping, document_organization: {...editingMapping.document_organization, related_documents: e.target.value}})} />
                     </div>
-                  )}
 
-                  {activeSection === "summary" && (
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-4 border-t border-[#303030]">
                       <div className="flex justify-between items-center border-b border-[#303030] pb-2 mb-4">
                         <h3 className="text-lg font-bold text-[#FFE600]">2. Object Summary</h3>
                         {!isApproved && (
@@ -474,16 +430,14 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                         </table>
                       </div>
                     </div>
-                  )}
 
-                  {activeSection === "flow" && (
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-4 border-t border-[#303030]">
                       <h3 className="text-lg font-bold text-[#FFE600] border-b border-[#303030] pb-2 mb-4">3.1 Technical Data Flow & Visual Architecture</h3>
                       {editingMapping.technical_data_flow && editingMapping.technical_data_flow.map((flow, idx) => (
                         <div key={idx} className="space-y-4 p-4 border border-[#303030] bg-[#151515] rounded-sm">
                           <div>
                             <label className="text-[10px] font-bold text-[#B0B0B0] uppercase block mb-1">Flow Description</label>
-                            <textarea disabled={isApproved} rows={3} className="field w-full text-xs" value={flow.description} onChange={e => {
+                            <textarea disabled={isApproved} rows={6} className="field w-full text-xs" value={flow.description} onChange={e => {
                               const list = [...editingMapping.technical_data_flow];
                               list[idx].description = e.target.value;
                               setEditingMapping({ ...editingMapping, technical_data_flow: list });
@@ -500,10 +454,8 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                         </div>
                       ))}
                     </div>
-                  )}
 
-                  {activeSection === "models" && (
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-4 border-t border-[#303030]">
                       <div className="flex justify-between items-center border-b border-[#303030] pb-2 mb-4">
                         <h3 className="text-lg font-bold text-[#FFE600]">3.2 Data Models</h3>
                         {!isApproved && (
@@ -575,10 +527,8 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                         </table>
                       </div>
                     </div>
-                  )}
 
-                  {activeSection === "mappings" && (
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-4 border-t border-[#303030]">
                       <div className="flex justify-between items-center border-b border-[#303030] pb-2 mb-4">
                         <h3 className="text-lg font-bold text-[#FFE600]">3.3 Technical Details & Mapping Table</h3>
                         {!isApproved && (
@@ -651,7 +601,7 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                                   }} />
                                 </td>
                                 <td className="border border-[#303030] p-1">
-                                  <textarea disabled={isApproved} rows={2} className="bg-[#111111] border-0 focus:ring-0 w-full p-1 text-xs text-white rounded-sm" value={row.transformation_logic} onChange={e => {
+                                  <textarea disabled={isApproved} rows={4} className="bg-[#111111] border-0 focus:ring-0 w-full p-1 text-xs text-white rounded-sm" value={row.transformation_logic} onChange={e => {
                                     const list = [...editingMapping.technical_mappings];
                                     list[idx].transformation_logic = e.target.value;
                                     setEditingMapping({ ...editingMapping, technical_mappings: list });
@@ -684,27 +634,25 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                         </table>
                       </div>
                     </div>
-                  )}
 
-                  {activeSection === "rules" && (
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-4 border-t border-[#303030]">
                       <h3 className="text-lg font-bold text-[#FFE600] border-b border-[#303030] pb-2 mb-4">3.4 Data Transformation Rules</h3>
                       <div className="space-y-4">
                         <div>
                           <label className="text-[10px] font-bold text-[#B0B0B0] uppercase block mb-1">Aggregations</label>
-                          <textarea disabled={isApproved} rows={2} className="field w-full text-xs" value={editingMapping.transformation_rules.aggregations} onChange={e => setEditingMapping({...editingMapping, transformation_rules: {...editingMapping.transformation_rules, aggregations: e.target.value}})} />
+                          <textarea disabled={isApproved} rows={4} className="field w-full text-xs" value={editingMapping.transformation_rules.aggregations} onChange={e => setEditingMapping({...editingMapping, transformation_rules: {...editingMapping.transformation_rules, aggregations: e.target.value}})} />
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-[#B0B0B0] uppercase block mb-1">Derived Columns</label>
-                          <textarea disabled={isApproved} rows={2} className="field w-full text-xs" value={editingMapping.transformation_rules.derived_columns} onChange={e => setEditingMapping({...editingMapping, transformation_rules: {...editingMapping.transformation_rules, derived_columns: e.target.value}})} />
+                          <textarea disabled={isApproved} rows={4} className="field w-full text-xs" value={editingMapping.transformation_rules.derived_columns} onChange={e => setEditingMapping({...editingMapping, transformation_rules: {...editingMapping.transformation_rules, derived_columns: e.target.value}})} />
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-[#B0B0B0] uppercase block mb-1">Calculated Fields</label>
-                          <textarea disabled={isApproved} rows={2} className="field w-full text-xs" value={editingMapping.transformation_rules.calculated_fields} onChange={e => setEditingMapping({...editingMapping, transformation_rules: {...editingMapping.transformation_rules, calculated_fields: e.target.value}})} />
+                          <textarea disabled={isApproved} rows={4} className="field w-full text-xs" value={editingMapping.transformation_rules.calculated_fields} onChange={e => setEditingMapping({...editingMapping, transformation_rules: {...editingMapping.transformation_rules, calculated_fields: e.target.value}})} />
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-[#B0B0B0] uppercase block mb-1">Business Filters</label>
-                          <textarea disabled={isApproved} rows={2} className="field w-full text-xs" value={editingMapping.transformation_rules.business_filters} onChange={e => setEditingMapping({...editingMapping, transformation_rules: {...editingMapping.transformation_rules, business_filters: e.target.value}})} />
+                          <textarea disabled={isApproved} rows={4} className="field w-full text-xs" value={editingMapping.transformation_rules.business_filters} onChange={e => setEditingMapping({...editingMapping, transformation_rules: {...editingMapping.transformation_rules, business_filters: e.target.value}})} />
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
@@ -718,19 +666,17 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                         </div>
                       </div>
                     </div>
-                  )}
 
-                  {activeSection === "security" && (
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-4 border-t border-[#303030]">
                       <h3 className="text-lg font-bold text-[#FFE600] border-b border-[#303030] pb-2 mb-4">3.5 Security Policies</h3>
                       <div className="space-y-4">
                         <div>
                           <label className="text-[10px] font-bold text-[#B0B0B0] uppercase block mb-1">Row-Level Security (RLS)</label>
-                          <textarea disabled={isApproved} rows={2} className="field w-full text-xs" value={editingMapping.security.row_level_security} onChange={e => setEditingMapping({...editingMapping, security: {...editingMapping.security, row_level_security: e.target.value}})} />
+                          <textarea disabled={isApproved} rows={4} className="field w-full text-xs" value={editingMapping.security.row_level_security} onChange={e => setEditingMapping({...editingMapping, security: {...editingMapping.security, row_level_security: e.target.value}})} />
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-[#B0B0B0] uppercase block mb-1">Object-Level Security (OLS)</label>
-                          <textarea disabled={isApproved} rows={2} className="field w-full text-xs" value={editingMapping.security.object_level_security} onChange={e => setEditingMapping({...editingMapping, security: {...editingMapping.security, object_level_security: e.target.value}})} />
+                          <textarea disabled={isApproved} rows={4} className="field w-full text-xs" value={editingMapping.security.object_level_security} onChange={e => setEditingMapping({...editingMapping, security: {...editingMapping.security, object_level_security: e.target.value}})} />
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-[#B0B0B0] uppercase block mb-1">Sensitive Fields & Masking</label>
@@ -742,10 +688,8 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                         </div>
                       </div>
                     </div>
-                  )}
 
-                  {activeSection === "load" && (
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-4 border-t border-[#303030]">
                       <h3 className="text-lg font-bold text-[#FFE600] border-b border-[#303030] pb-2 mb-4">4. Data Load Strategy</h3>
                       <div className="space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -764,66 +708,60 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-[#B0B0B0] uppercase block mb-1">Dependencies</label>
-                          <textarea disabled={isApproved} rows={2} className="field w-full text-xs" value={editingMapping.data_load_strategy.dependencies} onChange={e => setEditingMapping({...editingMapping, data_load_strategy: {...editingMapping.data_load_strategy, dependencies: e.target.value}})} />
+                          <textarea disabled={isApproved} rows={4} className="field w-full text-xs" value={editingMapping.data_load_strategy.dependencies} onChange={e => setEditingMapping({...editingMapping, data_load_strategy: {...editingMapping.data_load_strategy, dependencies: e.target.value}})} />
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-[#B0B0B0] uppercase block mb-1">Scheduling Considerations</label>
-                          <textarea disabled={isApproved} rows={2} className="field w-full text-xs" value={editingMapping.data_load_strategy.scheduling_considerations} onChange={e => setEditingMapping({...editingMapping, data_load_strategy: {...editingMapping.data_load_strategy, scheduling_considerations: e.target.value}})} />
+                          <textarea disabled={isApproved} rows={4} className="field w-full text-xs" value={editingMapping.data_load_strategy.scheduling_considerations} onChange={e => setEditingMapping({...editingMapping, data_load_strategy: {...editingMapping.data_load_strategy, scheduling_considerations: e.target.value}})} />
                         </div>
                       </div>
                     </div>
-                  )}
 
-                  {activeSection === "quality" && (
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-4 border-t border-[#303030]">
                       <h3 className="text-lg font-bold text-[#FFE600] border-b border-[#303030] pb-2 mb-4">5. Data Quality & Validation</h3>
                       <div className="space-y-4">
                         <div>
                           <label className="text-[10px] font-bold text-[#B0B0B0] uppercase block mb-1">Null Checks</label>
-                          <textarea disabled={isApproved} rows={2} className="field w-full text-xs" value={editingMapping.data_quality_validation.null_checks} onChange={e => setEditingMapping({...editingMapping, data_quality_validation: {...editingMapping.data_quality_validation, null_checks: e.target.value}})} />
+                          <textarea disabled={isApproved} rows={4} className="field w-full text-xs" value={editingMapping.data_quality_validation.null_checks} onChange={e => setEditingMapping({...editingMapping, data_quality_validation: {...editingMapping.data_quality_validation, null_checks: e.target.value}})} />
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-[#B0B0B0] uppercase block mb-1">Duplicate Checks</label>
-                          <textarea disabled={isApproved} rows={2} className="field w-full text-xs" value={editingMapping.data_quality_validation.duplicate_checks} onChange={e => setEditingMapping({...editingMapping, data_quality_validation: {...editingMapping.data_quality_validation, duplicate_checks: e.target.value}})} />
+                          <textarea disabled={isApproved} rows={4} className="field w-full text-xs" value={editingMapping.data_quality_validation.duplicate_checks} onChange={e => setEditingMapping({...editingMapping, data_quality_validation: {...editingMapping.data_quality_validation, duplicate_checks: e.target.value}})} />
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-[#B0B0B0] uppercase block mb-1">Mandatory Field Checks</label>
-                          <textarea disabled={isApproved} rows={2} className="field w-full text-xs" value={editingMapping.data_quality_validation.mandatory_field_checks} onChange={e => setEditingMapping({...editingMapping, data_quality_validation: {...editingMapping.data_quality_validation, mandatory_field_checks: e.target.value}})} />
+                          <textarea disabled={isApproved} rows={4} className="field w-full text-xs" value={editingMapping.data_quality_validation.mandatory_field_checks} onChange={e => setEditingMapping({...editingMapping, data_quality_validation: {...editingMapping.data_quality_validation, mandatory_field_checks: e.target.value}})} />
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-[#B0B0B0] uppercase block mb-1">Business Rule Validation</label>
-                          <textarea disabled={isApproved} rows={2} className="field w-full text-xs" value={editingMapping.data_quality_validation.business_rule_validation} onChange={e => setEditingMapping({...editingMapping, data_quality_validation: {...editingMapping.data_quality_validation, business_rule_validation: e.target.value}})} />
+                          <textarea disabled={isApproved} rows={4} className="field w-full text-xs" value={editingMapping.data_quality_validation.business_rule_validation} onChange={e => setEditingMapping({...editingMapping, data_quality_validation: {...editingMapping.data_quality_validation, business_rule_validation: e.target.value}})} />
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-[#B0B0B0] uppercase block mb-1">KPI Validation Logic</label>
-                          <textarea disabled={isApproved} rows={2} className="field w-full text-xs" value={editingMapping.data_quality_validation.kpi_validation_logic} onChange={e => setEditingMapping({...editingMapping, data_quality_validation: {...editingMapping.data_quality_validation, kpi_validation_logic: e.target.value}})} />
+                          <textarea disabled={isApproved} rows={4} className="field w-full text-xs" value={editingMapping.data_quality_validation.kpi_validation_logic} onChange={e => setEditingMapping({...editingMapping, data_quality_validation: {...editingMapping.data_quality_validation, kpi_validation_logic: e.target.value}})} />
                         </div>
                       </div>
                     </div>
-                  )}
 
-                  {activeSection === "testing" && (
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-4 border-t border-[#303030]">
                       <h3 className="text-lg font-bold text-[#FFE600] border-b border-[#303030] pb-2 mb-4">6. Testing Strategy</h3>
                       <div className="space-y-4">
                         <div>
                           <label className="text-[10px] font-bold text-[#B0B0B0] uppercase block mb-1">Unit Test Scenarios</label>
-                          <textarea disabled={isApproved} rows={3} className="field w-full text-xs" value={editingMapping.testing_strategy.unit_test_scenarios} onChange={e => setEditingMapping({...editingMapping, testing_strategy: {...editingMapping.testing_strategy, unit_test_scenarios: e.target.value}})} />
+                          <textarea disabled={isApproved} rows={6} className="field w-full text-xs" value={editingMapping.testing_strategy.unit_test_scenarios} onChange={e => setEditingMapping({...editingMapping, testing_strategy: {...editingMapping.testing_strategy, unit_test_scenarios: e.target.value}})} />
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-[#B0B0B0] uppercase block mb-1">Integration Test Scenarios</label>
-                          <textarea disabled={isApproved} rows={3} className="field w-full text-xs" value={editingMapping.testing_strategy.integration_test_scenarios} onChange={e => setEditingMapping({...editingMapping, testing_strategy: {...editingMapping.testing_strategy, integration_test_scenarios: e.target.value}})} />
+                          <textarea disabled={isApproved} rows={6} className="field w-full text-xs" value={editingMapping.testing_strategy.integration_test_scenarios} onChange={e => setEditingMapping({...editingMapping, testing_strategy: {...editingMapping.testing_strategy, integration_test_scenarios: e.target.value}})} />
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-[#B0B0B0] uppercase block mb-1">Validation Handoff Criteria</label>
-                          <textarea disabled={isApproved} rows={3} className="field w-full text-xs" value={editingMapping.testing_strategy.validation_criteria} onChange={e => setEditingMapping({...editingMapping, testing_strategy: {...editingMapping.testing_strategy, validation_criteria: e.target.value}})} />
+                          <textarea disabled={isApproved} rows={6} className="field w-full text-xs" value={editingMapping.testing_strategy.validation_criteria} onChange={e => setEditingMapping({...editingMapping, testing_strategy: {...editingMapping.testing_strategy, validation_criteria: e.target.value}})} />
                         </div>
                       </div>
                     </div>
-                  )}
 
-                  {activeSection === "glossary" && (
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-4 border-t border-[#303030]">
                       <div className="flex justify-between items-center border-b border-[#303030] pb-2 mb-4">
                         <h3 className="text-lg font-bold text-[#FFE600]">7. Glossary</h3>
                         {!isApproved && (
@@ -871,48 +809,15 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                         </table>
                       </div>
                     </div>
-                  )}
-
                 </div>
               </div>
             ) : null}
 
-            {activeTab === "preview" && mapping && (
-              <div className="max-w-4xl mx-auto space-y-6 preview-doc">
-                <style>{`
-                  .preview-page {
-                    background: #ffffff;
-                    color: #111111;
-                    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-                    border: 1px solid #e5e7eb;
-                    margin-bottom: 2rem;
-                    padding: 3rem;
-                    min-height: 1056px;
-                    position: relative;
-                    page-break-after: always;
-                    break-after: page;
-                  }
-                  .preview-doc h1 { font-size: 2.2rem; font-weight: bold; margin-bottom: 1.5rem; color: #111; border-bottom: 3px solid #FFE600; padding-bottom: 0.75rem; }
-                  .preview-doc h2 { font-size: 1.4rem; font-weight: bold; margin-top: 1rem; margin-bottom: 0.75rem; color: #1B1B1B; border-bottom: 1.5px solid #1B1B1B; padding-bottom: 0.35rem; }
-                  .preview-doc h3 { font-size: 1.15rem; font-weight: 600; margin-top: 1.25rem; margin-bottom: 0.5rem; color: #333; }
-                  .preview-doc p { font-size: 0.95rem; line-height: 1.6; margin-bottom: 1rem; color: #333; }
-                  .preview-doc table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; font-size: 0.85rem; }
-                  .preview-doc th, .preview-doc td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-                  .preview-doc th { background-color: #1b1b1b; color: #ffffff; font-weight: bold; }
-                  .preview-doc tr:nth-child(even) { background-color: #f9f9f9; }
-                  @media print {
-                    .preview-page {
-                      box-shadow: none !important;
-                      border: none !important;
-                      margin: 0 !important;
-                      padding: 0 !important;
-                      min-height: auto !important;
-                    }
-                  }
-                `}</style>
-                
-                {/* Title Cover Page */}
-                <div className="preview-page flex flex-col justify-between py-24">
+            {activeTab === "preview" && mapping && (() => {
+              const previewPages = [];
+              
+              previewPages.push(
+                <div key="cover" className="preview-page flex flex-col justify-between py-24">
                   <div className="text-center my-auto">
                     <p className="text-[#B49600] text-sm font-bold uppercase tracking-[0.25em] mb-4">KPI Advisory & Transformation</p>
                     <h1 className="border-none !text-4xl text-center mb-6">Technical Design Document (TDD)</h1>
@@ -924,9 +829,10 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                     EY Advisory Services &copy; {new Date().getFullYear()}
                   </div>
                 </div>
+              );
 
-                {/* 1. Document Control */}
-                <div className="preview-page">
+              previewPages.push(
+                <div key="doc-control" className="preview-page">
                   <h2>1. Document Control & Organization</h2>
                   <div className="h-2.5"></div>
                   <table>
@@ -966,9 +872,10 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                     </tbody>
                   </table>
                 </div>
+              );
 
-                {/* 2. Object Summary */}
-                <div className="preview-page">
+              previewPages.push(
+                <div key="object-summary" className="preview-page">
                   <h2>2. Object Summary</h2>
                   <p className="mb-4 text-xs text-gray-500">
                     Enterprise implementation inventory of transactional facts, dimensions, and reporting views:
@@ -996,7 +903,7 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                         {(mapping.object_summary || []).map((obj, idx) => (
                           <tr key={idx}>
                             <td className="font-semibold">{obj.object_name}</td>
-                            <td>{obj.object_type || "TBC"}</td>
+                            <td>{obj.object_type || "N/A"}</td>
                             <td>{obj.business_process || "N/A"}</td>
                             <td>{obj.purpose || obj.short_description || "N/A"}</td>
                             <td>{obj.source_systems || obj.primary_source_systems || "N/A"}</td>
@@ -1019,9 +926,10 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                     </table>
                   </div>
                 </div>
+              );
 
-                {/* 3.1 Technical Data Flow */}
-                <div className="preview-page">
+              previewPages.push(
+                <div key="tech-flow" className="preview-page">
                   <h2>3. Technical Specifications</h2>
                   <h3>3.1 Technical Data Flow Blueprint</h3>
                   {(mapping.technical_data_flow || []).map((flow, idx) => (
@@ -1046,9 +954,10 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                     </div>
                   ))}
                 </div>
+              );
 
-                {/* 3.2 Data Models */}
-                <div className="preview-page">
+              previewPages.push(
+                <div key="data-models" className="preview-page">
                   <h2>3.2 Data Models Specification</h2>
                   <div className="overflow-x-auto">
                     <table className="min-w-full text-xs">
@@ -1095,10 +1004,11 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                     </table>
                   </div>
                 </div>
+              );
 
-                {/* 3.3 Physical Table Definitions */}
-                {mapping.physical_table_definitions && mapping.physical_table_definitions.length > 0 && (
-                  <div className="preview-page">
+              if (mapping.physical_table_definitions && mapping.physical_table_definitions.length > 0) {
+                previewPages.push(
+                  <div key="physical-tables" className="preview-page">
                     <h2>3.3 Physical Table Definitions</h2>
                     <p className="mb-4 text-xs text-gray-500">
                       Physical column schemas, data types, and primary/foreign key mappings:
@@ -1135,11 +1045,12 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                       </div>
                     ))}
                   </div>
-                )}
+                );
+              }
 
-                {/* 3.4 Field-Level Source Mapping */}
-                {mapping.field_level_mappings && mapping.field_level_mappings.length > 0 && (
-                  <div className="preview-page">
+              if (mapping.field_level_mappings && mapping.field_level_mappings.length > 0) {
+                previewPages.push(
+                  <div key="field-mappings" className="preview-page">
                     <h2>3.4 Field-Level Source Mappings</h2>
                     <p className="mb-4 text-xs text-gray-500">
                       Granular mapping from ERP/CRM origin tables to analytics warehouse target fields:
@@ -1169,10 +1080,11 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                       </tbody>
                     </table>
                   </div>
-                )}
+                );
+              }
 
-                {/* 3.5 Step-by-Step Transformation Rules */}
-                <div className="preview-page">
+              previewPages.push(
+                <div key="transform-rules" className="preview-page">
                   <h2>3.5 Data Transformation Rules</h2>
                   {mapping.transformation_rules_list && mapping.transformation_rules_list.length > 0 ? (
                     mapping.transformation_rules_list.map((rule, idx) => (
@@ -1219,10 +1131,11 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                     </div>
                   )}
                 </div>
+              );
 
-                {/* 3.6 SQL / Pseudo-SQL Guidance */}
-                {mapping.kpi_sql_guidance && mapping.kpi_sql_guidance.length > 0 && (
-                  <div className="preview-page">
+              if (mapping.kpi_sql_guidance && mapping.kpi_sql_guidance.length > 0) {
+                previewPages.push(
+                  <div key="sql-guidance" className="preview-page">
                     <h2>3.6 SQL & Logic Snippet Guidance</h2>
                     <p className="mb-4 text-xs text-gray-500">
                       Standard query blocks demonstrating joins, groups, and filters to calculate KPIs:
@@ -1236,11 +1149,12 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                       </div>
                     ))}
                   </div>
-                )}
+                );
+              }
 
-                {/* 3.7 Database Relationship Diagram */}
-                {mapping.db_relationship_diagrams && mapping.db_relationship_diagrams.length > 0 && (
-                  <div className="preview-page">
+              if (mapping.db_relationship_diagrams && mapping.db_relationship_diagrams.length > 0) {
+                previewPages.push(
+                  <div key="db-rel" className="preview-page">
                     <h2>3.7 Database Entity-Relationship Diagram</h2>
                     <p className="mb-4 text-xs text-gray-500">
                       Logical schema joins connecting facts and dimensions:
@@ -1254,11 +1168,12 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                       </div>
                     ))}
                   </div>
-                )}
+                );
+              }
 
-                {/* 3.8 Data Lineage Diagram */}
-                {mapping.data_lineage_diagrams && mapping.data_lineage_diagrams.length > 0 && (
-                  <div className="preview-page">
+              if (mapping.data_lineage_diagrams && mapping.data_lineage_diagrams.length > 0) {
+                previewPages.push(
+                  <div key="lineage" className="preview-page">
                     <h2>3.8 Source-to-KPI Data Lineage</h2>
                     <p className="mb-4 text-xs text-gray-500">
                       End-to-end data tracing from ERP transactional source to executive dashboard KPIs:
@@ -1272,10 +1187,11 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                       </div>
                     ))}
                   </div>
-                )}
+                );
+              }
 
-                {/* 3.9 Technical Mappings Details */}
-                <div className="preview-page">
+              previewPages.push(
+                <div key="tech-mappings" className="preview-page">
                   <h2>3.9 Technical Mappings Details</h2>
                   <div className="overflow-x-auto">
                     <table className="min-w-full text-xs">
@@ -1320,9 +1236,10 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                     </table>
                   </div>
                 </div>
+              );
 
-                {/* 3.10 Security Section */}
-                <div className="preview-page">
+              previewPages.push(
+                <div key="security" className="preview-page">
                   <h2>3.10 Security & Access Recommendations</h2>
                   {mapping.security_access_grid && mapping.security_access_grid.length > 0 ? (
                     <table>
@@ -1362,9 +1279,10 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                     </div>
                   )}
                 </div>
+              );
 
-                {/* 4. Load Strategy */}
-                <div className="preview-page">
+              previewPages.push(
+                <div key="load-strategy" className="preview-page">
                   <h2>4. Data Load Strategy</h2>
                   <div className="space-y-4 text-sm mt-4 text-xs">
                     <div className="p-3 bg-gray-50 border-l-4 border-gray-400">
@@ -1389,9 +1307,10 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                     </div>
                   </div>
                 </div>
+              );
 
-                {/* 5. Quality & Validation */}
-                <div className="preview-page">
+              previewPages.push(
+                <div key="quality" className="preview-page">
                   <h2>5. Data Quality & Validation Matrix</h2>
                   {mapping.data_quality_validation_matrix && mapping.data_quality_validation_matrix.length > 0 ? (
                     <table>
@@ -1427,9 +1346,10 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                     </div>
                   )}
                 </div>
+              );
 
-                {/* 6. Testing Strategy */}
-                <div className="preview-page">
+              previewPages.push(
+                <div key="testing" className="preview-page">
                   <h2>6. Testing Strategy & Scenarios</h2>
                   {mapping.testing_strategy_matrix && mapping.testing_strategy_matrix.length > 0 ? (
                     <table>
@@ -1467,10 +1387,11 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                     </div>
                   )}
                 </div>
+              );
 
-                {/* Data Dictionary */}
-                {mapping.data_dictionary && mapping.data_dictionary.length > 0 && (
-                  <div className="preview-page">
+              if (mapping.data_dictionary && mapping.data_dictionary.length > 0) {
+                previewPages.push(
+                  <div key="data-dict" className="preview-page">
                     <h2>7. Data Dictionary</h2>
                     <p className="mb-4 text-xs text-gray-500">
                       Standard metadata dictionary for business fields:
@@ -1498,11 +1419,12 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                       </tbody>
                     </table>
                   </div>
-                )}
+                );
+              }
 
-                {/* Traceability Matrix */}
-                {mapping.traceability_matrix && mapping.traceability_matrix.length > 0 && (
-                  <div className="preview-page">
+              if (mapping.traceability_matrix && mapping.traceability_matrix.length > 0) {
+                previewPages.push(
+                  <div key="traceability" className="preview-page">
                     <h2>8. KPI-to-Table Traceability Matrix</h2>
                     <p className="mb-4 text-xs text-gray-500">
                       Advisory traceability tracking KPIs back to tables and target reports:
@@ -1530,10 +1452,11 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                       </tbody>
                     </table>
                   </div>
-                )}
+                );
+              }
 
-                {/* Glossary */}
-                <div className="preview-page">
+              previewPages.push(
+                <div key="glossary" className="preview-page">
                   <h2>9. Glossary</h2>
                   <table>
                     <thead>
@@ -1552,8 +1475,90 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
                     </tbody>
                   </table>
                 </div>
-              </div>
-            )}
+              );
+
+              const totalPages = previewPages.length;
+
+              return (
+                <div className="max-w-4xl mx-auto space-y-6">
+                  {/* Pagination controls for screen */}
+                  <div className="flex justify-between items-center bg-[#1B1B1B] border border-[#303030] p-3 rounded-sm print:hidden shadow-lg">
+                    <div className="text-xs text-[#B0B0B0] font-sans flex items-center gap-2">
+                      <span>Viewing Page</span>
+                      <select
+                        value={previewPageNum}
+                        onChange={(e) => setPreviewPageNum(Number(e.target.value))}
+                        className="bg-[#111] text-[#FFE600] border border-[#303030] rounded px-2 py-0.5 text-xs font-bold focus:border-[#FFE600] focus:outline-none cursor-pointer"
+                      >
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(num => (
+                          <option key={num} value={num} className="bg-[#1B1B1B] text-[#F5F5F5]">
+                            {num}
+                          </option>
+                        ))}
+                      </select>
+                      <span>of <span className="font-bold text-[#F5F5F5]">{totalPages}</span></span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setPreviewPageNum(p => Math.max(1, p - 1))}
+                        disabled={previewPageNum === 1}
+                        className="button-secondary !py-1 !px-2 disabled:opacity-40 disabled:pointer-events-none text-xs"
+                      >
+                        &larr; Prev
+                      </button>
+                      <button
+                        onClick={() => setPreviewPageNum(p => Math.min(totalPages, p + 1))}
+                        disabled={previewPageNum === totalPages}
+                        className="button-secondary !py-1 !px-2 disabled:opacity-40 disabled:pointer-events-none text-xs"
+                      >
+                        Next &rarr;
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="preview-doc space-y-8 print:space-y-0 print:bg-white">
+                    <style>{`
+                      .preview-page {
+                        background: #ffffff;
+                        color: #111111;
+                        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+                        border: 1px solid #e5e7eb;
+                        margin-bottom: 2rem;
+                        padding: 3rem;
+                        min-height: 1056px;
+                        position: relative;
+                        page-break-after: always;
+                        break-after: page;
+                      }
+                      .preview-doc h1 { font-size: 2.2rem; font-weight: bold; margin-bottom: 1.5rem; color: #111; border-bottom: 3px solid #FFE600; padding-bottom: 0.75rem; }
+                      .preview-doc h2 { font-size: 1.4rem; font-weight: bold; margin-top: 1rem; margin-bottom: 0.75rem; color: #1B1B1B; border-bottom: 1.5px solid #1B1B1B; padding-bottom: 0.35rem; }
+                      .preview-doc h3 { font-size: 1.15rem; font-weight: 600; margin-top: 1.25rem; margin-bottom: 0.5rem; color: #333; }
+                      .preview-doc p { font-size: 0.95rem; line-height: 1.6; margin-bottom: 1rem; color: #333; }
+                      .preview-doc table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; font-size: 0.85rem; }
+                      .preview-doc th, .preview-doc td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+                      .preview-doc th { background-color: #1b1b1b; color: #ffffff; font-weight: bold; }
+                      .preview-doc tr:nth-child(even) { background-color: #f9f9f9; }
+                      @media print {
+                        .preview-page {
+                          box-shadow: none !important;
+                          border: none !important;
+                          margin: 0 !important;
+                          padding: 0 !important;
+                          min-height: auto !important;
+                        }
+                      }
+                    `}</style>
+                    
+                    {previewPages.map((page, index) => (
+                      <div key={page.key} className={`${previewPageNum === index + 1 ? 'block' : 'hidden print:block'}`}>
+                        {page}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
           </div>
         )}
       </div>

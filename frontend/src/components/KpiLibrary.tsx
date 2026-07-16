@@ -1,4 +1,4 @@
-import { Check, CheckCheck, Download, Edit3, Search, X, ChevronRight } from "lucide-react";
+import { Check, CheckCheck, Download, Edit3, Search, X, ChevronRight, FileSearch } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, exportUrl } from "../lib/api";
@@ -139,9 +139,18 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
     }
   }
 
+  // Split items into AI-generated and document-parsed
+  const aiItems = useMemo(() => library.items.filter(
+    (item) => !item.source || item.source === "ai_generated" || item.source === "manual"
+  ), [library.items]);
+
+  const docParsedItems = useMemo(() => library.items.filter(
+    (item) => item.source === "document_parsed" || item.source === "excel_import"
+  ), [library.items]);
+
   const filtered = useMemo(() => {
     const needle = query.toLowerCase();
-    return [...library.items]
+    return [...aiItems]
       .filter((item) => JSON.stringify(item).toLowerCase().includes(needle))
       .sort((a, b) => {
         const valA = a[sortKey];
@@ -151,7 +160,18 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
         }
         return String(valA ?? "").localeCompare(String(valB ?? ""));
       });
-  }, [library.items, query, sortKey]);
+  }, [aiItems, query, sortKey]);
+
+  const [docPage, setDocPage] = useState(1);
+  const docPageSize = 6;
+  const filteredDocItems = useMemo(() => {
+    const needle = query.toLowerCase();
+    return [...docParsedItems]
+      .filter((item) => JSON.stringify(item).toLowerCase().includes(needle))
+      .sort((a, b) => String(a.kpi_name ?? "").localeCompare(String(b.kpi_name ?? "")));
+  }, [docParsedItems, query]);
+  const docPaged = filteredDocItems.slice((docPage - 1) * docPageSize, docPage * docPageSize);
+  const docPages = Math.max(1, Math.ceil(filteredDocItems.length / docPageSize));
 
   const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -419,7 +439,139 @@ export function KpiLibrary({ onChange, exports }: { onChange: () => void; export
         </div>
       </div>
 
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* DOCUMENT-PARSED KPI SECTION                                    */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {docParsedItems.length > 0 && (
+        <div className="mt-8 border-t-2 border-cyan-500/30 pt-8">
+          <div className="mb-6 flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center bg-cyan-500/10 border border-cyan-500/30 rounded-sm">
+                <FileSearch size={20} className="text-cyan-400" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl font-semibold text-[#F5F5F5]">Document-Parsed KPIs</h3>
+                  <span className="text-[9px] font-bold uppercase tracking-wider bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded-sm">
+                    📄 Parsed from Document
+                  </span>
+                </div>
+                <p className="mt-1 max-w-2xl text-xs leading-5 text-[#B0B0B0]">
+                  These KPIs were extracted from uploaded business documents. Review, edit, and approve/reject them independently.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="inline-flex items-center justify-center gap-2 border border-cyan-500/30 bg-[#1B1B1B] px-3 py-2 text-xs font-semibold text-[#F5F5F5] transition hover:border-rose-500 hover:text-rose-400 disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={!docParsedItems.length}
+                onClick={() => setStatus(docParsedItems.map((item) => item.id), "rejected")}
+              >
+                <X size={14} />
+                Reject All
+              </button>
+              <button
+                className="inline-flex items-center justify-center gap-2 bg-cyan-500 px-3 py-2 text-xs font-semibold text-[#111] transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={!docParsedItems.length}
+                onClick={() => setStatus(docParsedItems.map((item) => item.id), "approved")}
+              >
+                <CheckCheck size={14} />
+                Approve All
+              </button>
+            </div>
+          </div>
 
+          {/* Document-Parsed KPI Table */}
+          <div className="overflow-hidden border border-cyan-500/20 bg-[#1B1B1B] rounded-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1200px] border-collapse text-left text-sm">
+                <thead className="bg-[#111111] text-[10px] uppercase tracking-[0.18em] text-cyan-400 border-b border-cyan-500/20">
+                  <tr>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Source</th>
+                    {columns.map(([, label]) => <th key={label} className="px-4 py-3">{label}</th>)}
+                    <th className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#303030]">
+                  {docPaged.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="align-middle hover:bg-cyan-500/5 transition-colors cursor-pointer"
+                      onClick={() => {
+                        setSelectedKpi(item);
+                        setIsEditing(false);
+                        setEditForm(item);
+                      }}
+                    >
+                      <td className="px-4 py-4">
+                        <span className={`border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${item.status === "approved" ? "border-emerald-500 text-emerald-400 bg-emerald-500/10" : item.status === "rejected" ? "border-rose-500 text-rose-400 bg-rose-500/10" : "border-[#B0B0B0]/40 text-[#B0B0B0] bg-[#B0B0B0]/5"}`}>
+                          {item.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className={`border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                          item.source === "excel_import"
+                            ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10"
+                            : "border-cyan-500/40 text-cyan-400 bg-cyan-500/10"
+                        }`}>
+                          {item.source === "excel_import" ? "📊 Excel" : "📄 Document"}
+                        </span>
+                      </td>
+                      {columns.map(([key]) => (
+                        <td key={key} className="max-w-[260px] px-4 py-4 text-[#F5F5F5] text-xs leading-relaxed truncate">
+                          {String(item[key] ?? "") || "—"}
+                        </td>
+                      ))}
+                      <td className="px-4 py-4 text-right">
+                        <div className="flex justify-end gap-1.5">
+                          <button
+                            className="icon-button !h-8 !w-8"
+                            title="Approve KPI"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setStatus([item.id], "approved");
+                            }}
+                          >
+                            <Check size={14} />
+                          </button>
+                          <button
+                            className="icon-button !h-8 !w-8"
+                            title="Reject KPI"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setStatus([item.id], "rejected");
+                            }}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {!docPaged.length && (
+                    <tr>
+                      <td className="px-4 py-8 text-center text-[#B0B0B0]/40 text-xs" colSpan={columns.length + 3}>
+                        No document-parsed KPIs match the current search.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Pagination for Document KPIs */}
+          <div className="mt-4 flex items-center justify-between text-xs text-[#B0B0B0]">
+            <span className="text-cyan-400 font-semibold">{filteredDocItems.length} document-parsed KPI(s)</span>
+            <div className="flex items-center gap-2">
+              <button className="button-secondary !px-3 !py-1.5" disabled={docPage === 1} onClick={() => setDocPage((v) => v - 1)}>Previous</button>
+              <span>Page {docPage} of {docPages}</span>
+              <button className="button-secondary !px-3 !py-1.5" disabled={docPage === docPages} onClick={() => setDocPage((v) => v + 1)}>Next</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* KPI Details Side Drawer */}
       {selectedKpi && (

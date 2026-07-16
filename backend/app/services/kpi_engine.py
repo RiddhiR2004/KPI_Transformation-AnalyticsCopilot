@@ -417,3 +417,192 @@ def recommendations(kpis: list[KPI], context: BusinessContext) -> dict[str, Any]
             "Use clear, designated data owners for each KPI to establish accountabilities."
         ],
     }
+
+def derive_kpis_from_document_text(
+    text: str,
+    context: BusinessContext,
+    source: str = "document_parsed",
+) -> list[KPI]:
+    import re
+    import uuid
+    from app.models import KPIStatus
+    from app.models import KPI
+
+    kpis: list[KPI] = []
+    seen_names: set[str] = set()
+
+    kpi_indicators = [
+        r"(?:KPI|metric|measure|indicator|ratio|rate|score|index|percentage|efficiency|effectiveness|utilization|cost|margin|turnover|time|retention|revenue|mrr|nrr|cac|dso)",
+    ]
+
+    text_clean = text.replace("\n", " ")
+    sentences = re.split(r'(?<=[.!?])\s+', text_clean)
+    
+    for sentence in sentences:
+        sentence_stripped = sentence.strip()
+        if not sentence_stripped or len(sentence_stripped) < 10:
+            continue
+
+        is_kpi_line = False
+        for pattern in kpi_indicators:
+            if re.search(pattern, sentence_stripped, re.IGNORECASE):
+                is_kpi_line = True
+                break
+
+        if not is_kpi_line:
+            continue
+
+        potential_name = sentence_stripped
+        potential_name = re.sub(r"^[\s\-•●○▪▸►\d.):]+", "", potential_name).strip()
+
+        if len(potential_name) > 60:
+            title_case = re.findall(r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)', potential_name)
+            if title_case:
+                best_match = title_case[0]
+                for phrase in title_case:
+                    if any(re.search(p, phrase, re.IGNORECASE) for p in kpi_indicators):
+                        best_match = phrase
+                        break
+                potential_name = best_match
+            else:
+                for sep in [",", ":", "–", "—", " - ", "which", "that"]:
+                    if sep in potential_name.lower():
+                        parts = re.split(f"(?i){re.escape(sep)}", potential_name, 1)
+                        if len(parts[0].strip()) > 5:
+                            potential_name = parts[0].strip()
+                            break
+                if len(potential_name) > 80:
+                    potential_name = potential_name[:80].strip()
+
+        if not potential_name or len(potential_name) < 3:
+            continue
+
+        name_key = potential_name.lower().strip()
+        if name_key in seen_names:
+            continue
+        seen_names.add(name_key)
+
+        functional_area = "General"
+        fa_keywords = {
+            "Finance": ["revenue", "cost", "profit", "margin", "budget", "expense", "cash", "roi", "ebitda"],
+            "Human Resources": ["employee", "attrition", "retention", "headcount", "training", "hr", "workforce", "talent"],
+            "Supply Chain": ["supply", "inventory", "logistics", "delivery", "warehouse", "procurement", "lead time"],
+            "Sales": ["sales", "conversion", "pipeline", "deal", "quota", "booking", "order"],
+            "Marketing": ["marketing", "campaign", "brand", "engagement", "acquisition", "cac", "ltv"],
+            "Operations": ["operational", "downtime", "throughput", "capacity", "oee", "cycle time", "yield"],
+            "Quality": ["quality", "defect", "compliance", "audit", "inspection", "ncr", "scrap"],
+            "Customer Service": ["customer", "satisfaction", "nps", "sla", "resolution", "complaint", "csat"],
+        }
+        line_lower = sentence_stripped.lower()
+        for area, keywords in fa_keywords.items():
+            if any(kw in line_lower for kw in keywords):
+                functional_area = area
+                break
+
+        kpi_id = f"KPI-DOC-{uuid.uuid4().hex[:6].upper()}"
+        kpis.append(
+            KPI(
+                id=kpi_id,
+                kpi_name=potential_name,
+                functional_area=functional_area,
+                kra="To Be Defined",
+                kpi_category="Operational",
+                business_definition="",
+                kpi_description=f"Extracted from uploaded document. Original context: {sentence_stripped[:200]}",
+                why_important="Identified as a relevant metric from the client's business documentation.",
+                formula="TBD",
+                numerator="",
+                denominator="",
+                source_system="TBD",
+                sap_module="",
+                business_owner="",
+                data_owner="",
+                refresh_cadence="TBD",
+                recommended_target_range="",
+                recommended_threshold_range="",
+                strategic_focus_area="",
+                standard_driver="",
+                sector_driver="",
+                value_drivers=[],
+                industry_tags=[context.industry] if context.industry else [],
+                recommendation_score=calculate_recommendation_score(
+                    {"kpi_name": potential_name, "functional_area": functional_area,
+                     "kra": "To Be Defined", "value_drivers": [], "industry_tags": [],
+                     "kpi_description": sentence_stripped},
+                    context,
+                ),
+                status=KPIStatus.draft,
+                source=source,
+                notes=f"Auto-extracted from document. Requires review and enrichment.",
+            )
+        )
+
+        if len(kpis) >= 30:
+            break
+
+    return kpis
+
+def derive_kpis_from_excel_columns(
+    headers: list[str],
+    sample_rows: list[dict],
+    context: BusinessContext,
+) -> list[KPI]:
+    import uuid
+    from app.models import KPIStatus
+    from app.models import KPI
+
+    kpis: list[KPI] = []
+    seen: set[str] = set()
+
+    metric_keywords = [
+        "rate", "ratio", "score", "index", "count", "total", "average", "avg",
+        "percentage", "percent", "%", "amount", "revenue", "cost", "profit",
+        "margin", "efficiency", "utilization", "throughput", "yield", "target",
+        "actual", "variance", "kpi", "metric", "measure", "performance",
+    ]
+
+    for header in headers:
+        if not header or not header.strip():
+            continue
+
+        header_clean = header.strip()
+        header_lower = header_clean.lower()
+
+        is_metric = any(kw in header_lower for kw in metric_keywords)
+        
+        if is_metric and header_lower not in seen:
+            seen.add(header_lower)
+            kpi_id = f"KPI-XLS-{uuid.uuid4().hex[:6].upper()}"
+            kpis.append(
+                KPI(
+                    id=kpi_id,
+                    kpi_name=header_clean,
+                    functional_area=context.functional_areas[0] if context.functional_areas else "General",
+                    kra="To Be Defined",
+                    kpi_category="Operational",
+                    business_definition="",
+                    kpi_description=f"Extracted from dataset column: {header_clean}",
+                    why_important="Identified as a numeric measure from uploaded dataset.",
+                    formula="TBD",
+                    numerator="",
+                    denominator="",
+                    source_system="TBD",
+                    sap_module="",
+                    business_owner="",
+                    data_owner="",
+                    refresh_cadence="TBD",
+                    recommended_target_range="",
+                    recommended_threshold_range="",
+                    strategic_focus_area="",
+                    standard_driver="",
+                    sector_driver="",
+                    value_drivers=[],
+                    industry_tags=[context.industry] if context.industry else [],
+                    recommendation_score=60,
+                    status=KPIStatus.draft,
+                    source="excel_import",
+                    notes="Auto-extracted from Excel column.",
+                )
+            )
+
+    return kpis

@@ -11,6 +11,7 @@ import { ClientSelectionPage } from "./pages/ClientSelectionPage";
 import { AuditLogPage } from "./pages/AuditLogPage";
 import { KpiDriverTreePage } from "./pages/KpiDriverTreePage";
 import { TechnicalDataMappingPage } from "./pages/TechnicalDataMappingPage";
+import { KpiDashboardPage } from "./pages/KpiDashboardPage";
 import { api } from "./lib/api";
 import type { ActivityEvent, ExportItem, WorkflowStatus } from "./types/api";
 
@@ -75,7 +76,7 @@ export default function App() {
         <Route path="/step-3" element={<KpiDriverTreePage onChange={refresh} />} />
         <Route path="/step-4" element={<FunctionalSpecificationPage onChange={refresh} exports={exports} />} />
         <Route path="/step-5" element={<TechnicalDataMappingPage onChange={refresh} exports={exports} />} />
-        <Route path="/step-6" element={<RestrictedStepPage step="06" title="Dashboard & Visualization Design" />} />
+        <Route path="/step-6" element={<KpiDashboardPage onChange={refresh} />} />
         <Route path="/step-7" element={<RestrictedStepPage step="07" title="Implementation Roadmap" />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

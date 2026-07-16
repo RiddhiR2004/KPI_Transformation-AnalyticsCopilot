@@ -84,6 +84,14 @@ export const api = {
       body: formData,
     });
   },
+  uploadKpiDocument: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request<KPILibrary>("/kpi-library/upload-document", {
+      method: "POST",
+      body: formData,
+    });
+  },
   getFunctionalSpec: () => request<FunctionalSpecification>("/functional-spec"),
   saveFunctionalSpec: (spec: FunctionalSpecification) =>
     request<FunctionalSpecification>("/functional-spec", {

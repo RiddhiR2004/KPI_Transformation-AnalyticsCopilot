@@ -56,6 +56,7 @@ export type KPI = {
   industry_tags: string[];
   recommendation_score: number;
   status: KPIStatus;
+  source?: "ai_generated" | "excel_import" | "document_parsed" | "manual";
 };
 
 export type KPILibrary = {
