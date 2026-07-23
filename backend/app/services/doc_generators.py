@@ -2807,6 +2807,55 @@ def generate_docx_tdm(path: Path, mapping: Any, context: BusinessContext) -> Non
         cell_val.width = Inches(4.8)
 
     doc.add_page_break()
+
+    # --- Table of Contents Section (DOCX) ---
+    toc_title_p = doc.add_paragraph()
+    toc_title_p.paragraph_format.space_before = Pt(20)
+    toc_title_p.paragraph_format.space_after = Pt(8)
+    toc_title_run = toc_title_p.add_run("Table of Contents")
+    toc_title_run.font.size = Pt(13)
+    toc_title_run.font.bold = True
+    toc_title_run.font.color.rgb = RGBColor(27, 27, 27)
+
+    toc_items = [
+        ("1. Document Control & Organization", "2"),
+        ("2. Object Summary", "4"),
+        ("3. Technical Specifications", "5"),
+        ("   3.1 Technical Data Flow Blueprint", "5"),
+        ("   3.2 Data Models Specification", "6"),
+        ("   3.3 Physical Table Definitions", "7"),
+        ("   3.4 Field-Level Source Mappings", "8"),
+        ("   3.5 Data Transformation Rules", "9"),
+        ("   3.6 SQL & Logic Snippet Guidance", "10"),
+        ("   3.7 Database Entity-Relationship Diagram", "11"),
+        ("   3.8 Source-to-KPI Data Lineage", "12"),
+        ("   3.9 Technical Mappings Details", "13"),
+        ("   3.10 Security & Access Recommendations", "14"),
+        ("4. Data Load Strategy", "15"),
+        ("5. Data Quality & Validation Matrix", "16"),
+        ("6. Testing Strategy & Scenarios", "17"),
+        ("7. Data Dictionary", "18"),
+        ("8. KPI-to-Table Traceability Matrix", "19"),
+        ("9. Glossary", "20"),
+    ]
+
+    for title, pagenum in toc_items:
+        p = doc.add_paragraph()
+        p.paragraph_format.tab_stops.add_tab_stop(Inches(7.0), alignment=WD_TAB_ALIGNMENT.RIGHT, leader=WD_TAB_LEADER.DOTS)
+        p.paragraph_format.space_before = Pt(3.5)
+        p.paragraph_format.space_after = Pt(3.5)
+        
+        run_title = p.add_run(title)
+        run_title.font.name = 'Calibri'
+        run_title.font.size = Pt(9.5)
+        if not title.startswith("   "):
+            run_title.font.bold = True
+        
+        run_dots = p.add_run(f"\t{pagenum}")
+        run_dots.font.name = 'Calibri'
+        run_dots.font.size = Pt(9.5)
+
+    doc.add_page_break()
     # 2. Object Summary
     add_h1("2. Object Summary")
     obj_summary_list = getattr(mapping, "object_summary", [])
@@ -3064,6 +3113,95 @@ def generate_pdf_tdm(path: Path, mapping: Any, context: BusinessContext, doc_nam
         ('RIGHTPADDING', (0, 0), (-1, -1), 8),
     ]))
     story.append(meta_table)
+    story.append(PageBreak())
+
+    # --- Table of Contents (PDF) ---
+    sub_section_title_style = ParagraphStyle(
+        'SubSectionTitleTDD',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=14,
+        leading=18,
+        textColor=colors.HexColor("#1B1B1B"),
+        spaceBefore=14,
+        spaceAfter=8,
+        keepWithNext=True
+    )
+    story.append(Paragraph("Table of Contents", sub_section_title_style))
+    story.append(Spacer(1, 4))
+    
+    toc_page_style = ParagraphStyle(
+        'TocPageTDD',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8.5,
+        leading=11,
+        textColor=colors.HexColor("#B49600"),
+        alignment=2
+    )
+
+    toc_items = [
+        ("1. Document Control & Organization", "2"),
+        ("2. Object Summary", "4"),
+        ("3. Technical Specifications", "5"),
+        ("   3.1 Technical Data Flow Blueprint", "5"),
+        ("   3.2 Data Models Specification", "6"),
+        ("   3.3 Physical Table Definitions", "7"),
+        ("   3.4 Field-Level Source Mappings", "8"),
+        ("   3.5 Data Transformation Rules", "9"),
+        ("   3.6 SQL & Logic Snippet Guidance", "10"),
+        ("   3.7 Database Entity-Relationship Diagram", "11"),
+        ("   3.8 Source-to-KPI Data Lineage", "12"),
+        ("   3.9 Technical Mappings Details", "13"),
+        ("   3.10 Security & Access Recommendations", "14"),
+        ("4. Data Load Strategy", "15"),
+        ("5. Data Quality & Validation Matrix", "16"),
+        ("6. Testing Strategy & Scenarios", "17"),
+        ("7. Data Dictionary", "18"),
+        ("8. KPI-to-Table Traceability Matrix", "19"),
+        ("9. Glossary", "20"),
+    ]
+
+    toc_data = []
+    for title, pagenum in toc_items:
+        is_sub = title.startswith("   3.")
+        
+        if is_sub:
+            item_title_style = ParagraphStyle(
+                'TocSubTitleTDD',
+                parent=styles['Normal'],
+                fontName='Helvetica',
+                fontSize=8.5,
+                leading=11,
+                textColor=colors.HexColor("#444444"),
+                leftIndent=15
+            )
+        else:
+            item_title_style = ParagraphStyle(
+                'TocMainTitleTDD',
+                parent=styles['Normal'],
+                fontName='Helvetica-Bold',
+                fontSize=9,
+                leading=12,
+                textColor=colors.HexColor("#1B1B1B")
+            )
+            
+        toc_data.append([
+            Paragraph(title.strip(), item_title_style),
+            Paragraph(". . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .", ParagraphStyle('DotsTDD', parent=styles['Normal'], fontName='Helvetica', fontSize=7, textColor=colors.HexColor("#CCCCCC"), alignment=1)),
+            Paragraph(pagenum, toc_page_style)
+        ])
+
+    toc_table = Table(toc_data, colWidths=[2.8 * inch, 3.1 * inch, 0.6 * inch])
+    toc_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,0), (-1,-1), 2),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+    ]))
+    story.append(toc_table)
+    story.append(Spacer(1, 15))
     story.append(PageBreak())
 
     # Section helper

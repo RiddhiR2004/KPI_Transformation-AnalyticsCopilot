@@ -875,6 +875,110 @@ export function TechnicalDataMappingPage({ onChange, exports }: { onChange: () =
               );
 
               previewPages.push(
+                <div key="toc" className="preview-page">
+                  <h2>Table of Contents</h2>
+                  <div className="h-4"></div>
+                  <div className="bg-gray-50 border border-gray-200 p-6 rounded-sm space-y-3 font-sans">
+                    <p className="text-xs font-bold uppercase tracking-wider text-gray-700 border-b pb-2 border-gray-300 mb-3">Document Structure</p>
+                    <div className="space-y-2 text-xs text-gray-700">
+                      <div className="flex justify-between border-b border-dotted border-gray-300 pb-1 font-semibold">
+                        <span>1. Document Control & Organization</span>
+                        <span className="text-gray-500 font-mono">Page 2</span>
+                      </div>
+                      <div className="flex justify-between border-b border-dotted border-gray-300 pb-1 font-semibold">
+                        <span>2. Object Summary</span>
+                        <span className="text-gray-500 font-mono">Page 4</span>
+                      </div>
+                      <div className="flex justify-between border-b border-dotted border-gray-300 pb-1 font-semibold">
+                        <span>3. Technical Specifications</span>
+                        <span className="text-gray-500 font-mono">Page 5</span>
+                      </div>
+                      <div className="pl-4 space-y-1.5 text-[11px] text-gray-600">
+                        <div className="flex justify-between border-b border-gray-100 pb-0.5">
+                          <span>3.1 Technical Data Flow Blueprint</span>
+                          <span className="text-gray-400 font-mono">Page 5</span>
+                        </div>
+                        <div className="flex justify-between border-b border-gray-100 pb-0.5">
+                          <span>3.2 Data Models Specification</span>
+                          <span className="text-gray-400 font-mono">Page 6</span>
+                        </div>
+                        {mapping.physical_table_definitions && mapping.physical_table_definitions.length > 0 && (
+                          <div className="flex justify-between border-b border-gray-100 pb-0.5">
+                            <span>3.3 Physical Table Definitions</span>
+                            <span className="text-gray-400 font-mono">Page 7</span>
+                          </div>
+                        )}
+                        {mapping.field_level_mappings && mapping.field_level_mappings.length > 0 && (
+                          <div className="flex justify-between border-b border-gray-100 pb-0.5">
+                            <span>3.4 Field-Level Source Mappings</span>
+                            <span className="text-gray-400 font-mono">Page 8</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between border-b border-gray-100 pb-0.5">
+                          <span>3.5 Data Transformation Rules</span>
+                          <span className="text-gray-400 font-mono">Page 9</span>
+                        </div>
+                        {mapping.kpi_sql_guidance && mapping.kpi_sql_guidance.length > 0 && (
+                          <div className="flex justify-between border-b border-gray-100 pb-0.5">
+                            <span>3.6 SQL & Logic Snippet Guidance</span>
+                            <span className="text-gray-400 font-mono">Page 10</span>
+                          </div>
+                        )}
+                        {mapping.db_relationship_diagrams && mapping.db_relationship_diagrams.length > 0 && (
+                          <div className="flex justify-between border-b border-gray-100 pb-0.5">
+                            <span>3.7 Database Entity-Relationship Diagram</span>
+                            <span className="text-gray-400 font-mono">Page 11</span>
+                          </div>
+                        )}
+                        {mapping.data_lineage_diagrams && mapping.data_lineage_diagrams.length > 0 && (
+                          <div className="flex justify-between border-b border-gray-100 pb-0.5">
+                            <span>3.8 Source-to-KPI Data Lineage</span>
+                            <span className="text-gray-400 font-mono">Page 12</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between border-b border-gray-100 pb-0.5">
+                          <span>3.9 Technical Mappings Details</span>
+                          <span className="text-gray-400 font-mono">Page 13</span>
+                        </div>
+                        <div className="flex justify-between border-b border-gray-100 pb-0.5">
+                          <span>3.10 Security & Access Recommendations</span>
+                          <span className="text-gray-400 font-mono">Page 14</span>
+                        </div>
+                      </div>
+                      <div className="flex justify-between border-b border-dotted border-gray-300 pb-1 font-semibold pt-1">
+                        <span>4. Data Load Strategy</span>
+                        <span className="text-gray-500 font-mono">Page 15</span>
+                      </div>
+                      <div className="flex justify-between border-b border-dotted border-gray-300 pb-1 font-semibold">
+                        <span>5. Data Quality & Validation Matrix</span>
+                        <span className="text-gray-500 font-mono">Page 16</span>
+                      </div>
+                      <div className="flex justify-between border-b border-dotted border-gray-300 pb-1 font-semibold">
+                        <span>6. Testing Strategy & Scenarios</span>
+                        <span className="text-gray-500 font-mono">Page 17</span>
+                      </div>
+                      {mapping.data_dictionary && mapping.data_dictionary.length > 0 && (
+                        <div className="flex justify-between border-b border-dotted border-gray-300 pb-1 font-semibold">
+                          <span>7. Data Dictionary</span>
+                          <span className="text-gray-500 font-mono">Page 18</span>
+                        </div>
+                      )}
+                      {mapping.traceability_matrix && mapping.traceability_matrix.length > 0 && (
+                        <div className="flex justify-between border-b border-dotted border-gray-300 pb-1 font-semibold">
+                          <span>8. KPI-to-Table Traceability Matrix</span>
+                          <span className="text-gray-500 font-mono">Page 19</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between border-b border-dotted border-gray-300 pb-1 font-semibold">
+                        <span>9. Glossary</span>
+                        <span className="text-gray-500 font-mono">Page 20</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+
+              previewPages.push(
                 <div key="object-summary" className="preview-page">
                   <h2>2. Object Summary</h2>
                   <p className="mb-4 text-xs text-gray-500">
